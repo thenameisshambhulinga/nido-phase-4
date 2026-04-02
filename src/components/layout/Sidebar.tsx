@@ -64,6 +64,7 @@ const NAV_ITEMS: NavItem[] = [
     module: "clients",
     children: [
       { label: "Client List", path: "/clients" },
+      { label: "Client Addition", path: "/clients/add" },
       { label: "Contracts", path: "/clients/contracts" },
     ],
   },

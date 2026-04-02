@@ -184,7 +184,10 @@ export default function OrderDetailsPage() {
       timestamp: new Date().toISOString(),
       type: "internal" as const,
     };
-    updateOrder(order.id, { comments: [...order.comments, comment] });
+    updateOrder(order.id, {
+      comments: newComment,
+      commentHistory: [...order.commentHistory, comment],
+    });
     setNewComment("");
     toast({ title: "Comment Added" });
   };
@@ -207,7 +210,7 @@ export default function OrderDetailsPage() {
   const handlePreview = (filename: string) =>
     toast({ title: "Preview", description: `Previewing ${filename}` });
 
-  const filteredComments = order.comments.filter(
+  const filteredComments = order.commentHistory.filter(
     (c) => commentFilter === "all" || c.type === commentFilter,
   );
   const STATUS_COLORS: Record<string, string> = {
@@ -242,7 +245,7 @@ export default function OrderDetailsPage() {
 
   return (
     <div>
-      <Header title="Order Details Page" />
+      <Header title="Order History" />
       <div className="p-6 space-y-6 animate-fade-in">
         <Button
           variant="ghost"
@@ -557,7 +560,7 @@ export default function OrderDetailsPage() {
                   Comments & Collaboration
                 </CardTitle>
                 <Badge variant="secondary" className="text-xs">
-                  {order.comments.length} messages
+                  {order.commentHistory.length} messages
                 </Badge>
               </div>
               <div className="flex gap-2">

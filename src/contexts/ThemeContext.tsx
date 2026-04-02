@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { safeReadJson } from "@/lib/storage";
 
 export type ThemeMode = "light" | "dark" | "comfort";
 
@@ -7,13 +8,15 @@ interface ThemeContextType {
   setTheme: (theme: ThemeMode) => void;
 }
 
-const ThemeContext = createContext<ThemeContextType>({ theme: "light", setTheme: () => {} });
+const ThemeContext = createContext<ThemeContextType>({
+  theme: "light",
+  setTheme: () => {},
+});
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    const stored = localStorage.getItem("app-theme");
-    return (stored as ThemeMode) || "light";
-  });
+  const [theme, setTheme] = useState<ThemeMode>(() =>
+    safeReadJson<ThemeMode>("app-theme", "light"),
+  );
 
   useEffect(() => {
     localStorage.setItem("app-theme", theme);

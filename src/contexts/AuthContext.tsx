@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import { safeReadJson } from "@/lib/storage";
 
 export type UserRole =
   | "owner"
@@ -167,15 +168,13 @@ const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem("nido_user");
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState<User | null>(() =>
+    safeReadJson<User | null>("nido_user", null),
+  );
 
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem("nido_users");
-    return saved ? JSON.parse(saved) : DEFAULT_USERS;
-  });
+  const [users, setUsers] = useState<User[]>(() =>
+    safeReadJson<User[]>("nido_users", DEFAULT_USERS),
+  );
 
   useEffect(() => {
     if (user) localStorage.setItem("nido_user", JSON.stringify(user));

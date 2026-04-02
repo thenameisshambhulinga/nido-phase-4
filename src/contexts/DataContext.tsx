@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useEffect,
 } from "react";
+import { safeReadJson } from "@/lib/storage";
 import type {
   GeneralSettings,
   UserRole,
@@ -34,8 +35,10 @@ export interface Order {
   assignedAnalyst: string;
   analystTeam: string;
   totalAmount: number;
-  comments: Comment[];
+  comments?: string;
+  commentHistory: Comment[];
   attachments: string[];
+  serviceType?: string;
 }
 
 export interface OrderItem {
@@ -180,6 +183,106 @@ export interface Role {
   permissions: Record<string, Record<string, boolean>>;
 }
 
+export interface MasterCatalogItem {
+  id: string;
+  productCode: string;
+  name: string;
+  category: string;
+  subCategory: string;
+  brand: string;
+  productType: string;
+  physicalType: string;
+  price: number;
+  discountPrice?: number;
+  status: "In Stock" | "Low Stock" | "Out of Stock";
+  image?: string;
+  description?: string;
+  initialStock: number;
+  minStockThreshold: number;
+  tags?: string[];
+  specification?: string;
+  warranty?: string;
+  hsnCode?: string;
+  dimensionL?: string;
+  dimensionW?: string;
+  dimensionH?: string;
+  dimUnit?: string;
+  weight?: string;
+  weightUnit?: string;
+  customsDeclaration?: string;
+  primaryVendor?: string;
+  vendorSku?: string;
+  leadTime?: string;
+  vendorContact?: string;
+  vendorEmail?: string;
+  vendorPhone?: string;
+  vendorPhone2?: string;
+  trackPerformance?: boolean;
+  performanceRating?: number;
+}
+
+export interface ClientCatalogItem extends MasterCatalogItem {
+  clientId: string;
+  masterProductId: string;
+  stock: number;
+  minStock: number;
+}
+
+export interface PricingRule {
+  id: string;
+  name: string;
+  status: "active" | "inactive";
+  ruleType: "Volume-Based" | "Tiered Pricing";
+  minimumQuantity: number;
+  categories: string[];
+  products: string[];
+  adjustmentType: "discount" | "markup";
+  valueType: "percentage" | "fixed";
+  value: number;
+  startDate: string;
+  endDate: string;
+  applyBeforeTax?: boolean;
+}
+
+export interface DiscountRule {
+  id: string;
+  name: string;
+  status: "active" | "inactive";
+  ruleType: "Catalogue-Based" | "Volume-Based";
+  categories: string[];
+  products: string[];
+  minimumOrderAmount: number;
+  discountPercent: number;
+  maxUsagePerUser: number;
+  stackable: boolean;
+  startDate?: string;
+  endDate?: string;
+  applyBeforeTax?: boolean;
+}
+
+export interface TaxSetting {
+  id: string;
+  taxType: string;
+  taxRate: number;
+  taxRegistrationNo: string;
+  active: boolean;
+}
+
+export interface RuleConflict {
+  id: string;
+  severity: "warning" | "high";
+  message: string;
+  ruleIds: string[];
+}
+
+export interface PricingComputation {
+  baseAmount: number;
+  adjustedAmount: number;
+  discountedAmount: number;
+  taxedAmount: number;
+  total: number;
+}
+
 interface DataContextType {
   orders: Order[];
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
@@ -196,8 +299,14 @@ interface DataContextType {
   generalSettings: Record<string, GeneralSettings>;
   userRoles: UserRole[];
   appUsers: AppUser[];
+  masterCatalogItems: MasterCatalogItem[];
+  clientCatalogItems: Record<string, ClientCatalogItem[]>;
+  pricingRules: PricingRule[];
+  discountRules: DiscountRule[];
+  taxSettings: TaxSetting[];
   addOrder: (order: Partial<Order>) => void;
   updateOrder: (id: string, data: Partial<Order>) => void;
+  bulkUpdateOrders: (ids: string[], data: Partial<Order>) => void;
   deleteOrder: (id: string) => void;
   addVendor: (vendor: Partial<Vendor>) => void;
   updateVendor: (id: string, data: Partial<Vendor>) => void;
@@ -229,6 +338,56 @@ interface DataContextType {
   addUserRole: (role: Omit<UserRole, "id">) => void;
   updateUserRole: (id: string, data: Partial<UserRole>) => void;
   deleteUserRole: (id: string) => void;
+  addMasterCatalogItem: (item: Partial<MasterCatalogItem>) => void;
+  updateMasterCatalogItem: (
+    id: string,
+    data: Partial<MasterCatalogItem>,
+  ) => void;
+  deleteMasterCatalogItem: (id: string) => void;
+  getClientCatalog: (clientId: string) => ClientCatalogItem[];
+  addClientCatalogItem: (
+    clientId: string,
+    item: Partial<ClientCatalogItem>,
+  ) => void;
+  updateClientCatalogItem: (
+    clientId: string,
+    itemId: string,
+    data: Partial<ClientCatalogItem>,
+  ) => void;
+  deleteClientCatalogItem: (clientId: string, itemId: string) => void;
+  addPricingRule: (rule: Omit<PricingRule, "id">) => void;
+  addDiscountRule: (rule: Omit<DiscountRule, "id">) => void;
+  addTaxSetting: (setting: Omit<TaxSetting, "id">) => void;
+  updateTaxSetting: (id: string, data: Partial<TaxSetting>) => void;
+  upsertPrimaryTaxSetting: (setting: Omit<TaxSetting, "id">) => void;
+  exportRuleTemplate: () => string;
+  importRuleTemplate: (csvText: string) => {
+    pricingAdded: number;
+    discountAdded: number;
+    skipped: number;
+    errors: string[];
+  };
+  detectRuleConflicts: () => RuleConflict[];
+  computeOrderPricing: (args: {
+    amount: number;
+    quantity?: number;
+    category?: string;
+    productCode?: string;
+    orderDate?: string;
+  }) => PricingComputation;
+  applyPricingRules: (args: {
+    price: number;
+    quantity?: number;
+    category?: string;
+    productCode?: string;
+  }) => number;
+  applyDiscountRules: (args: {
+    amount: number;
+    quantity?: number;
+    category?: string;
+    productCode?: string;
+  }) => number;
+  applyTax: (amount: number) => number;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -237,10 +396,9 @@ function usePersistedState<T>(
   key: string,
   defaultValue: T,
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
-  const [state, setState] = useState<T>(() => {
-    const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : defaultValue;
-  });
+  const [state, setState] = useState<T>(() =>
+    safeReadJson<T>(key, defaultValue),
+  );
   useEffect(() => {
     localStorage.setItem(key, JSON.stringify(state));
   }, [key, state]);
@@ -296,7 +454,8 @@ const DEFAULT_ORDERS: Order[] = [
     assignedAnalyst: "Mark Adams",
     analystTeam: "IT Procurement",
     totalAmount: 66500,
-    comments: [
+    comments: "Urgent order, prioritize processing.",
+    commentHistory: [
       {
         id: "c1",
         user: "Mark Adams",
@@ -358,7 +517,7 @@ const DEFAULT_ORDERS: Order[] = [
     assignedAnalyst: "Jane Smith",
     analystTeam: "IT Procurement",
     totalAmount: 31200,
-    comments: [],
+    commentHistory: [],
     attachments: [],
   },
   {
@@ -409,8 +568,143 @@ const DEFAULT_ORDERS: Order[] = [
     assignedAnalyst: "Mark Adams",
     analystTeam: "Mobile",
     totalAmount: 34500,
-    comments: [],
+    commentHistory: [],
     attachments: [],
+  },
+];
+const DEFAULT_MASTER_CATALOG: MasterCatalogItem[] = [
+  {
+    id: "mc-1",
+    productCode: "LAP-1001",
+    name: "HP Envy Laptop",
+    category: "IT Hardware",
+    subCategory: "Laptops",
+    brand: "HP",
+    productType: "Product",
+    physicalType: "Physical",
+    price: 80000,
+    status: "In Stock",
+    initialStock: 50,
+    minStockThreshold: 5,
+  },
+  {
+    id: "mc-2",
+    productCode: "SSD-2025",
+    name: "Sandisk 1TB SSD",
+    category: "IT Hardware",
+    subCategory: "Storage",
+    brand: "Sandisk",
+    productType: "Product",
+    physicalType: "Physical",
+    price: 12000,
+    status: "Low Stock",
+    initialStock: 12,
+    minStockThreshold: 5,
+  },
+  {
+    id: "mc-3",
+    productCode: "MOU-3301",
+    name: "Logitech Wireless Mouse",
+    category: "IT Hardware",
+    subCategory: "Peripherals",
+    brand: "Logitech",
+    productType: "Product",
+    physicalType: "Physical",
+    price: 1000,
+    status: "In Stock",
+    initialStock: 200,
+    minStockThreshold: 20,
+  },
+  {
+    id: "mc-4",
+    productCode: "TAB-1110",
+    name: "Apple iPad Air",
+    category: "IT Hardware",
+    subCategory: "Laptops",
+    brand: "Apple",
+    productType: "Product",
+    physicalType: "Physical",
+    price: 450,
+    status: "Low Stock",
+    initialStock: 8,
+    minStockThreshold: 3,
+  },
+  {
+    id: "mc-5",
+    productCode: "PRN-3215",
+    name: "Epson Workforce Printer",
+    category: "Stationery",
+    subCategory: "Paper",
+    brand: "Epson",
+    productType: "Product",
+    physicalType: "Physical",
+    price: 62000,
+    status: "Out of Stock",
+    initialStock: 0,
+    minStockThreshold: 2,
+  },
+];
+
+const DEFAULT_CLIENT_CATALOG: Record<string, ClientCatalogItem[]> = {
+  cl1: [
+    {
+      ...DEFAULT_MASTER_CATALOG[0],
+      clientId: "cl1",
+      masterProductId: DEFAULT_MASTER_CATALOG[0].id,
+      stock: 50,
+      minStock: 5,
+    },
+    {
+      ...DEFAULT_MASTER_CATALOG[2],
+      clientId: "cl1",
+      masterProductId: DEFAULT_MASTER_CATALOG[2].id,
+      stock: 200,
+      minStock: 20,
+    },
+  ],
+  cl2: [],
+  cl3: [],
+};
+
+const DEFAULT_PRICING_RULES: PricingRule[] = [
+  {
+    id: "pr-1",
+    name: "Volume Discount",
+    status: "active",
+    ruleType: "Volume-Based",
+    minimumQuantity: 10,
+    categories: ["IT Hardware"],
+    products: [],
+    adjustmentType: "discount",
+    valueType: "percentage",
+    value: 5,
+    startDate: "2026-01-01",
+    endDate: "2026-12-31",
+  },
+];
+
+const DEFAULT_DISCOUNT_RULES: DiscountRule[] = [
+  {
+    id: "dr-1",
+    name: "Catalog Discount",
+    status: "active",
+    ruleType: "Catalogue-Based",
+    categories: ["IT Hardware"],
+    products: [],
+    minimumOrderAmount: 50000,
+    discountPercent: 3,
+    maxUsagePerUser: 5,
+    stackable: false,
+  },
+];
+
+const DEFAULT_TAX_SETTINGS: TaxSetting[] = [
+  {
+    id: "tx-1",
+    taxType: "GST",
+    taxRate: 18,
+    taxRegistrationNo: "27AACCN1234A11ZD",
+    active: true,
   },
 ];
 
@@ -1722,6 +2016,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     "nido_app_users",
     DEFAULT_APP_USERS,
   );
+  const [masterCatalogItems, setMasterCatalogItems] = usePersistedState(
+    "nido_master_catalog",
+    DEFAULT_MASTER_CATALOG,
+  );
+  const [clientCatalogItems, setClientCatalogItems] = usePersistedState(
+    "nido_client_catalog",
+    DEFAULT_CLIENT_CATALOG,
+  );
+  const [pricingRules, setPricingRules] = usePersistedState(
+    "nido_pricing_rules",
+    DEFAULT_PRICING_RULES,
+  );
+  const [discountRules, setDiscountRules] = usePersistedState(
+    "nido_discount_rules",
+    DEFAULT_DISCOUNT_RULES,
+  );
+  const [taxSettings, setTaxSettings] = usePersistedState(
+    "nido_tax_settings",
+    DEFAULT_TAX_SETTINGS,
+  );
 
   const makeCrud = <T extends { id: string }>(
     setter: React.Dispatch<React.SetStateAction<T[]>>,
@@ -1746,6 +2060,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const categoryCrud = makeCrud(setVendorCategories);
   const roleCrud = makeCrud(setRoles);
   const userRoleCrud = makeCrud(setUserRoles);
+
+  const bulkUpdateOrders = useCallback(
+    (ids: string[], data: Partial<Order>) => {
+      setOrders((prev) =>
+        prev.map((order) =>
+          ids.includes(order.id) ? { ...order, ...data } : order,
+        ),
+      );
+    },
+    [setOrders],
+  );
 
   const addAuditEntry = useCallback(
     (entry: Partial<AuditEntry>) => {
@@ -1822,6 +2147,536 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     [setUserRoles],
   );
 
+  const addMasterCatalogItem = useCallback(
+    (item: Partial<MasterCatalogItem>) => {
+      const productCode =
+        item.productCode ||
+        `${(item.category || "CAT").replace(/\s+/g, "").slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+      const newItem: MasterCatalogItem = {
+        id: `mc-${Date.now()}`,
+        productCode,
+        name: item.name || "Unnamed Item",
+        category: item.category || "IT Hardware",
+        subCategory: item.subCategory || "",
+        brand: item.brand || "",
+        productType: item.productType || "Product",
+        physicalType: item.physicalType || "Physical",
+        price: item.price ?? 0,
+        discountPrice: item.discountPrice,
+        status: item.status || "In Stock",
+        image: item.image,
+        description: item.description,
+        initialStock: item.initialStock ?? 0,
+        minStockThreshold: item.minStockThreshold ?? 0,
+        tags: item.tags || [],
+        specification: item.specification,
+        warranty: item.warranty,
+        hsnCode: item.hsnCode,
+        dimensionL: item.dimensionL,
+        dimensionW: item.dimensionW,
+        dimensionH: item.dimensionH,
+        dimUnit: item.dimUnit,
+        weight: item.weight,
+        weightUnit: item.weightUnit,
+        customsDeclaration: item.customsDeclaration,
+        primaryVendor: item.primaryVendor,
+        vendorSku: item.vendorSku,
+        leadTime: item.leadTime,
+        vendorContact: item.vendorContact,
+        vendorEmail: item.vendorEmail,
+        vendorPhone: item.vendorPhone,
+        vendorPhone2: item.vendorPhone2,
+        trackPerformance: item.trackPerformance,
+        performanceRating: item.performanceRating,
+      };
+      setMasterCatalogItems((prev) => [...prev, newItem]);
+    },
+    [setMasterCatalogItems],
+  );
+
+  const updateMasterCatalogItem = useCallback(
+    (id: string, data: Partial<MasterCatalogItem>) => {
+      setMasterCatalogItems((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, ...data } : item)),
+      );
+    },
+    [setMasterCatalogItems],
+  );
+
+  const deleteMasterCatalogItem = useCallback(
+    (id: string) => {
+      setMasterCatalogItems((prev) => prev.filter((item) => item.id !== id));
+      setClientCatalogItems((prev) => {
+        const next = { ...prev };
+        Object.keys(next).forEach((clientId) => {
+          next[clientId] = next[clientId].filter(
+            (item) => item.masterProductId !== id && item.id !== id,
+          );
+        });
+        return next;
+      });
+    },
+    [setClientCatalogItems, setMasterCatalogItems],
+  );
+
+  const getClientCatalog = useCallback(
+    (clientId: string) => clientCatalogItems[clientId] || [],
+    [clientCatalogItems],
+  );
+
+  const addClientCatalogItem = useCallback(
+    (clientId: string, item: Partial<ClientCatalogItem>) => {
+      const catalogItem: ClientCatalogItem = {
+        id: `cli-${Date.now()}`,
+        clientId,
+        masterProductId: item.masterProductId || item.id || `mc-${Date.now()}`,
+        productCode: item.productCode || "",
+        name: item.name || "Unnamed Item",
+        category: item.category || "IT Hardware",
+        subCategory: item.subCategory || "",
+        brand: item.brand || "",
+        productType: item.productType || "Product",
+        physicalType: item.physicalType || "Physical",
+        price: item.price ?? 0,
+        discountPrice: item.discountPrice,
+        status: item.status || "In Stock",
+        image: item.image,
+        description: item.description,
+        initialStock: item.initialStock ?? 0,
+        minStockThreshold: item.minStockThreshold ?? 0,
+        tags: item.tags || [],
+        specification: item.specification,
+        warranty: item.warranty,
+        hsnCode: item.hsnCode,
+        dimensionL: item.dimensionL,
+        dimensionW: item.dimensionW,
+        dimensionH: item.dimensionH,
+        dimUnit: item.dimUnit,
+        weight: item.weight,
+        weightUnit: item.weightUnit,
+        customsDeclaration: item.customsDeclaration,
+        primaryVendor: item.primaryVendor,
+        vendorSku: item.vendorSku,
+        leadTime: item.leadTime,
+        vendorContact: item.vendorContact,
+        vendorEmail: item.vendorEmail,
+        vendorPhone: item.vendorPhone,
+        vendorPhone2: item.vendorPhone2,
+        trackPerformance: item.trackPerformance,
+        performanceRating: item.performanceRating,
+        stock: item.stock ?? item.initialStock ?? 0,
+        minStock: item.minStock ?? item.minStockThreshold ?? 0,
+      };
+      setClientCatalogItems((prev) => ({
+        ...prev,
+        [clientId]: [...(prev[clientId] || []), catalogItem],
+      }));
+    },
+    [setClientCatalogItems],
+  );
+
+  const updateClientCatalogItem = useCallback(
+    (clientId: string, itemId: string, data: Partial<ClientCatalogItem>) => {
+      setClientCatalogItems((prev) => ({
+        ...prev,
+        [clientId]: (prev[clientId] || []).map((item) =>
+          item.id === itemId ? { ...item, ...data } : item,
+        ),
+      }));
+    },
+    [setClientCatalogItems],
+  );
+
+  const deleteClientCatalogItem = useCallback(
+    (clientId: string, itemId: string) => {
+      setClientCatalogItems((prev) => ({
+        ...prev,
+        [clientId]: (prev[clientId] || []).filter((item) => item.id !== itemId),
+      }));
+    },
+    [setClientCatalogItems],
+  );
+
+  const addPricingRule = useCallback(
+    (rule: Omit<PricingRule, "id">) => {
+      setPricingRules((prev) => [...prev, { ...rule, id: `pr-${Date.now()}` }]);
+    },
+    [setPricingRules],
+  );
+
+  const addDiscountRule = useCallback(
+    (rule: Omit<DiscountRule, "id">) => {
+      setDiscountRules((prev) => [
+        ...prev,
+        { ...rule, id: `dr-${Date.now()}` },
+      ]);
+    },
+    [setDiscountRules],
+  );
+
+  const addTaxSetting = useCallback(
+    (setting: Omit<TaxSetting, "id">) => {
+      setTaxSettings((prev) => [
+        ...prev,
+        { ...setting, id: `tx-${Date.now()}` },
+      ]);
+    },
+    [setTaxSettings],
+  );
+
+  const updateTaxSetting = useCallback(
+    (id: string, data: Partial<TaxSetting>) => {
+      setTaxSettings((prev) =>
+        prev.map((setting) =>
+          setting.id === id ? { ...setting, ...data } : setting,
+        ),
+      );
+    },
+    [setTaxSettings],
+  );
+
+  const upsertPrimaryTaxSetting = useCallback(
+    (setting: Omit<TaxSetting, "id">) => {
+      setTaxSettings((prev) => {
+        if (!prev.length) {
+          return [{ ...setting, id: `tx-${Date.now()}`, active: true }];
+        }
+        const firstId = prev[0].id;
+        return prev.map((entry) =>
+          entry.id === firstId
+            ? { ...entry, ...setting, active: true }
+            : { ...entry, active: false },
+        );
+      });
+    },
+    [setTaxSettings],
+  );
+
+  const exportRuleTemplate = useCallback(() => {
+    const lines = [
+      "RuleScope,RuleType,Name,Status,Category,ProductCode,MinimumQuantity,MinimumOrderAmount,AdjustmentType,ValueType,Value,DiscountPercent,StartDate,EndDate,Stackable,ApplyBeforeTax",
+      "pricing,Volume-Based,Sample Volume Rule,active,IT Hardware,,10,,discount,percentage,5,,2026-01-01,2026-12-31,,true",
+      "discount,Catalogue-Based,Sample Discount Rule,active,IT Hardware,,,50000,,, ,3,2026-01-01,2026-12-31,false,true",
+    ];
+    return lines.join("\n");
+  }, []);
+
+  const importRuleTemplate = useCallback(
+    (csvText: string) => {
+      const lines = csvText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (lines.length < 2) {
+        return {
+          pricingAdded: 0,
+          discountAdded: 0,
+          skipped: 0,
+          errors: ["Template is empty"],
+        };
+      }
+
+      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+      const idx = (name: string) => headers.indexOf(name.toLowerCase());
+      const get = (cols: string[], name: string) => {
+        const i = idx(name);
+        return i >= 0 ? (cols[i] || "").trim().replace(/^"|"$/g, "") : "";
+      };
+
+      const pricingToAdd: PricingRule[] = [];
+      const discountToAdd: DiscountRule[] = [];
+      const errors: string[] = [];
+      let skipped = 0;
+
+      lines.slice(1).forEach((line, lineIndex) => {
+        const cols = line.split(",");
+        const scope = get(cols, "RuleScope").toLowerCase();
+        const name = get(cols, "Name");
+        if (!scope || !name) {
+          skipped += 1;
+          return;
+        }
+
+        const status =
+          get(cols, "Status").toLowerCase() === "inactive"
+            ? "inactive"
+            : "active";
+        const category = get(cols, "Category");
+        const productCode = get(cols, "ProductCode");
+        const startDate =
+          get(cols, "StartDate") || new Date().toISOString().slice(0, 10);
+        const endDate = get(cols, "EndDate") || "2099-12-31";
+        const applyBeforeTax =
+          get(cols, "ApplyBeforeTax").toLowerCase() !== "false";
+
+        if (scope === "pricing") {
+          pricingToAdd.push({
+            id: `pr-${Date.now()}-${lineIndex}`,
+            name,
+            status,
+            ruleType:
+              get(cols, "RuleType") === "Tiered Pricing"
+                ? "Tiered Pricing"
+                : "Volume-Based",
+            minimumQuantity: Number(get(cols, "MinimumQuantity")) || 1,
+            categories: category ? [category] : [],
+            products: productCode ? [productCode] : [],
+            adjustmentType:
+              get(cols, "AdjustmentType") === "markup" ? "markup" : "discount",
+            valueType:
+              get(cols, "ValueType") === "fixed" ? "fixed" : "percentage",
+            value: Number(get(cols, "Value")) || 0,
+            startDate,
+            endDate,
+            applyBeforeTax,
+          });
+          return;
+        }
+
+        if (scope === "discount") {
+          discountToAdd.push({
+            id: `dr-${Date.now()}-${lineIndex}`,
+            name,
+            status,
+            ruleType:
+              get(cols, "RuleType") === "Volume-Based"
+                ? "Volume-Based"
+                : "Catalogue-Based",
+            categories: category ? [category] : [],
+            products: productCode ? [productCode] : [],
+            minimumOrderAmount: Number(get(cols, "MinimumOrderAmount")) || 0,
+            discountPercent: Number(get(cols, "DiscountPercent")) || 0,
+            maxUsagePerUser: 9999,
+            stackable: get(cols, "Stackable").toLowerCase() === "true",
+            startDate,
+            endDate,
+            applyBeforeTax,
+          });
+          return;
+        }
+
+        skipped += 1;
+        errors.push(`Line ${lineIndex + 2}: Unsupported RuleScope '${scope}'`);
+      });
+
+      if (pricingToAdd.length) {
+        setPricingRules((prev) => [...prev, ...pricingToAdd]);
+      }
+      if (discountToAdd.length) {
+        setDiscountRules((prev) => [...prev, ...discountToAdd]);
+      }
+
+      return {
+        pricingAdded: pricingToAdd.length,
+        discountAdded: discountToAdd.length,
+        skipped,
+        errors,
+      };
+    },
+    [setDiscountRules, setPricingRules],
+  );
+
+  const detectRuleConflicts = useCallback(() => {
+    const conflicts: RuleConflict[] = [];
+
+    for (let i = 0; i < pricingRules.length; i += 1) {
+      const a = pricingRules[i];
+      if (a.status !== "active") continue;
+      for (let j = i + 1; j < pricingRules.length; j += 1) {
+        const b = pricingRules[j];
+        if (b.status !== "active") continue;
+        const sameCategory =
+          !a.categories.length ||
+          !b.categories.length ||
+          a.categories.some((c) => b.categories.includes(c));
+        const sameProduct =
+          !a.products.length ||
+          !b.products.length ||
+          a.products.some((p) => b.products.includes(p));
+        const sameWindow = a.startDate <= b.endDate && b.startDate <= a.endDate;
+
+        if ((sameCategory || sameProduct) && sameWindow) {
+          conflicts.push({
+            id: `pricing-${a.id}-${b.id}`,
+            severity: "warning",
+            message: `Pricing rules '${a.name}' and '${b.name}' overlap and may compound unexpectedly.`,
+            ruleIds: [a.id, b.id],
+          });
+        }
+      }
+    }
+
+    const activeNonStackable = discountRules.filter(
+      (r) => r.status === "active" && !r.stackable,
+    );
+    if (activeNonStackable.length > 1) {
+      conflicts.push({
+        id: "discount-non-stackable",
+        severity: "high",
+        message:
+          "Multiple non-stackable discount rules are active. Only one should apply for the same order context.",
+        ruleIds: activeNonStackable.map((r) => r.id),
+      });
+    }
+
+    return conflicts;
+  }, [discountRules, pricingRules]);
+
+  const applyPricingRules = useCallback(
+    ({
+      price,
+      quantity = 1,
+      category,
+      productCode,
+    }: {
+      price: number;
+      quantity?: number;
+      category?: string;
+      productCode?: string;
+    }) => {
+      let nextPrice = price;
+      const now = new Date().toISOString().slice(0, 10);
+      pricingRules
+        .filter((rule) => rule.status === "active")
+        .forEach((rule) => {
+          if (now < rule.startDate || now > rule.endDate) return;
+          const categoryMatch =
+            !rule.categories.length ||
+            (category ? rule.categories.includes(category) : false);
+          const productMatch =
+            !rule.products.length ||
+            (productCode ? rule.products.includes(productCode) : false);
+          if (!categoryMatch && !productMatch) return;
+          if (quantity < rule.minimumQuantity) return;
+          const delta =
+            rule.valueType === "percentage"
+              ? (nextPrice * rule.value) / 100
+              : rule.value;
+          nextPrice =
+            rule.adjustmentType === "discount"
+              ? Math.max(0, nextPrice - delta)
+              : nextPrice + delta;
+        });
+      return Math.round(nextPrice * 100) / 100;
+    },
+    [pricingRules],
+  );
+
+  const applyDiscountRules = useCallback(
+    ({
+      amount,
+      quantity = 1,
+      category,
+      productCode,
+    }: {
+      amount: number;
+      quantity?: number;
+      category?: string;
+      productCode?: string;
+    }) => {
+      let nextAmount = amount;
+      const now = new Date().toISOString().slice(0, 10);
+      let nonStackableApplied = false;
+      discountRules
+        .filter((rule) => rule.status === "active")
+        .forEach((rule) => {
+          if (rule.startDate && now < rule.startDate) return;
+          if (rule.endDate && now > rule.endDate) return;
+          const categoryMatch =
+            !rule.categories.length ||
+            (category ? rule.categories.includes(category) : false);
+          const productMatch =
+            !rule.products.length ||
+            (productCode ? rule.products.includes(productCode) : false);
+          if (!categoryMatch && !productMatch) return;
+          if (nextAmount < rule.minimumOrderAmount) return;
+          if (quantity < 1) return;
+          if (nonStackableApplied && !rule.stackable) return;
+          nextAmount = Math.max(
+            0,
+            nextAmount - (nextAmount * rule.discountPercent) / 100,
+          );
+          if (!rule.stackable) {
+            nonStackableApplied = true;
+          }
+        });
+      return Math.round(nextAmount * 100) / 100;
+    },
+    [discountRules],
+  );
+
+  const applyTax = useCallback(
+    (amount: number) => {
+      const activeTax = taxSettings.find((setting) => setting.active);
+      if (!activeTax) return amount;
+      return (
+        Math.round((amount + (amount * activeTax.taxRate) / 100) * 100) / 100
+      );
+    },
+    [taxSettings],
+  );
+
+  const computeOrderPricing = useCallback(
+    ({
+      amount,
+      quantity = 1,
+      category,
+      productCode,
+      orderDate,
+    }: {
+      amount: number;
+      quantity?: number;
+      category?: string;
+      productCode?: string;
+      orderDate?: string;
+    }) => {
+      const dateToUse = orderDate || new Date().toISOString().slice(0, 10);
+      const activePricing = pricingRules.filter(
+        (rule) =>
+          rule.status === "active" &&
+          dateToUse >= rule.startDate &&
+          dateToUse <= rule.endDate,
+      );
+
+      let adjustedAmount = amount;
+      activePricing.forEach((rule) => {
+        const categoryMatch =
+          !rule.categories.length ||
+          (category ? rule.categories.includes(category) : false);
+        const productMatch =
+          !rule.products.length ||
+          (productCode ? rule.products.includes(productCode) : false);
+        if (!categoryMatch && !productMatch) return;
+        if (quantity < rule.minimumQuantity) return;
+        const delta =
+          rule.valueType === "percentage"
+            ? (adjustedAmount * rule.value) / 100
+            : rule.value;
+        adjustedAmount =
+          rule.adjustmentType === "discount"
+            ? Math.max(0, adjustedAmount - delta)
+            : adjustedAmount + delta;
+      });
+
+      const discountedAmount = applyDiscountRules({
+        amount: adjustedAmount,
+        quantity,
+        category,
+        productCode,
+      });
+      const taxedAmount = applyTax(discountedAmount);
+
+      return {
+        baseAmount: Math.round(amount * 100) / 100,
+        adjustedAmount: Math.round(adjustedAmount * 100) / 100,
+        discountedAmount,
+        taxedAmount,
+        total: taxedAmount,
+      };
+    },
+    [applyDiscountRules, applyTax, pricingRules],
+  );
+
   return (
     <DataContext.Provider
       value={{
@@ -1839,10 +2694,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         generalSettings,
         userRoles,
         appUsers,
+        masterCatalogItems,
+        clientCatalogItems,
+        pricingRules,
+        discountRules,
+        taxSettings,
 
         roles,
         addOrder: orderCrud.add,
         updateOrder: orderCrud.update,
+        bulkUpdateOrders,
         deleteOrder: orderCrud.delete,
         addVendor: vendorCrud.add,
         updateVendor: vendorCrud.update,
@@ -1871,6 +2732,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         addUserRole,
         updateUserRole,
         deleteUserRole,
+        addMasterCatalogItem,
+        updateMasterCatalogItem,
+        deleteMasterCatalogItem,
+        getClientCatalog,
+        addClientCatalogItem,
+        updateClientCatalogItem,
+        deleteClientCatalogItem,
+        addPricingRule,
+        addDiscountRule,
+        addTaxSetting,
+        updateTaxSetting,
+        upsertPrimaryTaxSetting,
+        exportRuleTemplate,
+        importRuleTemplate,
+        detectRuleConflicts,
+        computeOrderPricing,
+        applyPricingRules,
+        applyDiscountRules,
+        applyTax,
       }}
     >
       {children}

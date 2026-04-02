@@ -44,6 +44,7 @@ import OrganizationsPage from "@/pages/OrganizationsPage";
 import ArchivePage from "@/pages/ArchivePage";
 import TicketTrackingPage from "@/pages/TicketTrackingPage";
 import PricingDiscountsPage from "@/pages/PricingDiscountsPage";
+import MasterCataloguePage from "@/pages/MasterCataloguePage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -114,6 +115,10 @@ function AppRoutes() {
         <Route
           path="configuration/pricing"
           element={<PricingDiscountsPage />}
+        />
+        <Route
+          path="configuration/master-catalogue"
+          element={<MasterCataloguePage />}
         />
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="reports" element={<MainDashboard />} />

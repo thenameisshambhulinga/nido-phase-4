@@ -73,9 +73,13 @@ export interface Organization {
 export const MODULES = [
   "Dashboard",
   "Orders (Purchase Orders)",
+  "Services",
+  "Shop",
   "Vendors",
   "Clients",
   "Inventory",
+  "Transactions",
+  "Invoices",
   "Invoices & Payments",
   "Reports & Analytics",
   "Configuration",

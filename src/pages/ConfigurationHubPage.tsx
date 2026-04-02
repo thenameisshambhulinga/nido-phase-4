@@ -11,7 +11,6 @@ import {
   CreditCard,
   BarChart3,
   Tag,
-  UserPlus,
   BookOpen,
   Building2,
   Plug,
@@ -87,16 +86,10 @@ const CONFIG_CARDS: ConfigCard[] = [
     description: "Volume pricing & discount rules",
   },
   {
-    label: "Client Addition",
-    icon: UserPlus,
-    path: "/clients",
-    description: "Onboard new client companies",
-  },
-  {
-    label: "Catalog Updates",
+    label: "Master Catalogue",
     icon: BookOpen,
-    path: "/orders",
-    description: "Manage product & service catalog",
+    path: "/configuration/master-catalogue",
+    description: "Manage and register the global product/service catalogue",
   },
   {
     label: "Vendor Categories",

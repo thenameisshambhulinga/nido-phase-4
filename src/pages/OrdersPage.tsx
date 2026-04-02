@@ -77,8 +77,9 @@ export default function OrdersPage() {
 
       if (bulkAction === "comments") {
         updateOrder(id, {
-          comments: [
-            ...target.comments,
+          comments: bulkComment || "Bulk comment updated",
+          commentHistory: [
+            ...target.commentHistory,
             {
               id: `c-${Date.now()}-${id}`,
               user: "System",
@@ -125,7 +126,7 @@ export default function OrdersPage() {
 
   return (
     <div>
-      <Header title="Order Details" />
+      <Header title="Order History" />
 
       <div className="p-6 space-y-4">
         <div className="flex flex-wrap items-center gap-2">

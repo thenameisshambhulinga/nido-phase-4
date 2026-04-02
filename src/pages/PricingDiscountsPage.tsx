@@ -6,25 +6,79 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { Tag, Plus, Percent, Gift, Zap, Settings, Copy, Edit, Trash2 } from "lucide-react";
+import {
+  Tag,
+  Plus,
+  Percent,
+  Gift,
+  Zap,
+  Settings,
+  Copy,
+  Edit,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface PricingRule {
-  id: string; name: string; type: string; value: string; enabled: boolean; details?: string;
+  id: string;
+  name: string;
+  type: string;
+  ruleType?: string;
+  value: string;
+  enabled: boolean;
+  details?: string;
+  startDate?: string;
+  endDate?: string;
+  conditions?: Record<string, any>;
 }
 interface DiscountRule {
-  id: string; name: string; type: string; value: string; enabled: boolean; details?: string;
+  id: string;
+  name: string;
+  type: string;
+  value: string;
+  enabled: boolean;
+  details?: string;
+  startDate?: string;
+  endDate?: string;
+  conditions?: Record<string, any>;
 }
 interface CouponCode {
-  id: string; code: string; discount: string; status: "active" | "expired"; validFrom: string; validTo: string;
+  id: string;
+  code: string;
+  discount: string;
+  status: "active" | "expired";
+  validFrom: string;
+  validTo: string;
 }
 
 export default function PricingDiscountsPage() {
@@ -32,19 +86,75 @@ export default function PricingDiscountsPage() {
   const [showAddPricing, setShowAddPricing] = useState(false);
   const [showAddDiscount, setShowAddDiscount] = useState(false);
   const [showCreateCoupon, setShowCreateCoupon] = useState(false);
+  const [showCouponCodeRule, setShowCouponCodeRule] = useState(false);
 
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([
-    { id: "pr1", name: "Default Markup (%)", type: "markup", value: "15%", enabled: true },
-    { id: "pr2", name: "Tier-Based Pricing", type: "tier", value: "Active", enabled: true, details: "3 tiers configured" },
-    { id: "pr3", name: "Seasonal & Promotional Pricing", type: "seasonal", value: "Active", enabled: true, details: "Diwali Offer · 10% OFF · 15 Nov → 15 Nov 2026" },
-    { id: "pr4", name: "Bulk Order Pricing", type: "bulk", value: "Active", enabled: true, details: "₹100 units · ₹500 units 5 · ₹106 · 15% OFF" },
+    {
+      id: "pr1",
+      name: "Default Markup (%)",
+      type: "markup",
+      value: "15%",
+      enabled: true,
+    },
+    {
+      id: "pr2",
+      name: "Tier-Based Pricing",
+      type: "tier",
+      value: "Active",
+      enabled: true,
+      details: "3 tiers configured",
+    },
+    {
+      id: "pr3",
+      name: "Seasonal & Promotional Pricing",
+      type: "seasonal",
+      value: "Active",
+      enabled: true,
+      details: "Diwali Offer · 10% OFF · 15 Nov → 15 Nov 2026",
+    },
+    {
+      id: "pr4",
+      name: "Bulk Order Pricing",
+      type: "bulk",
+      value: "Active",
+      enabled: true,
+      details: "₹100 units · ₹500 units 5 · ₹106 · 15% OFF",
+    },
   ]);
 
   const [discountRules, setDiscountRules] = useState<DiscountRule[]>([
-    { id: "dr1", name: "Volume-Based Discount", type: "volume", value: "₹200", enabled: true, details: "₹4,000 – ₹4,000" },
-    { id: "dr2", name: "Client Loyalty Discount", type: "loyalty", value: "₹000", enabled: true, details: "₹4,000 – ₹10,000" },
-    { id: "dr3", name: "Catalogue-Based Discount", type: "catalogue", value: "15% off", enabled: true, details: "131 SanDisk products" },
-    { id: "dr4", name: "Payment Method Discount", type: "payment", value: "10% off", enabled: true, details: "For Advance Payment" },
+    {
+      id: "dr1",
+      name: "Volume-Based Discount",
+      type: "volume",
+      value: "₹200",
+      enabled: true,
+      details: "₹4,000 – ₹4,000",
+    },
+    {
+      id: "dr2",
+      name: "Client Loyalty Discount",
+      type: "loyalty",
+      value: "₹000",
+      enabled: true,
+      details: "₹4,000 – ₹10,000",
+    },
+    {
+      id: "dr3",
+      name: "Catalogue-Based Discount",
+      type: "catalogue",
+      value: "15% off",
+      enabled: true,
+      details: "131 SanDisk products",
+    },
+    {
+      id: "dr4",
+      name: "Payment Method Discount",
+      type: "payment",
+      value: "10% off",
+      enabled: true,
+      details: "For Advance Payment",
+    },
   ]);
 
   const [discountComputation, setDiscountComputation] = useState("before_tax");
@@ -53,37 +163,246 @@ export default function PricingDiscountsPage() {
   const [couponPrefix, setCouponPrefix] = useState("NIDO");
 
   const [coupons, setCoupons] = useState<CouponCode[]>([
-    { id: "cp1", code: "NIDO1000", discount: "₹1000 OFF", status: "active", validFrom: "2026-01-04", validTo: "2026-03-31" },
-    { id: "cp2", code: "SAVE500", discount: "₹500 OFF", status: "active", validFrom: "2026-01-04", validTo: "2026-03-31" },
-    { id: "cp3", code: "FREESHIP", discount: "Free Shipping", status: "active", validFrom: "2026-01-01", validTo: "2026-12-31" },
+    {
+      id: "cp1",
+      code: "NIDO1000",
+      discount: "₹1000 OFF",
+      status: "active",
+      validFrom: "2026-01-04",
+      validTo: "2026-03-31",
+    },
+    {
+      id: "cp2",
+      code: "SAVE500",
+      discount: "₹500 OFF",
+      status: "active",
+      validFrom: "2026-01-04",
+      validTo: "2026-03-31",
+    },
+    {
+      id: "cp3",
+      code: "FREESHIP",
+      discount: "Free Shipping",
+      status: "active",
+      validFrom: "2026-01-01",
+      validTo: "2026-12-31",
+    },
   ]);
 
-  const [newCoupon, setNewCoupon] = useState({ code: "", discount: "", validFrom: "", validTo: "" });
-  const [newPricing, setNewPricing] = useState({ name: "", type: "markup", value: "", details: "" });
-  const [newDiscount, setNewDiscount] = useState({ name: "", type: "volume", value: "", details: "" });
+  // Form states
+  const [newPricing, setNewPricing] = useState({
+    name: "",
+    ruleType: "Volume-Based",
+    quantityMin: "",
+    quantityOp: "Greater Than or Equal To",
+    quantityVal: "",
+    applyTo: "Specific Product Categories",
+    selectedCategories: [] as string[],
+    discountType: "Percentage Discount",
+    discountValue: "",
+    startDate: "",
+    endDate: "",
+  });
+
+  const [newDiscount, setNewDiscount] = useState({
+    name: "",
+    description: "",
+    ruleType: "Catalogue-Based Discount",
+    minOrderAmount: "",
+    discountType: "Percentage Discount",
+    discountValue: "",
+    startDate: "",
+    endDate: "",
+    maxUsagePerCustomer: "1",
+    stackable: false,
+  });
+
+  const [newCoupon, setNewCoupon] = useState({
+    name: "",
+    codeGen: "Manual",
+    code: "",
+    discountType: "Percentage Discount",
+    discountValue: "",
+    requireMinPurchase: false,
+    minPurchaseAmount: "",
+    requireMinItems: false,
+    minItemsInCart: "",
+    validFrom: "",
+    validTo: "",
+    noExpiry: false,
+    internalNotes: "",
+    maxUsageGlobal: "500",
+    maxUsagePerCustomer: "1",
+  });
+
+  const [couponCodeRuleForm, setCouponCodeRuleForm] = useState({
+    name: "",
+    description: "",
+    triggerType: "Apply to Specific Code(s)",
+    triggerValue: "",
+    applyToCodesWith: "Apply to Codes with Prefix",
+    codePrefix: "",
+    conditions: [
+      {
+        type: "Cart Total",
+        operator: "Greater Than or Equal To",
+        value: "10000",
+      },
+    ],
+    actions: { discountType: "Percentage Discount", discountValue: "20" },
+    maxUsageGlobal: "500",
+    maxUsagePerCustomer: "1",
+  });
 
   const handleCreateCoupon = () => {
-    if (!newCoupon.code || !newCoupon.discount) { toast({ title: "Error", description: "Code and discount are required", variant: "destructive" }); return; }
-    setCoupons(prev => [...prev, { ...newCoupon, id: `cp-${Date.now()}`, status: "active" }]);
-    setNewCoupon({ code: "", discount: "", validFrom: "", validTo: "" });
+    if (!newCoupon.name || !newCoupon.discountValue) {
+      toast({
+        title: "Error",
+        description: "Coupon name and discount are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    const code =
+      newCoupon.codeGen === "Auto-Generate"
+        ? `${couponPrefix}${Math.random().toString(36).substring(7).toUpperCase()}`
+        : newCoupon.code;
+    setCoupons((prev) => [
+      ...prev,
+      {
+        id: `cp-${Date.now()}`,
+        code,
+        discount: `${newCoupon.discountValue}${newCoupon.discountType.includes("%") ? "%" : ""} OFF`,
+        status: "active",
+        validFrom:
+          newCoupon.validFrom || new Date().toISOString().split("T")[0],
+        validTo: newCoupon.validTo || "2026-12-31",
+      },
+    ]);
+    setNewCoupon({
+      name: "",
+      codeGen: "Manual",
+      code: "",
+      discountType: "Percentage Discount",
+      discountValue: "",
+      requireMinPurchase: false,
+      minPurchaseAmount: "",
+      requireMinItems: false,
+      minItemsInCart: "",
+      validFrom: "",
+      validTo: "",
+      noExpiry: false,
+      internalNotes: "",
+      maxUsageGlobal: "500",
+      maxUsagePerCustomer: "1",
+    });
     setShowCreateCoupon(false);
-    toast({ title: "Coupon Created", description: `Coupon ${newCoupon.code} created successfully` });
+    toast({
+      title: "Coupon Created",
+      description: `Coupon created successfully`,
+    });
   };
 
   const handleAddPricingRule = () => {
-    if (!newPricing.name) { toast({ title: "Error", description: "Rule name is required", variant: "destructive" }); return; }
-    setPricingRules(prev => [...prev, { ...newPricing, id: `pr-${Date.now()}`, enabled: true }]);
-    setNewPricing({ name: "", type: "markup", value: "", details: "" });
+    if (!newPricing.name) {
+      toast({
+        title: "Error",
+        description: "Rule name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPricingRules((prev) => [
+      ...prev,
+      {
+        ...newPricing,
+        id: `pr-${Date.now()}`,
+        type: "dynamic",
+        value: `${newPricing.discountValue}%`,
+        enabled: true,
+      },
+    ]);
+    setNewPricing({
+      name: "",
+      ruleType: "Volume-Based",
+      quantityMin: "",
+      quantityOp: "Greater Than or Equal To",
+      quantityVal: "",
+      applyTo: "Specific Product Categories",
+      selectedCategories: [],
+      discountType: "Percentage Discount",
+      discountValue: "",
+      startDate: "",
+      endDate: "",
+    });
     setShowAddPricing(false);
     toast({ title: "Pricing Rule Added" });
   };
 
   const handleAddDiscountRule = () => {
-    if (!newDiscount.name) { toast({ title: "Error", description: "Rule name is required", variant: "destructive" }); return; }
-    setDiscountRules(prev => [...prev, { ...newDiscount, id: `dr-${Date.now()}`, enabled: true }]);
-    setNewDiscount({ name: "", type: "volume", value: "", details: "" });
+    if (!newDiscount.name) {
+      toast({
+        title: "Error",
+        description: "Rule name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    setDiscountRules((prev) => [
+      ...prev,
+      {
+        ...newDiscount,
+        id: `dr-${Date.now()}`,
+        type: "dynamic",
+        value: `${newDiscount.discountValue}%`,
+        enabled: true,
+      },
+    ]);
+    setNewDiscount({
+      name: "",
+      description: "",
+      ruleType: "Catalogue-Based Discount",
+      minOrderAmount: "",
+      discountType: "Percentage Discount",
+      discountValue: "",
+      startDate: "",
+      endDate: "",
+      maxUsagePerCustomer: "1",
+      stackable: false,
+    });
     setShowAddDiscount(false);
     toast({ title: "Discount Rule Added" });
+  };
+
+  const handleAddCouponCodeRule = () => {
+    if (!couponCodeRuleForm.name) {
+      toast({
+        title: "Error",
+        description: "Rule name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: "Coupon Code Rule Added" });
+    setCouponCodeRuleForm({
+      name: "",
+      description: "",
+      triggerType: "Apply to Specific Code(s)",
+      triggerValue: "",
+      applyToCodesWith: "Apply to Codes with Prefix",
+      codePrefix: "",
+      conditions: [
+        {
+          type: "Cart Total",
+          operator: "Greater Than or Equal To",
+          value: "10000",
+        },
+      ],
+      actions: { discountType: "Percentage Discount", discountValue: "20" },
+      maxUsageGlobal: "500",
+      maxUsagePerCustomer: "1",
+    });
+    setShowCouponCodeRule(false);
   };
 
   return (
@@ -92,8 +411,14 @@ export default function PricingDiscountsPage() {
       <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold">Pricing & Discounts</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage pricing, discounts, and promotions for products and services. Define tier-based pricing, seasonal discounts, bulk order discounts, and manage coupon codes.</p>
+            <h1 className="text-2xl font-display font-bold">
+              Pricing & Discounts
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage pricing, discounts, and promotions for products and
+              services. Define tier-based pricing, seasonal discounts, bulk
+              order discounts, and manage coupon codes.
+            </p>
           </div>
           <Button className="gap-2" onClick={() => setShowCreateCoupon(true)}>
             <Plus className="h-4 w-4" /> Create Coupon
@@ -106,34 +431,82 @@ export default function PricingDiscountsPage() {
             {/* Pricing Rules */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <CardTitle className="text-sm flex items-center gap-2"><Tag className="h-4 w-4 text-primary" /> Pricing Rules</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-primary" /> Pricing Rules
+                </CardTitle>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7"><Settings className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7"><Copy className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <Settings className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {pricingRules.map(rule => (
-                  <div key={rule.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                {pricingRules.map((rule) => (
+                  <div
+                    key={rule.id}
+                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                  >
                     <div className="flex items-center gap-3">
-                      <Checkbox checked={rule.enabled} onCheckedChange={v => setPricingRules(prev => prev.map(r => r.id === rule.id ? { ...r, enabled: !!v } : r))} />
+                      <Checkbox
+                        checked={rule.enabled}
+                        onCheckedChange={(v) =>
+                          setPricingRules((prev) =>
+                            prev.map((r) =>
+                              r.id === rule.id ? { ...r, enabled: !!v } : r,
+                            ),
+                          )
+                        }
+                      />
                       <div>
                         <span className="text-sm font-medium">{rule.name}</span>
-                        {rule.type === "seasonal" && <Badge className="ml-2 bg-amber-500 text-white text-[10px]">New Offer!</Badge>}
-                        {rule.details && <p className="text-xs text-muted-foreground mt-0.5">{rule.details}</p>}
+                        {rule.type === "seasonal" && (
+                          <Badge className="ml-2 bg-amber-500 text-white text-[10px]">
+                            New Offer!
+                          </Badge>
+                        )}
+                        {rule.details && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {rule.details}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {rule.type === "markup" && (
-                        <Select defaultValue="15"><SelectTrigger className="w-20 h-8"><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value="10">10%</SelectItem><SelectItem value="15">15%</SelectItem><SelectItem value="20">20%</SelectItem><SelectItem value="25">25%</SelectItem></SelectContent>
+                        <Select defaultValue="15">
+                          <SelectTrigger className="w-20 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="10">10%</SelectItem>
+                            <SelectItem value="15">15%</SelectItem>
+                            <SelectItem value="20">20%</SelectItem>
+                            <SelectItem value="25">25%</SelectItem>
+                          </SelectContent>
                         </Select>
                       )}
-                      <Switch checked={rule.enabled} onCheckedChange={v => setPricingRules(prev => prev.map(r => r.id === rule.id ? { ...r, enabled: v } : r))} />
+                      <Switch
+                        checked={rule.enabled}
+                        onCheckedChange={(v) =>
+                          setPricingRules((prev) =>
+                            prev.map((r) =>
+                              r.id === rule.id ? { ...r, enabled: v } : r,
+                            ),
+                          )
+                        }
+                      />
                     </div>
                   </div>
                 ))}
-                <Button variant="default" size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => setShowAddPricing(true)}>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => setShowAddPricing(true)}
+                >
                   <Plus className="h-3.5 w-3.5" /> Add Pricing Rule
                 </Button>
               </CardContent>
@@ -142,26 +515,60 @@ export default function PricingDiscountsPage() {
             {/* Discount Rules */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <CardTitle className="text-sm flex items-center gap-2"><Percent className="h-4 w-4 text-primary" /> Discount Rules</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Percent className="h-4 w-4 text-primary" /> Discount Rules
+                </CardTitle>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7"><Settings className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7"><Copy className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <Settings className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {discountRules.map(rule => (
-                  <div key={rule.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                {discountRules.map((rule) => (
+                  <div
+                    key={rule.id}
+                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                  >
                     <div className="flex items-center gap-3">
-                      <Checkbox checked={rule.enabled} onCheckedChange={v => setDiscountRules(prev => prev.map(r => r.id === rule.id ? { ...r, enabled: !!v } : r))} />
+                      <Checkbox
+                        checked={rule.enabled}
+                        onCheckedChange={(v) =>
+                          setDiscountRules((prev) =>
+                            prev.map((r) =>
+                              r.id === rule.id ? { ...r, enabled: !!v } : r,
+                            ),
+                          )
+                        }
+                      />
                       <div>
                         <span className="text-sm font-medium">{rule.name}</span>
-                        <p className="text-xs text-muted-foreground mt-0.5">{rule.value} · {rule.details}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {rule.value} · {rule.details}
+                        </p>
                       </div>
                     </div>
-                    <Switch checked={rule.enabled} onCheckedChange={v => setDiscountRules(prev => prev.map(r => r.id === rule.id ? { ...r, enabled: v } : r))} />
+                    <Switch
+                      checked={rule.enabled}
+                      onCheckedChange={(v) =>
+                        setDiscountRules((prev) =>
+                          prev.map((r) =>
+                            r.id === rule.id ? { ...r, enabled: v } : r,
+                          ),
+                        )
+                      }
+                    />
                   </div>
                 ))}
-                <Button variant="default" size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => setShowAddDiscount(true)}>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => setShowAddDiscount(true)}
+                >
                   <Plus className="h-3.5 w-3.5" /> Add Discount Rule
                 </Button>
               </CardContent>
@@ -172,25 +579,57 @@ export default function PricingDiscountsPage() {
           <div className="space-y-6">
             {/* Discount Computation Control */}
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm">Discount Computation Control</CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">
+                  Discount Computation Control
+                </CardTitle>
+              </CardHeader>
               <CardContent className="space-y-4">
-                <RadioGroup value={discountComputation} onValueChange={setDiscountComputation} className="space-y-2">
-                  <div className="flex items-center gap-2"><RadioGroupItem value="before_tax" id="bt" /><Label htmlFor="bt" className="text-sm">Apply Discount Before Tax</Label></div>
-                  <div className="flex items-center gap-2"><RadioGroupItem value="after_tax" id="at" /><Label htmlFor="at" className="text-sm">Apply Discount After Tax</Label></div>
-                  <div className="flex items-center gap-2"><RadioGroupItem value="inclusive" id="inc" /><Label htmlFor="inc" className="text-sm">Calculate Discount Inclusive of Tax</Label></div>
+                <RadioGroup
+                  value={discountComputation}
+                  onValueChange={setDiscountComputation}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="before_tax" id="bt" />
+                    <Label htmlFor="bt" className="text-sm">
+                      Apply Discount Before Tax
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="after_tax" id="at" />
+                    <Label htmlFor="at" className="text-sm">
+                      Apply Discount After Tax
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="inclusive" id="inc" />
+                    <Label htmlFor="inc" className="text-sm">
+                      Calculate Discount Inclusive of Tax
+                    </Label>
+                  </div>
                 </RadioGroup>
                 <Separator />
                 <div className="flex items-center gap-3">
                   <Label className="text-sm font-medium">GST Rate:</Label>
                   <Select value={gstRate} onValueChange={setGstRate}>
-                    <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="5">5%</SelectItem><SelectItem value="12">12%</SelectItem>
-                      <SelectItem value="18">18%</SelectItem><SelectItem value="28">28%</SelectItem>
+                      <SelectItem value="5">5%</SelectItem>
+                      <SelectItem value="12">12%</SelectItem>
+                      <SelectItem value="18">18%</SelectItem>
+                      <SelectItem value="28">28%</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <Button variant="default" size="sm" className="gap-2 w-full bg-primary">
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="gap-2 w-full bg-primary"
+                  onClick={() => setShowCouponCodeRule(true)}
+                >
                   <Plus className="h-3.5 w-3.5" /> Add Coupon Code Rule
                 </Button>
               </CardContent>
@@ -198,15 +637,24 @@ export default function PricingDiscountsPage() {
 
             {/* Coupon Codes */}
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm">Coupon Codes</CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Coupon Codes</CardTitle>
+              </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Checkbox checked={autoGenCoupons} onCheckedChange={v => setAutoGenCoupons(!!v)} />
+                  <Checkbox
+                    checked={autoGenCoupons}
+                    onCheckedChange={(v) => setAutoGenCoupons(!!v)}
+                  />
                   <Label className="text-sm">Auto Generate Coupon Codes</Label>
                 </div>
                 <div className="flex items-center gap-3">
                   <Label className="text-sm">Coupon Prefix:</Label>
-                  <Input value={couponPrefix} onChange={e => setCouponPrefix(e.target.value)} className="w-24 h-8" />
+                  <Input
+                    value={couponPrefix}
+                    onChange={(e) => setCouponPrefix(e.target.value)}
+                    className="w-24 h-8"
+                  />
                 </div>
                 <Separator />
                 <Table>
@@ -219,16 +667,33 @@ export default function PricingDiscountsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {coupons.map(c => (
+                    {coupons.map((c) => (
                       <TableRow key={c.id}>
-                        <TableCell className="font-mono font-medium text-xs">{c.code}</TableCell>
+                        <TableCell className="font-mono font-medium text-xs">
+                          {c.code}
+                        </TableCell>
                         <TableCell className="text-xs">{c.discount}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={c.status === "active" ? "border-emerald-300 text-emerald-700 text-[10px]" : "text-[10px]"}>
+                          <Badge
+                            variant="outline"
+                            className={
+                              c.status === "active"
+                                ? "border-emerald-300 text-emerald-700 text-[10px]"
+                                : "text-[10px]"
+                            }
+                          >
                             {c.status === "active" ? "Active" : "Expired"}
                           </Badge>
                         </TableCell>
-                        <TableCell><Button variant="ghost" size="icon" className="h-6 w-6"><Edit className="h-3 w-3" /></Button></TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -238,33 +703,50 @@ export default function PricingDiscountsPage() {
 
             {/* Special Offers */}
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm flex items-center gap-2"><Gift className="h-4 w-4 text-primary" /> Special Offers & Promotions</CardTitle></CardHeader>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-primary" /> Special Offers &
+                  Promotions
+                </CardTitle>
+              </CardHeader>
               <CardContent className="space-y-3">
                 <div className="border rounded-lg p-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-bold text-sm">Flash Sale – 15% OFF</p>
-                      <p className="text-xs text-muted-foreground">All Laptops · Till Dec 2026</p>
+                      <p className="text-xs text-muted-foreground">
+                        All Laptops · Till Dec 2026
+                      </p>
                     </div>
-                    <Badge className="bg-emerald-600 text-white text-[10px]">Activate Flash Sale</Badge>
+                    <Badge className="bg-emerald-600 text-white text-[10px]">
+                      Activate Flash Sale
+                    </Badge>
                   </div>
                 </div>
                 <div className="border rounded-lg p-3 bg-gradient-to-r from-pink-50 to-purple-50 dark:from-pink-950/20 dark:to-purple-950/20">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-bold text-sm">Free Gift</p>
-                      <p className="text-xs text-muted-foreground">For orders above ₹5000</p>
+                      <p className="text-xs text-muted-foreground">
+                        For orders above ₹5000
+                      </p>
                     </div>
-                    <Badge className="bg-primary text-primary-foreground text-[10px]">Active till Nov 2026</Badge>
+                    <Badge className="bg-primary text-primary-foreground text-[10px]">
+                      Active till Nov 2026
+                    </Badge>
                   </div>
                 </div>
                 <div className="border rounded-lg p-3 bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-bold text-sm">Diwali Special</p>
-                      <p className="text-xs text-muted-foreground">10% OFF on all Electronics</p>
+                      <p className="text-xs text-muted-foreground">
+                        10% OFF on all Electronics
+                      </p>
                     </div>
-                    <Badge className="bg-amber-600 text-white text-[10px]">Active till 15 Nov 2026</Badge>
+                    <Badge className="bg-amber-600 text-white text-[10px]">
+                      Active till 15 Nov 2026
+                    </Badge>
                   </div>
                 </div>
               </CardContent>
@@ -273,72 +755,975 @@ export default function PricingDiscountsPage() {
         </div>
       </div>
 
-      {/* Create Coupon Dialog */}
+      {/* Create Coupon Dialog - Multi-tab */}
       <Dialog open={showCreateCoupon} onOpenChange={setShowCreateCoupon}>
-        <DialogContent className="max-w-[96vw] lg:max-w-[70vw] max-h-[90vh]">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-primary" /> Create New Coupon</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Coupon Code</Label><Input value={newCoupon.code} onChange={e => setNewCoupon(p => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="e.g. NIDO2026" /></div>
-              <div className="space-y-2"><Label>Discount Value</Label><Input value={newCoupon.discount} onChange={e => setNewCoupon(p => ({ ...p, discount: e.target.value }))} placeholder="e.g. ₹500 OFF or 10%" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Valid From</Label><Input type="date" value={newCoupon.validFrom} onChange={e => setNewCoupon(p => ({ ...p, validFrom: e.target.value }))} /></div>
-              <div className="space-y-2"><Label>Valid To</Label><Input type="date" value={newCoupon.validTo} onChange={e => setNewCoupon(p => ({ ...p, validTo: e.target.value }))} /></div>
-            </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button variant="outline" onClick={() => setShowCreateCoupon(false)}>Cancel</Button>
-              <Button onClick={handleCreateCoupon}>Create Coupon</Button>
-            </div>
-          </div>
+        <DialogContent className="max-w-[96vw] lg:max-w-[75vw] max-h-[90vh] p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" /> Create Coupon
+            </DialogTitle>
+          </DialogHeader>
+          <Tabs defaultValue="basic" className="w-full px-6">
+            <TabsList className="grid w-full grid-cols-4 mb-4">
+              <TabsTrigger value="basic">Basic Information &</TabsTrigger>
+              <TabsTrigger value="rules">Rules & Usage Limits</TabsTrigger>
+              <TabsTrigger value="validity">Validity & Notes</TabsTrigger>
+              <TabsTrigger value="codes">Codes</TabsTrigger>
+            </TabsList>
+
+            <ScrollArea className="h-[calc(90vh-250px)] pr-4">
+              <TabsContent value="basic" className="space-y-4 pb-4">
+                <div className="space-y-2">
+                  <Label>Coupon Name/Title *</Label>
+                  <Input
+                    value={newCoupon.name}
+                    onChange={(e) =>
+                      setNewCoupon((p) => ({ ...p, name: e.target.value }))
+                    }
+                    placeholder="e.g. Holiday Sale 20%"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Code Generation</Label>
+                  <RadioGroup
+                    value={newCoupon.codeGen}
+                    onValueChange={(v) =>
+                      setNewCoupon((p) => ({ ...p, codeGen: v }))
+                    }
+                  >
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="Manual" id="man" />
+                      <Label htmlFor="man" className="text-sm">
+                        Manual Entry
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="Auto-Generate" id="auto" />
+                      <Label htmlFor="auto" className="text-sm">
+                        Auto-Generate{" "}
+                        <Badge className="ml-2 bg-emerald-100 text-emerald-700">
+                          Generate
+                        </Badge>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {newCoupon.codeGen === "Manual" && (
+                  <div className="space-y-2">
+                    <Label>Coupon Code</Label>
+                    <Input
+                      value={newCoupon.code}
+                      onChange={(e) =>
+                        setNewCoupon((p) => ({
+                          ...p,
+                          code: e.target.value.toUpperCase(),
+                        }))
+                      }
+                      placeholder="e.g. HOLIDAY20"
+                    />
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <Label>Discount Details</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Discount Type</Label>
+                      <Select
+                        value={newCoupon.discountType}
+                        onValueChange={(v) =>
+                          setNewCoupon((p) => ({ ...p, discountType: v }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Percentage Discount">
+                            Percentage Discount
+                          </SelectItem>
+                          <SelectItem value="Fixed Amount Discount">
+                            Fixed Amount Discount
+                          </SelectItem>
+                          <SelectItem value="Free Shipping">
+                            Free Shipping
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Discount Value</Label>
+                      <Input
+                        value={newCoupon.discountValue}
+                        onChange={(e) =>
+                          setNewCoupon((p) => ({
+                            ...p,
+                            discountValue: e.target.value,
+                          }))
+                        }
+                        placeholder="20 (for %) or 500 (for ₹)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="rules" className="space-y-4 pb-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={newCoupon.requireMinPurchase}
+                      onCheckedChange={(v) =>
+                        setNewCoupon((p) => ({ ...p, requireMinPurchase: !!v }))
+                      }
+                      id="minPurch"
+                    />
+                    <Label htmlFor="minPurch" className="text-sm">
+                      Require Minimum Purchase
+                    </Label>
+                  </div>
+                  {newCoupon.requireMinPurchase && (
+                    <Input
+                      value={newCoupon.minPurchaseAmount}
+                      onChange={(e) =>
+                        setNewCoupon((p) => ({
+                          ...p,
+                          minPurchaseAmount: e.target.value,
+                        }))
+                      }
+                      placeholder="₹5000"
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={newCoupon.requireMinItems}
+                      onCheckedChange={(v) =>
+                        setNewCoupon((p) => ({ ...p, requireMinItems: !!v }))
+                      }
+                      id="minItems"
+                    />
+                    <Label htmlFor="minItems" className="text-sm">
+                      Require Minimum Items in Cart
+                    </Label>
+                  </div>
+                  {newCoupon.requireMinItems && (
+                    <Input
+                      value={newCoupon.minItemsInCart}
+                      onChange={(e) =>
+                        setNewCoupon((p) => ({
+                          ...p,
+                          minItemsInCart: e.target.value,
+                        }))
+                      }
+                      placeholder="3"
+                    />
+                  )}
+                </div>
+
+                <Separator />
+                <div className="space-y-2">
+                  <Label>Maximum Usage (Global)</Label>
+                  <Input
+                    value={newCoupon.maxUsageGlobal}
+                    onChange={(e) =>
+                      setNewCoupon((p) => ({
+                        ...p,
+                        maxUsageGlobal: e.target.value,
+                      }))
+                    }
+                    placeholder="500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Maximum Usage Per Customer</Label>
+                  <Input
+                    value={newCoupon.maxUsagePerCustomer}
+                    onChange={(e) =>
+                      setNewCoupon((p) => ({
+                        ...p,
+                        maxUsagePerCustomer: e.target.value,
+                      }))
+                    }
+                    placeholder="1"
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="validity" className="space-y-4 pb-4">
+                <div className="space-y-2">
+                  <Label>Valid From Date & Time</Label>
+                  <Input
+                    type="date"
+                    value={newCoupon.validFrom}
+                    onChange={(e) =>
+                      setNewCoupon((p) => ({ ...p, validFrom: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={newCoupon.noExpiry}
+                      onCheckedChange={(v) =>
+                        setNewCoupon((p) => ({ ...p, noExpiry: !!v }))
+                      }
+                      id="noExp"
+                    />
+                    <Label htmlFor="noExp" className="text-sm">
+                      No End Date
+                    </Label>
+                  </div>
+                  {!newCoupon.noExpiry && (
+                    <div className="space-y-2">
+                      <Label>Valid To Date & Time</Label>
+                      <Input
+                        type="date"
+                        value={newCoupon.validTo}
+                        onChange={(e) =>
+                          setNewCoupon((p) => ({
+                            ...p,
+                            validTo: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+                <div className="space-y-2">
+                  <Label>Admin Notes</Label>
+                  <Textarea
+                    value={newCoupon.internalNotes}
+                    onChange={(e) =>
+                      setNewCoupon((p) => ({
+                        ...p,
+                        internalNotes: e.target.value,
+                      }))
+                    }
+                    placeholder="Add details or context here..."
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="codes" className="space-y-4 pb-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={autoGenCoupons}
+                      onCheckedChange={setAutoGenCoupons}
+                      id="autoGen"
+                    />
+                    <Label htmlFor="autoGen" className="text-sm">
+                      Auto Generate Coupon Codes
+                    </Label>
+                  </div>
+                </div>
+
+                {autoGenCoupons && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Coupon Prefix</Label>
+                      <Input
+                        value={couponPrefix}
+                        onChange={(e) => setCouponPrefix(e.target.value)}
+                        placeholder="NIDO"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Prefix Length</Label>
+                      <Input type="number" placeholder="8" defaultValue="8" />
+                    </div>
+                  </>
+                )}
+              </TabsContent>
+            </ScrollArea>
+          </Tabs>
+
+          <DialogFooter className="px-6 pb-6 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateCoupon(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateCoupon}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              Save Coupon
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Add Pricing Rule Dialog */}
       <Dialog open={showAddPricing} onOpenChange={setShowAddPricing}>
-        <DialogContent className="max-w-[96vw] lg:max-w-[60vw] max-h-[90vh]">
-          <DialogHeader><DialogTitle>Add Pricing Rule</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2"><Label>Rule Name</Label><Input value={newPricing.name} onChange={e => setNewPricing(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Holiday Markup" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Type</Label>
-                <Select value={newPricing.type} onValueChange={v => setNewPricing(p => ({ ...p, type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="markup">Markup</SelectItem><SelectItem value="tier">Tier-Based</SelectItem><SelectItem value="seasonal">Seasonal</SelectItem><SelectItem value="bulk">Bulk</SelectItem></SelectContent>
-                </Select>
+        <DialogContent className="max-w-[96vw] lg:max-w-[70vw] max-h-[90vh] p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>Add New Pricing Rule</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[calc(90vh-150px)]">
+            <div className="px-6 pb-4 space-y-6">
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  BASIC INFORMATION
+                </h3>
+                <div className="space-y-2">
+                  <Label>Rule Name *</Label>
+                  <Input
+                    value={newPricing.name}
+                    onChange={(e) =>
+                      setNewPricing((p) => ({ ...p, name: e.target.value }))
+                    }
+                    placeholder="e.g. Diwali Offer"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Switch defaultChecked />
+                </div>
               </div>
-              <div className="space-y-2"><Label>Value</Label><Input value={newPricing.value} onChange={e => setNewPricing(p => ({ ...p, value: e.target.value }))} placeholder="e.g. 10%" /></div>
+
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  RULE TYPE & CONDITIONS
+                </h3>
+                <div className="space-y-2">
+                  <Label>Select Rule Type</Label>
+                  <RadioGroup
+                    value={newPricing.ruleType}
+                    onValueChange={(v) =>
+                      setNewPricing((p) => ({ ...p, ruleType: v }))
+                    }
+                  >
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="Volume-Based" id="vb" />
+                      <Label htmlFor="vb" className="text-sm">
+                        Volume-Based
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="Tiered Pricing" id="tp" />
+                      <Label htmlFor="tp" className="text-sm">
+                        Tiered Pricing
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-2 mt-4">
+                  <Label className="text-sm font-medium">
+                    Conditions (Logic Builder)
+                  </Label>
+                  <div className="space-y-3 p-3 border rounded bg-muted/50">
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <Label className="text-xs">Quantity is</Label>
+                        <Select
+                          value={newPricing.quantityOp}
+                          onValueChange={(v) =>
+                            setNewPricing((p) => ({ ...p, quantityOp: v }))
+                          }
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Greater Than or Equal To">
+                              Greater Than or Equal To
+                            </SelectItem>
+                            <SelectItem value="Less Than">Less Than</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-24">
+                        <Label className="text-xs">Value</Label>
+                        <Input
+                          type="number"
+                          value={newPricing.quantityVal}
+                          onChange={(e) =>
+                            setNewPricing((p) => ({
+                              ...p,
+                              quantityVal: e.target.value,
+                            }))
+                          }
+                          placeholder="100"
+                          className="h-8"
+                        />
+                      </div>
+                      <Button variant="ghost" size="sm">
+                        +
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 mt-4">
+                  <Label>Apply To</Label>
+                  <SelectContent>
+                    <SelectItem value="Select Category">
+                      Select Category
+                    </SelectItem>
+                    <SelectItem value="Laptops">Laptops</SelectItem>
+                    <SelectItem value="Storage Devices">
+                      Storage Devices
+                    </SelectItem>
+                  </SelectContent>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  PRICE ACTION
+                </h3>
+                <div className="space-y-2">
+                  <Label>Discount/Adjustment Type</Label>
+                  <Select
+                    value={newPricing.discountType}
+                    onValueChange={(v) =>
+                      setNewPricing((p) => ({ ...p, discountType: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Percentage Discount">
+                        Percentage Discount
+                      </SelectItem>
+                      <SelectItem value="Fixed Amount">Fixed Amount</SelectItem>
+                      <SelectItem value="Markup">Markup</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex gap-4 mt-2">
+                  <div className="flex-1 space-y-2">
+                    <Label>Discount/Markup Value</Label>
+                    <Input
+                      value={newPricing.discountValue}
+                      onChange={(e) =>
+                        setNewPricing((p) => ({
+                          ...p,
+                          discountValue: e.target.value,
+                        }))
+                      }
+                      placeholder="10%"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button variant="outline" size="sm">
+                      Apply Before/After Tax
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  AVAILABILITY
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <Input
+                      type="date"
+                      value={newPricing.startDate}
+                      onChange={(e) =>
+                        setNewPricing((p) => ({
+                          ...p,
+                          startDate: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Date</Label>
+                    <Input
+                      type="date"
+                      value={newPricing.endDate}
+                      onChange={(e) =>
+                        setNewPricing((p) => ({
+                          ...p,
+                          endDate: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2"><Label>Details / Description</Label><Input value={newPricing.details} onChange={e => setNewPricing(p => ({ ...p, details: e.target.value }))} placeholder="Additional details" /></div>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button variant="outline" onClick={() => setShowAddPricing(false)}>Cancel</Button>
-              <Button onClick={handleAddPricingRule}>Add Rule</Button>
-            </div>
-          </div>
+          </ScrollArea>
+          <DialogFooter className="px-6 pb-4 border-t">
+            <Button variant="outline" onClick={() => setShowAddPricing(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddPricingRule}>Save Rule</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Add Discount Rule Dialog */}
       <Dialog open={showAddDiscount} onOpenChange={setShowAddDiscount}>
-        <DialogContent className="max-w-[96vw] lg:max-w-[60vw] max-h-[90vh]">
-          <DialogHeader><DialogTitle>Add Discount Rule</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2"><Label>Rule Name</Label><Input value={newDiscount.name} onChange={e => setNewDiscount(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Early Bird Discount" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Type</Label>
-                <Select value={newDiscount.type} onValueChange={v => setNewDiscount(p => ({ ...p, type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="volume">Volume-Based</SelectItem><SelectItem value="loyalty">Loyalty</SelectItem><SelectItem value="catalogue">Catalogue-Based</SelectItem><SelectItem value="payment">Payment Method</SelectItem></SelectContent>
-                </Select>
+        <DialogContent className="max-w-[96vw] lg:max-w-[70vw] max-h-[90vh] p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>Add New Discount Rule</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[calc(90vh-150px)]">
+            <div className="px-6 pb-4 space-y-6">
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  --- Basic Info ---
+                </h3>
+                <div className="space-y-2">
+                  <Label>Rule Name *</Label>
+                  <Input
+                    value={newDiscount.name}
+                    onChange={(e) =>
+                      setNewDiscount((p) => ({ ...p, name: e.target.value }))
+                    }
+                    placeholder="e.g. Catalogue Clearance 25%"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Rule Description (Optional)</Label>
+                  <Textarea
+                    value={newDiscount.description}
+                    onChange={(e) =>
+                      setNewDiscount((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
+                    }
+                    placeholder="Brief explanation of this rule..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <RadioGroup defaultValue="active">
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="active" id="act" />
+                      <Label htmlFor="act" className="text-sm">
+                        Active
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="inactive" id="inact" />
+                      <Label htmlFor="inact" className="text-sm">
+                        Inactive
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
               </div>
-              <div className="space-y-2"><Label>Value</Label><Input value={newDiscount.value} onChange={e => setNewDiscount(p => ({ ...p, value: e.target.value }))} placeholder="e.g. ₹500 or 15%" /></div>
+
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  --- Rule Type ---
+                </h3>
+                <div className="space-y-2">
+                  <Label>Discount Rule Type</Label>
+                  <Select
+                    value={newDiscount.ruleType}
+                    onValueChange={(v) =>
+                      setNewDiscount((p) => ({ ...p, ruleType: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Catalogue-Based Discount">
+                        Catalogue-Based Discount
+                      </SelectItem>
+                      <SelectItem value="Volume-Based Discount">
+                        Volume-Based Discount
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 mt-4">
+                  <Label>Minimum Order Amount to Apply</Label>
+                  <Input
+                    value={newDiscount.minOrderAmount}
+                    onChange={(e) =>
+                      setNewDiscount((p) => ({
+                        ...p,
+                        minOrderAmount: e.target.value,
+                      }))
+                    }
+                    placeholder="Valid on orders above ₹10,000"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  --- Price Action ---
+                </h3>
+                <div className="space-y-2">
+                  <Label>Discount Type</Label>
+                  <Select
+                    value={newDiscount.discountType}
+                    onValueChange={(v) =>
+                      setNewDiscount((p) => ({ ...p, discountType: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Percentage Discount">
+                        Percentage Discount
+                      </SelectItem>
+                      <SelectItem value="Fixed Amount Discount">
+                        Fixed Amount Discount
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Discount Value</Label>
+                  <Input
+                    value={newDiscount.discountValue}
+                    onChange={(e) =>
+                      setNewDiscount((p) => ({
+                        ...p,
+                        discountValue: e.target.value,
+                      }))
+                    }
+                    placeholder="26"
+                  />
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Switch />
+                  <Label className="text-sm">Apply Before/After Tax</Label>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  --- Limitations ---
+                </h3>
+                <div className="space-y-2">
+                  <Label>Validity Period</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      type="date"
+                      value={newDiscount.startDate}
+                      onChange={(e) =>
+                        setNewDiscount((p) => ({
+                          ...p,
+                          startDate: e.target.value,
+                        }))
+                      }
+                      placeholder="Start Date"
+                    />
+                    <Input
+                      type="date"
+                      value={newDiscount.endDate}
+                      onChange={(e) =>
+                        setNewDiscount((p) => ({
+                          ...p,
+                          endDate: e.target.value,
+                        }))
+                      }
+                      placeholder="End Date"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Usage Per Customer</Label>
+                  <Input
+                    value={newDiscount.maxUsagePerCustomer}
+                    onChange={(e) =>
+                      setNewDiscount((p) => ({
+                        ...p,
+                        maxUsagePerCustomer: e.target.value,
+                      }))
+                    }
+                    placeholder="1"
+                  />
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Checkbox
+                    checked={newDiscount.stackable}
+                    onCheckedChange={(v) =>
+                      setNewDiscount((p) => ({ ...p, stackable: !!v }))
+                    }
+                  />
+                  <Label className="text-sm">
+                    Compatible Discounts (Stackable)
+                  </Label>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2"><Label>Details</Label><Input value={newDiscount.details} onChange={e => setNewDiscount(p => ({ ...p, details: e.target.value }))} placeholder="Additional details" /></div>
-            <div className="flex justify-end gap-3 pt-4">
-              <Button variant="outline" onClick={() => setShowAddDiscount(false)}>Cancel</Button>
-              <Button onClick={handleAddDiscountRule}>Add Rule</Button>
+          </ScrollArea>
+          <DialogFooter className="px-6 pb-4 border-t">
+            <Button variant="outline" onClick={() => setShowAddDiscount(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddDiscountRule}>Save Rule</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Coupon Code Rule Dialog */}
+      <Dialog open={showCouponCodeRule} onOpenChange={setShowCouponCodeRule}>
+        <DialogContent className="max-w-[96vw] lg:max-w-[70vw] max-h-[90vh] p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>Add New Coupon Code Rule</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[calc(90vh-150px)]">
+            <div className="px-6 pb-4 space-y-6">
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  --- Basic Info ---
+                </h3>
+                <div className="space-y-2">
+                  <Label>Rule Name *</Label>
+                  <Input
+                    value={couponCodeRuleForm.name}
+                    onChange={(e) =>
+                      setCouponCodeRuleForm((p) => ({
+                        ...p,
+                        name: e.target.value,
+                      }))
+                    }
+                    placeholder="Holiday Sale 20% OFF - New Codes Only"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Rule Description (Optional)</Label>
+                  <Textarea
+                    value={couponCodeRuleForm.description}
+                    onChange={(e) =>
+                      setCouponCodeRuleForm((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
+                    }
+                    placeholder="Enter code or prefix..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <RadioGroup defaultValue="active">
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="active" id="crule-act" />
+                      <Label htmlFor="crule-act" className="text-sm">
+                        Active
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  --- Rule Trigger ---
+                </h3>
+                <div className="space-y-2">
+                  <Label>Trigger Type</Label>
+                  <Select
+                    value={couponCodeRuleForm.triggerType}
+                    onValueChange={(v) =>
+                      setCouponCodeRuleForm((p) => ({ ...p, triggerType: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Apply to Specific Code(s)">
+                        Apply to Specific Code(s)
+                      </SelectItem>
+                      <SelectItem value="Apply to Codes with Prefix">
+                        Apply to Codes with Prefix
+                      </SelectItem>
+                      <SelectItem value="Apply to Codes with Suffix">
+                        Apply to Codes with Suffix
+                      </SelectItem>
+                      <SelectItem value="Apply to All Codes">
+                        Apply to All Codes
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {couponCodeRuleForm.triggerType !== "Apply to All Codes" && (
+                  <div className="space-y-2 mt-4">
+                    <Label>Trigger Value</Label>
+                    <Input
+                      value={couponCodeRuleForm.triggerValue}
+                      onChange={(e) =>
+                        setCouponCodeRuleForm((p) => ({
+                          ...p,
+                          triggerValue: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter code or prefix..."
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  --- Conditions ---
+                </h3>
+                <div className="space-y-3 p-3 border rounded bg-muted/50">
+                  {couponCodeRuleForm.conditions.map((cond, idx) => (
+                    <div key={idx} className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <Label className="text-xs">Cart Total</Label>
+                        <Input
+                          value={cond.value}
+                          placeholder="10000"
+                          className="h-8"
+                        />
+                      </div>
+                      {idx === couponCodeRuleForm.conditions.length - 1 && (
+                        <>
+                          <Button variant="outline" size="sm">
+                            +
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    Number of Items in Cart
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Specific Products
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  --- Actions ---
+                </h3>
+                <div className="space-y-2">
+                  <Label>Discount Type</Label>
+                  <Select
+                    value={couponCodeRuleForm.actions.discountType}
+                    onValueChange={(v) =>
+                      setCouponCodeRuleForm((p) => ({
+                        ...p,
+                        actions: { ...p.actions, discountType: v },
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Percentage Discount">
+                        Percentage Discount
+                      </SelectItem>
+                      <SelectItem value="Fixed Amount Discount">
+                        Fixed Amount Discount
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Discount Value</Label>
+                  <Input
+                    value={couponCodeRuleForm.actions.discountValue}
+                    onChange={(e) =>
+                      setCouponCodeRuleForm((p) => ({
+                        ...p,
+                        actions: {
+                          ...p.actions,
+                          discountValue: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="20 (for %) or 500 (for ₹)"
+                  />
+                </div>
+                <div className="space-y-2 mt-4">
+                  <Label>Calculation Order</Label>
+                  <RadioGroup defaultValue="before">
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="before" id="before" />
+                      <Label htmlFor="before" className="text-sm">
+                        Before Tax
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="after" id="after" />
+                      <Label htmlFor="after" className="text-sm">
+                        After Tax
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-sm mb-4 pb-2 border-b">
+                  --- Limitations ---
+                </h3>
+                <div className="space-y-2">
+                  <Label>Maximum Usage (Global)</Label>
+                  <Input
+                    value={couponCodeRuleForm.maxUsageGlobal}
+                    onChange={(e) =>
+                      setCouponCodeRuleForm((p) => ({
+                        ...p,
+                        maxUsageGlobal: e.target.value,
+                      }))
+                    }
+                    placeholder="500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Maximum Usage Per Customer</Label>
+                  <Input
+                    value={couponCodeRuleForm.maxUsagePerCustomer}
+                    onChange={(e) =>
+                      setCouponCodeRuleForm((p) => ({
+                        ...p,
+                        maxUsagePerCustomer: e.target.value,
+                      }))
+                    }
+                    placeholder="1"
+                  />
+                </div>
+                <div className="flex items-center gap-2 mt-4">
+                  <Checkbox />
+                  <Label className="text-sm">
+                    Compatible with Automatic Discounts
+                  </Label>
+                </div>
+              </div>
             </div>
-          </div>
+          </ScrollArea>
+          <DialogFooter className="px-6 pb-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setShowCouponCodeRule(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleAddCouponCodeRule}>Save Rule</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
