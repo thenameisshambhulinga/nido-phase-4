@@ -27,6 +27,8 @@ const NIDO_STORAGE_KEYS = [
   "nido_pricing_rules",
   "nido_discount_rules",
   "nido_tax_settings",
+  "nido_coupon_codes",
+  "nido_coupon_code_rules",
 ];
 
 describe("DataContext production flows", () => {

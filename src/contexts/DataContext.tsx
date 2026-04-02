@@ -268,6 +268,42 @@ export interface TaxSetting {
   active: boolean;
 }
 
+export interface CouponCode {
+  id: string;
+  title: string;
+  code: string;
+  discountType: "percentage" | "fixed" | "shipping";
+  discountValue: number;
+  minPurchase: number;
+  usageLimit: number;
+  usagePerCustomer: number;
+  validFrom: string;
+  validTo: string;
+  active: boolean;
+  notes?: string;
+}
+
+export interface CouponCodeRule {
+  id: string;
+  name: string;
+  triggerType: "prefix" | "suffix" | "specific" | "all";
+  triggerValue: string;
+  conditionField:
+    | "cart_total"
+    | "item_count"
+    | "specific_products"
+    | "client_type";
+  comparator: ">=" | "<=" | "==";
+  threshold: number;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  calculationOrder: "before_tax" | "after_tax";
+  maxUsageGlobal: number;
+  maxUsagePerCustomer: number;
+  stackable: boolean;
+  active: boolean;
+}
+
 export interface RuleConflict {
   id: string;
   severity: "warning" | "high";
@@ -304,6 +340,8 @@ interface DataContextType {
   pricingRules: PricingRule[];
   discountRules: DiscountRule[];
   taxSettings: TaxSetting[];
+  couponCodes: CouponCode[];
+  couponCodeRules: CouponCodeRule[];
   addOrder: (order: Partial<Order>) => void;
   updateOrder: (id: string, data: Partial<Order>) => void;
   bulkUpdateOrders: (ids: string[], data: Partial<Order>) => void;
@@ -356,10 +394,32 @@ interface DataContextType {
   ) => void;
   deleteClientCatalogItem: (clientId: string, itemId: string) => void;
   addPricingRule: (rule: Omit<PricingRule, "id">) => void;
+  updatePricingRule: (id: string, data: Partial<PricingRule>) => void;
   addDiscountRule: (rule: Omit<DiscountRule, "id">) => void;
+  updateDiscountRule: (id: string, data: Partial<DiscountRule>) => void;
+  addCouponCode: (coupon: Omit<CouponCode, "id">) => void;
+  updateCouponCode: (id: string, data: Partial<CouponCode>) => void;
+  addCouponCodeRule: (rule: Omit<CouponCodeRule, "id">) => void;
+  updateCouponCodeRule: (id: string, data: Partial<CouponCodeRule>) => void;
   addTaxSetting: (setting: Omit<TaxSetting, "id">) => void;
   updateTaxSetting: (id: string, data: Partial<TaxSetting>) => void;
   upsertPrimaryTaxSetting: (setting: Omit<TaxSetting, "id">) => void;
+  autoConfigurePricingAndDiscountRules: () => {
+    pricingAdded: number;
+    discountAdded: number;
+  };
+  autoGenerateCouponCampaign: (args?: {
+    prefix?: string;
+    count?: number;
+    discountType?: "percentage" | "fixed";
+    discountValue?: number;
+    minPurchase?: number;
+    validDays?: number;
+    category?: string;
+  }) => {
+    couponsCreated: number;
+    rulesCreated: number;
+  };
   exportRuleTemplate: () => string;
   importRuleTemplate: (csvText: string) => {
     pricingAdded: number;
@@ -704,6 +764,41 @@ const DEFAULT_TAX_SETTINGS: TaxSetting[] = [
     taxType: "GST",
     taxRate: 18,
     taxRegistrationNo: "27AACCN1234A11ZD",
+    active: true,
+  },
+];
+
+const DEFAULT_COUPON_CODES: CouponCode[] = [
+  {
+    id: "cp-1",
+    title: "Launch Offer",
+    code: "NIDO1000",
+    discountType: "fixed",
+    discountValue: 1000,
+    minPurchase: 5000,
+    usageLimit: 500,
+    usagePerCustomer: 1,
+    validFrom: "2026-01-01",
+    validTo: "2026-12-31",
+    active: true,
+  },
+];
+
+const DEFAULT_COUPON_CODE_RULES: CouponCodeRule[] = [
+  {
+    id: "ccr-1",
+    name: "Standard cart threshold rule",
+    triggerType: "prefix",
+    triggerValue: "NIDO",
+    conditionField: "cart_total",
+    comparator: ">=",
+    threshold: 5000,
+    discountType: "fixed",
+    discountValue: 500,
+    calculationOrder: "before_tax",
+    maxUsageGlobal: 500,
+    maxUsagePerCustomer: 1,
+    stackable: false,
     active: true,
   },
 ];
@@ -2036,6 +2131,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     "nido_tax_settings",
     DEFAULT_TAX_SETTINGS,
   );
+  const [couponCodes, setCouponCodes] = usePersistedState(
+    "nido_coupon_codes",
+    DEFAULT_COUPON_CODES,
+  );
+  const [couponCodeRules, setCouponCodeRules] = usePersistedState(
+    "nido_coupon_code_rules",
+    DEFAULT_COUPON_CODE_RULES,
+  );
 
   const makeCrud = <T extends { id: string }>(
     setter: React.Dispatch<React.SetStateAction<T[]>>,
@@ -2304,6 +2407,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     [setPricingRules],
   );
 
+  const updatePricingRule = useCallback(
+    (id: string, data: Partial<PricingRule>) => {
+      setPricingRules((prev) =>
+        prev.map((rule) => (rule.id === id ? { ...rule, ...data } : rule)),
+      );
+    },
+    [setPricingRules],
+  );
+
   const addDiscountRule = useCallback(
     (rule: Omit<DiscountRule, "id">) => {
       setDiscountRules((prev) => [
@@ -2312,6 +2424,55 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       ]);
     },
     [setDiscountRules],
+  );
+
+  const updateDiscountRule = useCallback(
+    (id: string, data: Partial<DiscountRule>) => {
+      setDiscountRules((prev) =>
+        prev.map((rule) => (rule.id === id ? { ...rule, ...data } : rule)),
+      );
+    },
+    [setDiscountRules],
+  );
+
+  const addCouponCode = useCallback(
+    (coupon: Omit<CouponCode, "id">) => {
+      setCouponCodes((prev) => [
+        ...prev,
+        { ...coupon, id: `cp-${Date.now()}` },
+      ]);
+    },
+    [setCouponCodes],
+  );
+
+  const updateCouponCode = useCallback(
+    (id: string, data: Partial<CouponCode>) => {
+      setCouponCodes((prev) =>
+        prev.map((coupon) =>
+          coupon.id === id ? { ...coupon, ...data } : coupon,
+        ),
+      );
+    },
+    [setCouponCodes],
+  );
+
+  const addCouponCodeRule = useCallback(
+    (rule: Omit<CouponCodeRule, "id">) => {
+      setCouponCodeRules((prev) => [
+        ...prev,
+        { ...rule, id: `ccr-${Date.now()}` },
+      ]);
+    },
+    [setCouponCodeRules],
+  );
+
+  const updateCouponCodeRule = useCallback(
+    (id: string, data: Partial<CouponCodeRule>) => {
+      setCouponCodeRules((prev) =>
+        prev.map((rule) => (rule.id === id ? { ...rule, ...data } : rule)),
+      );
+    },
+    [setCouponCodeRules],
   );
 
   const addTaxSetting = useCallback(
@@ -2350,6 +2511,150 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     },
     [setTaxSettings],
+  );
+
+  const autoConfigurePricingAndDiscountRules = useCallback(() => {
+    const categories = Array.from(
+      new Set(masterCatalogItems.map((item) => item.category).filter(Boolean)),
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    const oneYearOut = new Date();
+    oneYearOut.setFullYear(oneYearOut.getFullYear() + 1);
+    const endDate = oneYearOut.toISOString().slice(0, 10);
+
+    const pricingToAdd = categories
+      .filter(
+        (category) =>
+          !pricingRules.some(
+            (rule) =>
+              rule.status === "active" && rule.categories.includes(category),
+          ),
+      )
+      .map((category, index) => ({
+        id: `pr-auto-${Date.now()}-${index}`,
+        name: `Auto ${category} Volume Pricing`,
+        status: "active" as const,
+        ruleType: "Volume-Based" as const,
+        minimumQuantity: 10,
+        categories: [category],
+        products: [],
+        adjustmentType: "discount" as const,
+        valueType: "percentage" as const,
+        value: 5,
+        startDate: today,
+        endDate,
+        applyBeforeTax: true,
+      }));
+
+    const discountToAdd = categories
+      .filter(
+        (category) =>
+          !discountRules.some(
+            (rule) =>
+              rule.status === "active" && rule.categories.includes(category),
+          ),
+      )
+      .map((category, index) => ({
+        id: `dr-auto-${Date.now()}-${index}`,
+        name: `Auto ${category} Discount`,
+        status: "active" as const,
+        ruleType: "Catalogue-Based" as const,
+        categories: [category],
+        products: [],
+        minimumOrderAmount: 10000,
+        discountPercent: 3,
+        maxUsagePerUser: 999,
+        stackable: false,
+        startDate: today,
+        endDate,
+        applyBeforeTax: true,
+      }));
+
+    if (pricingToAdd.length > 0) {
+      setPricingRules((prev) => [...prev, ...pricingToAdd]);
+    }
+    if (discountToAdd.length > 0) {
+      setDiscountRules((prev) => [...prev, ...discountToAdd]);
+    }
+
+    return {
+      pricingAdded: pricingToAdd.length,
+      discountAdded: discountToAdd.length,
+    };
+  }, [
+    discountRules,
+    masterCatalogItems,
+    pricingRules,
+    setDiscountRules,
+    setPricingRules,
+  ]);
+
+  const autoGenerateCouponCampaign = useCallback(
+    (args?: {
+      prefix?: string;
+      count?: number;
+      discountType?: "percentage" | "fixed";
+      discountValue?: number;
+      minPurchase?: number;
+      validDays?: number;
+      category?: string;
+    }) => {
+      const prefix = (args?.prefix || "NIDO").toUpperCase();
+      const count = Math.max(1, Math.min(args?.count || 5, 50));
+      const discountType = args?.discountType || "percentage";
+      const discountValue = args?.discountValue ?? 10;
+      const minPurchase = args?.minPurchase ?? 5000;
+      const validDays = args?.validDays ?? 90;
+
+      const now = new Date();
+      const validFrom = now.toISOString().slice(0, 10);
+      const validToDate = new Date(now);
+      validToDate.setDate(now.getDate() + validDays);
+      const validTo = validToDate.toISOString().slice(0, 10);
+
+      const newCoupons: CouponCode[] = Array.from({ length: count }).map(
+        (_, index) => ({
+          id: `cp-auto-${Date.now()}-${index}`,
+          title: `${prefix} Auto Campaign`,
+          code: `${prefix}${Math.floor(1000 + Math.random() * 9000)}${index}`,
+          discountType,
+          discountValue,
+          minPurchase,
+          usageLimit: 1000,
+          usagePerCustomer: 1,
+          validFrom,
+          validTo,
+          active: true,
+          notes: "Auto-generated campaign",
+        }),
+      );
+
+      const nextRule: CouponCodeRule = {
+        id: `ccr-auto-${Date.now()}`,
+        name: `${prefix} Auto Rule`,
+        triggerType: "prefix",
+        triggerValue: prefix,
+        conditionField: "cart_total",
+        comparator: ">=",
+        threshold: minPurchase,
+        discountType: discountType === "fixed" ? "fixed" : "percentage",
+        discountValue,
+        calculationOrder: "before_tax",
+        maxUsageGlobal: 1000,
+        maxUsagePerCustomer: 1,
+        stackable: false,
+        active: true,
+      };
+
+      setCouponCodes((prev) => [...prev, ...newCoupons]);
+      setCouponCodeRules((prev) => [nextRule, ...prev]);
+
+      return {
+        couponsCreated: newCoupons.length,
+        rulesCreated: 1,
+      };
+    },
+    [setCouponCodeRules, setCouponCodes],
   );
 
   const exportRuleTemplate = useCallback(() => {
@@ -2699,6 +3004,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         pricingRules,
         discountRules,
         taxSettings,
+        couponCodes,
+        couponCodeRules,
 
         roles,
         addOrder: orderCrud.add,
@@ -2740,10 +3047,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         updateClientCatalogItem,
         deleteClientCatalogItem,
         addPricingRule,
+        updatePricingRule,
         addDiscountRule,
+        updateDiscountRule,
+        addCouponCode,
+        updateCouponCode,
+        addCouponCodeRule,
+        updateCouponCodeRule,
         addTaxSetting,
         updateTaxSetting,
         upsertPrimaryTaxSetting,
+        autoConfigurePricingAndDiscountRules,
+        autoGenerateCouponCampaign,
         exportRuleTemplate,
         importRuleTemplate,
         detectRuleConflicts,

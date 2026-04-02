@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import {
   Tag,
   Plus,
@@ -59,7 +60,7 @@ interface PricingRule {
   details?: string;
   startDate?: string;
   endDate?: string;
-  conditions?: Record<string, any>;
+  conditions?: Record<string, unknown>;
 }
 interface DiscountRule {
   id: string;
@@ -70,7 +71,7 @@ interface DiscountRule {
   details?: string;
   startDate?: string;
   endDate?: string;
-  conditions?: Record<string, any>;
+  conditions?: Record<string, unknown>;
 }
 interface CouponCode {
   id: string;
@@ -83,111 +84,40 @@ interface CouponCode {
 
 export default function PricingDiscountsPage() {
   const { isOwner } = useAuth();
+  const {
+    pricingRules,
+    discountRules,
+    couponCodes,
+    couponCodeRules,
+    masterCatalogItems,
+    addPricingRule,
+    updatePricingRule,
+    addDiscountRule,
+    updateDiscountRule,
+    addCouponCode,
+    addCouponCodeRule,
+    autoConfigurePricingAndDiscountRules,
+    autoGenerateCouponCampaign,
+  } = useData();
   const [showAddPricing, setShowAddPricing] = useState(false);
   const [showAddDiscount, setShowAddDiscount] = useState(false);
   const [showCreateCoupon, setShowCreateCoupon] = useState(false);
   const [showCouponCodeRule, setShowCouponCodeRule] = useState(false);
-
-  const [pricingRules, setPricingRules] = useState<PricingRule[]>([
-    {
-      id: "pr1",
-      name: "Default Markup (%)",
-      type: "markup",
-      value: "15%",
-      enabled: true,
-    },
-    {
-      id: "pr2",
-      name: "Tier-Based Pricing",
-      type: "tier",
-      value: "Active",
-      enabled: true,
-      details: "3 tiers configured",
-    },
-    {
-      id: "pr3",
-      name: "Seasonal & Promotional Pricing",
-      type: "seasonal",
-      value: "Active",
-      enabled: true,
-      details: "Diwali Offer · 10% OFF · 15 Nov → 15 Nov 2026",
-    },
-    {
-      id: "pr4",
-      name: "Bulk Order Pricing",
-      type: "bulk",
-      value: "Active",
-      enabled: true,
-      details: "₹100 units · ₹500 units 5 · ₹106 · 15% OFF",
-    },
-  ]);
-
-  const [discountRules, setDiscountRules] = useState<DiscountRule[]>([
-    {
-      id: "dr1",
-      name: "Volume-Based Discount",
-      type: "volume",
-      value: "₹200",
-      enabled: true,
-      details: "₹4,000 – ₹4,000",
-    },
-    {
-      id: "dr2",
-      name: "Client Loyalty Discount",
-      type: "loyalty",
-      value: "₹000",
-      enabled: true,
-      details: "₹4,000 – ₹10,000",
-    },
-    {
-      id: "dr3",
-      name: "Catalogue-Based Discount",
-      type: "catalogue",
-      value: "15% off",
-      enabled: true,
-      details: "131 SanDisk products",
-    },
-    {
-      id: "dr4",
-      name: "Payment Method Discount",
-      type: "payment",
-      value: "10% off",
-      enabled: true,
-      details: "For Advance Payment",
-    },
-  ]);
 
   const [discountComputation, setDiscountComputation] = useState("before_tax");
   const [gstRate, setGstRate] = useState("18");
   const [autoGenCoupons, setAutoGenCoupons] = useState(true);
   const [couponPrefix, setCouponPrefix] = useState("NIDO");
 
-  const [coupons, setCoupons] = useState<CouponCode[]>([
-    {
-      id: "cp1",
-      code: "NIDO1000",
-      discount: "₹1000 OFF",
-      status: "active",
-      validFrom: "2026-01-04",
-      validTo: "2026-03-31",
-    },
-    {
-      id: "cp2",
-      code: "SAVE500",
-      discount: "₹500 OFF",
-      status: "active",
-      validFrom: "2026-01-04",
-      validTo: "2026-03-31",
-    },
-    {
-      id: "cp3",
-      code: "FREESHIP",
-      discount: "Free Shipping",
-      status: "active",
-      validFrom: "2026-01-01",
-      validTo: "2026-12-31",
-    },
-  ]);
+  const catalogCategories = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          masterCatalogItems.map((item) => item.category).filter(Boolean),
+        ),
+      ),
+    [masterCatalogItems],
+  );
 
   // Form states
   const [newPricing, setNewPricing] = useState({
@@ -267,18 +197,24 @@ export default function PricingDiscountsPage() {
       newCoupon.codeGen === "Auto-Generate"
         ? `${couponPrefix}${Math.random().toString(36).substring(7).toUpperCase()}`
         : newCoupon.code;
-    setCoupons((prev) => [
-      ...prev,
-      {
-        id: `cp-${Date.now()}`,
-        code,
-        discount: `${newCoupon.discountValue}${newCoupon.discountType.includes("%") ? "%" : ""} OFF`,
-        status: "active",
-        validFrom:
-          newCoupon.validFrom || new Date().toISOString().split("T")[0],
-        validTo: newCoupon.validTo || "2026-12-31",
-      },
-    ]);
+    addCouponCode({
+      title: newCoupon.name,
+      code,
+      discountType:
+        newCoupon.discountType === "Fixed Amount Discount"
+          ? "fixed"
+          : newCoupon.discountType === "Free Shipping"
+            ? "shipping"
+            : "percentage",
+      discountValue: Number(newCoupon.discountValue) || 0,
+      minPurchase: Number(newCoupon.minPurchaseAmount) || 0,
+      usageLimit: Number(newCoupon.maxUsageGlobal) || 0,
+      usagePerCustomer: Number(newCoupon.maxUsagePerCustomer) || 1,
+      validFrom: newCoupon.validFrom || new Date().toISOString().split("T")[0],
+      validTo: newCoupon.validTo || "2026-12-31",
+      active: true,
+      notes: newCoupon.internalNotes,
+    });
     setNewCoupon({
       name: "",
       codeGen: "Manual",
@@ -312,16 +248,29 @@ export default function PricingDiscountsPage() {
       });
       return;
     }
-    setPricingRules((prev) => [
-      ...prev,
-      {
-        ...newPricing,
-        id: `pr-${Date.now()}`,
-        type: "dynamic",
-        value: `${newPricing.discountValue}%`,
-        enabled: true,
-      },
-    ]);
+    addPricingRule({
+      name: newPricing.name,
+      status: "active",
+      ruleType:
+        newPricing.ruleType === "Tiered Pricing"
+          ? "Tiered Pricing"
+          : "Volume-Based",
+      minimumQuantity: Number(newPricing.quantityVal) || 1,
+      categories:
+        newPricing.applyTo === "Specific Product Categories" &&
+        newPricing.selectedCategories.length > 0
+          ? newPricing.selectedCategories
+          : catalogCategories.slice(0, 1),
+      products: [],
+      adjustmentType:
+        newPricing.discountType === "Markup" ? "markup" : "discount",
+      valueType:
+        newPricing.discountType === "Fixed Amount" ? "fixed" : "percentage",
+      value: Number(newPricing.discountValue) || 0,
+      startDate: newPricing.startDate || new Date().toISOString().slice(0, 10),
+      endDate: newPricing.endDate || "2099-12-31",
+      applyBeforeTax: true,
+    });
     setNewPricing({
       name: "",
       ruleType: "Volume-Based",
@@ -348,16 +297,23 @@ export default function PricingDiscountsPage() {
       });
       return;
     }
-    setDiscountRules((prev) => [
-      ...prev,
-      {
-        ...newDiscount,
-        id: `dr-${Date.now()}`,
-        type: "dynamic",
-        value: `${newDiscount.discountValue}%`,
-        enabled: true,
-      },
-    ]);
+    addDiscountRule({
+      name: newDiscount.name,
+      status: "active",
+      ruleType:
+        newDiscount.ruleType === "Volume-Based Discount"
+          ? "Volume-Based"
+          : "Catalogue-Based",
+      categories: catalogCategories.slice(0, 1),
+      products: [],
+      minimumOrderAmount: Number(newDiscount.minOrderAmount) || 0,
+      discountPercent: Number(newDiscount.discountValue) || 0,
+      maxUsagePerUser: Number(newDiscount.maxUsagePerCustomer) || 1,
+      stackable: newDiscount.stackable,
+      startDate: newDiscount.startDate || new Date().toISOString().slice(0, 10),
+      endDate: newDiscount.endDate || "2099-12-31",
+      applyBeforeTax: true,
+    });
     setNewDiscount({
       name: "",
       description: "",
@@ -383,6 +339,32 @@ export default function PricingDiscountsPage() {
       });
       return;
     }
+    addCouponCodeRule({
+      name: couponCodeRuleForm.name,
+      triggerType:
+        couponCodeRuleForm.triggerType === "Apply to Codes with Prefix"
+          ? "prefix"
+          : couponCodeRuleForm.triggerType === "Apply to Codes with Suffix"
+            ? "suffix"
+            : couponCodeRuleForm.triggerType === "Apply to All Codes"
+              ? "all"
+              : "specific",
+      triggerValue: couponCodeRuleForm.triggerValue,
+      conditionField: "cart_total",
+      comparator: ">=",
+      threshold: Number(couponCodeRuleForm.conditions[0]?.value) || 0,
+      discountType:
+        couponCodeRuleForm.actions.discountType === "Fixed Amount Discount"
+          ? "fixed"
+          : "percentage",
+      discountValue: Number(couponCodeRuleForm.actions.discountValue) || 0,
+      calculationOrder: "before_tax",
+      maxUsageGlobal: Number(couponCodeRuleForm.maxUsageGlobal) || 0,
+      maxUsagePerCustomer: Number(couponCodeRuleForm.maxUsagePerCustomer) || 1,
+      stackable: false,
+      active: true,
+    });
+
     toast({ title: "Coupon Code Rule Added" });
     setCouponCodeRuleForm({
       name: "",
@@ -405,6 +387,23 @@ export default function PricingDiscountsPage() {
     setShowCouponCodeRule(false);
   };
 
+  const handleAutomationSetup = () => {
+    const configured = autoConfigurePricingAndDiscountRules();
+    const campaign = autoGenerateCouponCampaign({
+      prefix: couponPrefix,
+      count: 5,
+      discountType: "percentage",
+      discountValue: 10,
+      minPurchase: 5000,
+      validDays: 90,
+    });
+
+    toast({
+      title: "Automation completed",
+      description: `${configured.pricingAdded} pricing, ${configured.discountAdded} discount, ${campaign.couponsCreated} coupons and ${campaign.rulesCreated} coupon rule generated.`,
+    });
+  };
+
   return (
     <div>
       <Header title="Pricing & Discounts" />
@@ -420,9 +419,18 @@ export default function PricingDiscountsPage() {
               order discounts, and manage coupon codes.
             </p>
           </div>
-          <Button className="gap-2" onClick={() => setShowCreateCoupon(true)}>
-            <Plus className="h-4 w-4" /> Create Coupon
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={handleAutomationSetup}
+            >
+              <Zap className="h-4 w-4" /> Auto Configure
+            </Button>
+            <Button className="gap-2" onClick={() => setShowCreateCoupon(true)}>
+              <Plus className="h-4 w-4" /> Create Coupon
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -451,31 +459,29 @@ export default function PricingDiscountsPage() {
                   >
                     <div className="flex items-center gap-3">
                       <Checkbox
-                        checked={rule.enabled}
+                        checked={rule.status === "active"}
                         onCheckedChange={(v) =>
-                          setPricingRules((prev) =>
-                            prev.map((r) =>
-                              r.id === rule.id ? { ...r, enabled: !!v } : r,
-                            ),
-                          )
+                          updatePricingRule(rule.id, {
+                            status: v ? "active" : "inactive",
+                          })
                         }
                       />
                       <div>
                         <span className="text-sm font-medium">{rule.name}</span>
-                        {rule.type === "seasonal" && (
+                        {rule.ruleType === "Tiered Pricing" && (
                           <Badge className="ml-2 bg-amber-500 text-white text-[10px]">
                             New Offer!
                           </Badge>
                         )}
-                        {rule.details && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {rule.details}
-                          </p>
-                        )}
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {rule.ruleType} · Min Qty {rule.minimumQuantity} ·{" "}
+                          {rule.value}
+                          {rule.valueType === "percentage" ? "%" : " INR"}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {rule.type === "markup" && (
+                      {rule.adjustmentType === "markup" && (
                         <Select defaultValue="15">
                           <SelectTrigger className="w-20 h-8">
                             <SelectValue />
@@ -489,13 +495,11 @@ export default function PricingDiscountsPage() {
                         </Select>
                       )}
                       <Switch
-                        checked={rule.enabled}
+                        checked={rule.status === "active"}
                         onCheckedChange={(v) =>
-                          setPricingRules((prev) =>
-                            prev.map((r) =>
-                              r.id === rule.id ? { ...r, enabled: v } : r,
-                            ),
-                          )
+                          updatePricingRule(rule.id, {
+                            status: v ? "active" : "inactive",
+                          })
                         }
                       />
                     </div>
@@ -535,30 +539,27 @@ export default function PricingDiscountsPage() {
                   >
                     <div className="flex items-center gap-3">
                       <Checkbox
-                        checked={rule.enabled}
+                        checked={rule.status === "active"}
                         onCheckedChange={(v) =>
-                          setDiscountRules((prev) =>
-                            prev.map((r) =>
-                              r.id === rule.id ? { ...r, enabled: !!v } : r,
-                            ),
-                          )
+                          updateDiscountRule(rule.id, {
+                            status: v ? "active" : "inactive",
+                          })
                         }
                       />
                       <div>
                         <span className="text-sm font-medium">{rule.name}</span>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {rule.value} · {rule.details}
+                          {rule.ruleType} · {rule.discountPercent}% · Min ₹
+                          {rule.minimumOrderAmount.toLocaleString()}
                         </p>
                       </div>
                     </div>
                     <Switch
-                      checked={rule.enabled}
+                      checked={rule.status === "active"}
                       onCheckedChange={(v) =>
-                        setDiscountRules((prev) =>
-                          prev.map((r) =>
-                            r.id === rule.id ? { ...r, enabled: v } : r,
-                          ),
-                        )
+                        updateDiscountRule(rule.id, {
+                          status: v ? "active" : "inactive",
+                        })
                       }
                     />
                   </div>
@@ -667,22 +668,28 @@ export default function PricingDiscountsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {coupons.map((c) => (
+                    {couponCodes.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell className="font-mono font-medium text-xs">
                           {c.code}
                         </TableCell>
-                        <TableCell className="text-xs">{c.discount}</TableCell>
+                        <TableCell className="text-xs">
+                          {c.discountType === "percentage"
+                            ? `${c.discountValue}% OFF`
+                            : c.discountType === "fixed"
+                              ? `₹${c.discountValue} OFF`
+                              : "Free Shipping"}
+                        </TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
                             className={
-                              c.status === "active"
+                              c.active
                                 ? "border-emerald-300 text-emerald-700 text-[10px]"
                                 : "text-[10px]"
                             }
                           >
-                            {c.status === "active" ? "Active" : "Expired"}
+                            {c.active ? "Active" : "Expired"}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -1170,15 +1177,26 @@ export default function PricingDiscountsPage() {
 
                 <div className="space-y-2 mt-4">
                   <Label>Apply To</Label>
-                  <SelectContent>
-                    <SelectItem value="Select Category">
-                      Select Category
-                    </SelectItem>
-                    <SelectItem value="Laptops">Laptops</SelectItem>
-                    <SelectItem value="Storage Devices">
-                      Storage Devices
-                    </SelectItem>
-                  </SelectContent>
+                  <Select
+                    value={newPricing.selectedCategories[0] || ""}
+                    onValueChange={(value) =>
+                      setNewPricing((p) => ({
+                        ...p,
+                        selectedCategories: value ? [value] : [],
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {catalogCategories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

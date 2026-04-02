@@ -226,8 +226,12 @@ export default function ClientDetailPage() {
     deleteClientCatalogItem,
     addPricingRule,
     addDiscountRule,
+    addCouponCode,
+    addCouponCodeRule,
     addTaxSetting,
     upsertPrimaryTaxSetting,
+    autoConfigurePricingAndDiscountRules,
+    autoGenerateCouponCampaign,
     exportRuleTemplate,
     importRuleTemplate,
     detectRuleConflicts,
@@ -235,6 +239,8 @@ export default function ClientDetailPage() {
     taxSettings,
     pricingRules,
     discountRules,
+    couponCodes,
+    couponCodeRules,
     applyPricingRules,
     applyDiscountRules,
     applyTax,
@@ -326,8 +332,6 @@ export default function ClientDetailPage() {
   const [couponCodeRuleDialogOpen, setCouponCodeRuleDialogOpen] =
     useState(false);
   const [taxRuleDialogOpen, setTaxRuleDialogOpen] = useState(false);
-  const [createdCoupons, setCreatedCoupons] = useState<ClientCoupon[]>([]);
-  const [couponCodeRules, setCouponCodeRules] = useState<CouponCodeRule[]>([]);
   const [pricingRuleForm, setPricingRuleForm] = useState({
     name: "",
     status: true,
@@ -1358,8 +1362,7 @@ export default function ClientDetailPage() {
         ? `NIDO${Math.floor(1000 + Math.random() * 9000)}`
         : couponForm.code.trim().toUpperCase();
 
-    const coupon: ClientCoupon = {
-      id: `coupon-${Date.now()}`,
+    addCouponCode({
       title: couponForm.title,
       code,
       discountType: couponForm.discountType,
@@ -1371,14 +1374,13 @@ export default function ClientDetailPage() {
       validTo: couponForm.validTo,
       active: couponForm.active,
       notes: couponForm.notes,
-    };
+    });
 
-    setCreatedCoupons((prev) => [coupon, ...prev]);
     setCouponDialogOpen(false);
     setCouponForm((prev) => ({ ...prev, title: "", code: "", notes: "" }));
     toast({
       title: "Coupon created",
-      description: `Coupon code ${coupon.code} is ready for use.`,
+      description: `Coupon code ${code} is ready for use.`,
     });
   };
 
@@ -1388,8 +1390,7 @@ export default function ClientDetailPage() {
       return;
     }
 
-    const rule: CouponCodeRule = {
-      id: `coupon-rule-${Date.now()}`,
+    addCouponCodeRule({
       name: couponCodeRuleForm.name,
       triggerType: couponCodeRuleForm.triggerType,
       triggerValue: couponCodeRuleForm.triggerValue,
@@ -1403,9 +1404,8 @@ export default function ClientDetailPage() {
       maxUsagePerCustomer: Number(couponCodeRuleForm.maxUsagePerCustomer) || 1,
       stackable: couponCodeRuleForm.stackable,
       active: couponCodeRuleForm.status,
-    };
+    });
 
-    setCouponCodeRules((prev) => [rule, ...prev]);
     setCouponCodeRuleDialogOpen(false);
     setCouponCodeRuleForm((prev) => ({
       ...prev,
@@ -1414,6 +1414,24 @@ export default function ClientDetailPage() {
       triggerValue: "",
     }));
     toast({ title: "Coupon code rule created" });
+  };
+
+  const handleAutoConfigureCommercialRules = () => {
+    const configured = autoConfigurePricingAndDiscountRules();
+    const campaign = autoGenerateCouponCampaign({
+      prefix: client.name.replace(/[^A-Za-z]/g, "").slice(0, 4) || "NIDO",
+      count: 5,
+      discountType: "percentage",
+      discountValue: 10,
+      minPurchase: 5000,
+      validDays: 90,
+      category: pricingRuleForm.category,
+    });
+
+    toast({
+      title: "Automation completed",
+      description: `${configured.pricingAdded} pricing, ${configured.discountAdded} discount, ${campaign.couponsCreated} coupons and ${campaign.rulesCreated} coupon rule generated automatically.`,
+    });
   };
 
   const handleCreateTaxRule = () => {
@@ -2314,6 +2332,12 @@ export default function ClientDetailPage() {
                         code logic for this client profile.
                       </p>
                       <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={handleAutoConfigureCommercialRules}
+                        >
+                          Auto Configure Rules
+                        </Button>
                         <Button onClick={() => setCouponDialogOpen(true)}>
                           + Create Coupon
                         </Button>
@@ -2484,8 +2508,8 @@ export default function ClientDetailPage() {
                         </CardHeader>
                         <CardContent className="space-y-2">
                           <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                            {(createdCoupons.length > 0
-                              ? createdCoupons
+                            {(couponCodes.length > 0
+                              ? couponCodes
                               : [
                                   {
                                     id: "seed-coupon",
