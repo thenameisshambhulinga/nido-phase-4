@@ -319,6 +319,105 @@ export interface PricingComputation {
   total: number;
 }
 
+export interface GlobalSearchResult {
+  group: "Users" | "Orders" | "Vendors" | "Clients" | "Invoices";
+  title: string;
+  subtitle: string;
+  badge: string;
+  path: string;
+  id: string;
+  score: number;
+}
+
+export interface SalesLineItem {
+  id: string;
+  itemName: string;
+  description: string;
+  hsnSac: string;
+  quantity: number;
+  rate: number;
+  discount: number;
+  taxRate: number;
+  amount: number;
+}
+
+export interface SalesQuote {
+  id: string;
+  quoteNumber: string;
+  referenceNumber: string;
+  customerName: string;
+  customerId?: string;
+  quoteDate: string;
+  validTillDate: string;
+  projectName: string;
+  status: "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "CONVERTED";
+  billingAddress: string;
+  shippingAddress: string;
+  placeOfSupply: string;
+  salesperson: string;
+  emailRecipients: string[];
+  items: SalesLineItem[];
+  subtotal: number;
+  cgst: number;
+  sgst: number;
+  adjustment: number;
+  total: number;
+  customerNotes: string;
+  termsAndConditions: string;
+  attachments: string[];
+  bankDetails: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  referenceSalesOrderId?: string;
+  referenceInvoiceId?: string;
+}
+
+export interface SalesOrder {
+  id: string;
+  salesOrderNumber: string;
+  referenceQuoteId?: string;
+  referenceNumber: string;
+  customerName: string;
+  customerId?: string;
+  salesOrderDate: string;
+  expectedShipmentDate: string;
+  paymentTerms: string;
+  deliveryMethod: string;
+  status: "DRAFT" | "CONFIRMED" | "CANCELLED";
+  invoiceStatus: "NOT INVOICED" | "INVOICED";
+  paymentStatus: "UNPAID" | "PARTIALLY PAID" | "PAID";
+  shipmentStatus: "PENDING" | "PARTIALLY SHIPPED" | "SHIPPED";
+  billingAddress: string;
+  shippingAddress: string;
+  placeOfSupply: string;
+  emailRecipients: string[];
+  items: SalesLineItem[];
+  subtotal: number;
+  cgst: number;
+  sgst: number;
+  adjustment: number;
+  total: number;
+  customerNotes: string;
+  termsAndConditions: string;
+  attachments: string[];
+  bankDetails: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  referenceInvoiceId?: string;
+}
+
+export interface SalesActivity {
+  id: string;
+  entityType: "quote" | "sales_order" | "invoice";
+  entityId: string;
+  action: "CREATED" | "EDITED" | "SENT" | "CONVERTED";
+  message: string;
+  actor: string;
+  timestamp: string;
+}
+
 interface DataContextType {
   orders: Order[];
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
@@ -342,6 +441,9 @@ interface DataContextType {
   taxSettings: TaxSetting[];
   couponCodes: CouponCode[];
   couponCodeRules: CouponCodeRule[];
+  salesQuotes: SalesQuote[];
+  salesOrders: SalesOrder[];
+  salesActivities: SalesActivity[];
   addOrder: (order: Partial<Order>) => void;
   updateOrder: (id: string, data: Partial<Order>) => void;
   bulkUpdateOrders: (ids: string[], data: Partial<Order>) => void;
@@ -448,6 +550,40 @@ interface DataContextType {
     productCode?: string;
   }) => number;
   applyTax: (amount: number) => number;
+  searchAll: (query: string) => GlobalSearchResult[];
+  createQuote: (
+    quote: Omit<
+      SalesQuote,
+      "id" | "createdAt" | "updatedAt" | "createdBy" | "status"
+    > & {
+      status?: SalesQuote["status"];
+      createdBy?: string;
+    },
+  ) => SalesQuote;
+  updateQuote: (id: string, data: Partial<SalesQuote>) => void;
+  createSalesOrder: (
+    order: Omit<
+      SalesOrder,
+      "id" | "createdAt" | "updatedAt" | "createdBy" | "invoiceStatus"
+    > & {
+      invoiceStatus?: SalesOrder["invoiceStatus"];
+      createdBy?: string;
+    },
+  ) => SalesOrder;
+  updateSalesOrder: (id: string, data: Partial<SalesOrder>) => void;
+  convertQuoteToOrder: (quoteId: string, actor?: string) => SalesOrder | null;
+  convertQuoteToInvoice: (quoteId: string, actor?: string) => string | null;
+  sendEmail: (args: {
+    entityType: "quote" | "sales_order" | "invoice";
+    entityId: string;
+    to: string[];
+    actor?: string;
+    subject?: string;
+  }) => void;
+  getActivities: (
+    entityType: SalesActivity["entityType"],
+    entityId: string,
+  ) => SalesActivity[];
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -2058,6 +2194,144 @@ const DEFAULT_APP_USERS: AppUser[] = [
   },
 ];
 
+const DEFAULT_SALES_QUOTES: SalesQuote[] = [
+  {
+    id: "sq-1",
+    quoteNumber: "EST-000126",
+    referenceNumber: "REF-EST-126",
+    customerName: "Nido Technologies",
+    customerId: "cl1",
+    quoteDate: "2026-03-30",
+    validTillDate: "2026-04-30",
+    projectName: "Design Model Program",
+    status: "ACCEPTED",
+    billingAddress:
+      "Nido Technologies, 41/1 2nd Floor 10th Cross, Wilson Garden, Bengaluru",
+    shippingAddress:
+      "Nido Technologies, 41/1 2nd Floor 10th Cross, Wilson Garden, Bengaluru",
+    placeOfSupply: "Karnataka (29)",
+    salesperson: "Mark Adams",
+    emailRecipients: ["pavannido@gmail.com"],
+    items: [
+      {
+        id: "sqli-1",
+        itemName: "3D Design Model",
+        description: "3D model mould designs for handle",
+        hsnSac: "9983",
+        quantity: 1,
+        rate: 400,
+        discount: 0,
+        taxRate: 18,
+        amount: 400,
+      },
+    ],
+    subtotal: 400,
+    cgst: 36,
+    sgst: 36,
+    adjustment: 0,
+    total: 472,
+    customerNotes:
+      "BANK NAME:- IDFC\nA/c Payee Name: Nido Technologies\nBank A/C No.: 10028186411",
+    termsAndConditions:
+      "Payment of 50% post approval of quote, 30% against trial component and 20% before delivery.",
+    attachments: [],
+    bankDetails:
+      "BANK NAME:- IDFC\nA/c Payee Name: Nido Technologies\nBank IFSC Code: IDFB0080154",
+    createdBy: "System Owner",
+    createdAt: "2026-03-30T09:00:00.000Z",
+    updatedAt: "2026-03-30T09:00:00.000Z",
+  },
+];
+
+const DEFAULT_SALES_ORDERS: SalesOrder[] = [
+  {
+    id: "so-1",
+    salesOrderNumber: "SO-00001",
+    referenceQuoteId: "sq-1",
+    referenceNumber: "EST-000126",
+    customerName: "Nido Technologies",
+    customerId: "cl1",
+    salesOrderDate: "2026-03-30",
+    expectedShipmentDate: "2026-04-05",
+    paymentTerms: "Due on Receipt",
+    deliveryMethod: "Standard",
+    status: "CONFIRMED",
+    invoiceStatus: "NOT INVOICED",
+    paymentStatus: "UNPAID",
+    shipmentStatus: "PENDING",
+    billingAddress:
+      "Nido Technologies, 41/1 2nd Floor 10th Cross, Wilson Garden, Bengaluru",
+    shippingAddress:
+      "Nido Technologies, 41/1 2nd Floor 10th Cross, Wilson Garden, Bengaluru",
+    placeOfSupply: "Karnataka (29)",
+    emailRecipients: ["pavannido@gmail.com"],
+    items: [
+      {
+        id: "soli-1",
+        itemName: "3D Design Model",
+        description: "3D model mould designs for handle",
+        hsnSac: "9983",
+        quantity: 1,
+        rate: 400,
+        discount: 0,
+        taxRate: 18,
+        amount: 400,
+      },
+    ],
+    subtotal: 400,
+    cgst: 36,
+    sgst: 36,
+    adjustment: 0,
+    total: 472,
+    customerNotes: "Customer prefers afternoon dispatch window",
+    termsAndConditions:
+      "Trial cost not included and delivery will be made after payment confirmation.",
+    attachments: [],
+    bankDetails:
+      "BANK NAME:- IDFC\nA/c Payee Name: Nido Technologies\nBank IFSC Code: IDFB0080154",
+    createdBy: "System Owner",
+    createdAt: "2026-03-30T11:00:00.000Z",
+    updatedAt: "2026-03-30T11:00:00.000Z",
+  },
+];
+
+const DEFAULT_SALES_ACTIVITIES: SalesActivity[] = [
+  {
+    id: "sa-1",
+    entityType: "quote",
+    entityId: "sq-1",
+    action: "CREATED",
+    message: "Quote EST-000126 created",
+    actor: "System Owner",
+    timestamp: "2026-03-30T09:00:00.000Z",
+  },
+  {
+    id: "sa-2",
+    entityType: "quote",
+    entityId: "sq-1",
+    action: "CONVERTED",
+    message: "Quote EST-000126 converted to Sales Order SO-00001",
+    actor: "System Owner",
+    timestamp: "2026-03-30T11:00:00.000Z",
+  },
+];
+
+const computeSalesTotals = (items: SalesLineItem[], adjustment = 0) => {
+  const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
+  const totalTax = items.reduce(
+    (sum, item) => sum + (item.amount * item.taxRate) / 100,
+    0,
+  );
+  const halfTax = Math.round((totalTax / 2) * 100) / 100;
+  const total = Math.round((subtotal + totalTax + adjustment) * 100) / 100;
+  return {
+    subtotal: Math.round(subtotal * 100) / 100,
+    cgst: halfTax,
+    sgst: halfTax,
+    total,
+  };
+};
+
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -2139,6 +2413,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     "nido_coupon_code_rules",
     DEFAULT_COUPON_CODE_RULES,
   );
+  const [salesQuotes, setSalesQuotes] = usePersistedState(
+    "nido_sales_quotes",
+    DEFAULT_SALES_QUOTES,
+  );
+  const [salesOrders, setSalesOrders] = usePersistedState(
+    "nido_sales_orders",
+    DEFAULT_SALES_ORDERS,
+  );
+  const [salesActivities, setSalesActivities] = usePersistedState(
+    "nido_sales_activities",
+    DEFAULT_SALES_ACTIVITIES,
+  );
 
   const makeCrud = <T extends { id: string }>(
     setter: React.Dispatch<React.SetStateAction<T[]>>,
@@ -2209,6 +2495,322 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       }));
     },
     [setGeneralSettings],
+  );
+
+  const logSalesActivity = useCallback(
+    (
+      entry: Omit<SalesActivity, "id" | "timestamp"> & {
+        timestamp?: string;
+      },
+    ) => {
+      setSalesActivities((prev) => [
+        {
+          id: `sa-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          timestamp: entry.timestamp || new Date().toISOString(),
+          ...entry,
+        },
+        ...prev,
+      ]);
+    },
+    [setSalesActivities],
+  );
+
+  const createQuote = useCallback(
+    (
+      quote: Omit<
+        SalesQuote,
+        "id" | "createdAt" | "updatedAt" | "createdBy" | "status"
+      > & {
+        status?: SalesQuote["status"];
+        createdBy?: string;
+      },
+    ) => {
+      const totals = computeSalesTotals(quote.items, quote.adjustment);
+      const nextQuote: SalesQuote = {
+        ...quote,
+        ...totals,
+        status: quote.status || "DRAFT",
+        id: `sq-${Date.now()}`,
+        createdBy: quote.createdBy || "System",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      setSalesQuotes((prev) => [nextQuote, ...prev]);
+      logSalesActivity({
+        entityType: "quote",
+        entityId: nextQuote.id,
+        action: "CREATED",
+        actor: nextQuote.createdBy,
+        message: `Quote ${nextQuote.quoteNumber} created`,
+      });
+      return nextQuote;
+    },
+    [logSalesActivity, setSalesQuotes],
+  );
+
+  const updateQuote = useCallback(
+    (id: string, data: Partial<SalesQuote>) => {
+      setSalesQuotes((prev) =>
+        prev.map((quote) => {
+          if (quote.id !== id) return quote;
+          const nextItems = data.items || quote.items;
+          const nextAdjustment = data.adjustment ?? quote.adjustment;
+          const totals = computeSalesTotals(nextItems, nextAdjustment);
+          return {
+            ...quote,
+            ...data,
+            ...totals,
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      );
+      logSalesActivity({
+        entityType: "quote",
+        entityId: id,
+        action: "EDITED",
+        actor: data.createdBy || "System",
+        message: `Quote updated`,
+      });
+    },
+    [logSalesActivity, setSalesQuotes],
+  );
+
+  const createSalesOrder = useCallback(
+    (
+      order: Omit<
+        SalesOrder,
+        "id" | "createdAt" | "updatedAt" | "createdBy" | "invoiceStatus"
+      > & {
+        invoiceStatus?: SalesOrder["invoiceStatus"];
+        createdBy?: string;
+      },
+    ) => {
+      const totals = computeSalesTotals(order.items, order.adjustment);
+      const nextOrder: SalesOrder = {
+        ...order,
+        ...totals,
+        invoiceStatus: order.invoiceStatus || "NOT INVOICED",
+        id: `so-${Date.now()}`,
+        createdBy: order.createdBy || "System",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      setSalesOrders((prev) => [nextOrder, ...prev]);
+      logSalesActivity({
+        entityType: "sales_order",
+        entityId: nextOrder.id,
+        action: "CREATED",
+        actor: nextOrder.createdBy,
+        message: `Sales Order ${nextOrder.salesOrderNumber} created`,
+      });
+      return nextOrder;
+    },
+    [logSalesActivity, setSalesOrders],
+  );
+
+  const updateSalesOrder = useCallback(
+    (id: string, data: Partial<SalesOrder>) => {
+      setSalesOrders((prev) =>
+        prev.map((order) => {
+          if (order.id !== id) return order;
+          const nextItems = data.items || order.items;
+          const nextAdjustment = data.adjustment ?? order.adjustment;
+          const totals = computeSalesTotals(nextItems, nextAdjustment);
+          return {
+            ...order,
+            ...data,
+            ...totals,
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      );
+      logSalesActivity({
+        entityType: "sales_order",
+        entityId: id,
+        action: "EDITED",
+        actor: data.createdBy || "System",
+        message: `Sales Order updated`,
+      });
+    },
+    [logSalesActivity, setSalesOrders],
+  );
+
+  const convertQuoteToOrder = useCallback(
+    (quoteId: string, actor = "System") => {
+      const quote = salesQuotes.find((entry) => entry.id === quoteId);
+      if (!quote || quote.status !== "ACCEPTED") return null;
+
+      const nextOrderNumber = `SO-${String(Date.now()).slice(-5)}`;
+      const newOrder = createSalesOrder({
+        salesOrderNumber: nextOrderNumber,
+        referenceQuoteId: quote.id,
+        referenceNumber: quote.quoteNumber,
+        customerName: quote.customerName,
+        customerId: quote.customerId,
+        salesOrderDate: new Date().toISOString().slice(0, 10),
+        expectedShipmentDate: quote.validTillDate,
+        paymentTerms: "Due on Receipt",
+        deliveryMethod: "Standard",
+        status: "CONFIRMED",
+        paymentStatus: "UNPAID",
+        shipmentStatus: "PENDING",
+        billingAddress: quote.billingAddress,
+        shippingAddress: quote.shippingAddress,
+        placeOfSupply: quote.placeOfSupply,
+        emailRecipients: quote.emailRecipients,
+        items: quote.items,
+        subtotal: quote.subtotal,
+        cgst: quote.cgst,
+        sgst: quote.sgst,
+        adjustment: quote.adjustment,
+        total: quote.total,
+        customerNotes: quote.customerNotes,
+        termsAndConditions: quote.termsAndConditions,
+        attachments: quote.attachments,
+        bankDetails: quote.bankDetails,
+        createdBy: actor,
+      });
+
+      setSalesQuotes((prev) =>
+        prev.map((entry) =>
+          entry.id === quoteId
+            ? {
+                ...entry,
+                status: "CONVERTED",
+                referenceSalesOrderId: newOrder.id,
+                updatedAt: new Date().toISOString(),
+              }
+            : entry,
+        ),
+      );
+      logSalesActivity({
+        entityType: "quote",
+        entityId: quoteId,
+        action: "CONVERTED",
+        actor,
+        message: `Quote ${quote.quoteNumber} converted to Sales Order ${newOrder.salesOrderNumber}`,
+      });
+      return newOrder;
+    },
+    [createSalesOrder, logSalesActivity, salesQuotes],
+  );
+
+  const convertQuoteToInvoice = useCallback(
+    (quoteId: string, actor = "System") => {
+      const quote = salesQuotes.find((entry) => entry.id === quoteId);
+      if (!quote || quote.status !== "ACCEPTED") return null;
+
+      const invoices = safeReadJson<Array<Record<string, unknown>>>(
+        "nido_invoices",
+        [],
+      );
+      const invoiceId = `inv-${Date.now()}`;
+      const invoiceNumber = `INV-${String(Date.now()).slice(-6)}`;
+
+      const newInvoice = {
+        id: invoiceId,
+        invoiceNumber,
+        vendorOrClient: quote.customerName,
+        type: "client",
+        issueDate: new Date().toISOString().slice(0, 10),
+        dueDate: quote.validTillDate,
+        amount: quote.subtotal,
+        tax: quote.cgst + quote.sgst,
+        totalAmount: quote.total,
+        status: "sent",
+        items: quote.items.map((item) => ({
+          description: item.itemName,
+          quantity: item.quantity,
+          unitPrice: item.rate,
+          total: item.amount,
+        })),
+        notes: quote.customerNotes,
+        autoReminder: true,
+        referenceQuoteId: quote.id,
+      };
+
+      localStorage.setItem(
+        "nido_invoices",
+        JSON.stringify([newInvoice, ...invoices]),
+      );
+
+      setSalesQuotes((prev) =>
+        prev.map((entry) =>
+          entry.id === quoteId
+            ? {
+                ...entry,
+                status: "CONVERTED",
+                referenceInvoiceId: invoiceId,
+                updatedAt: new Date().toISOString(),
+              }
+            : entry,
+        ),
+      );
+
+      if (quote.referenceSalesOrderId) {
+        setSalesOrders((prev) =>
+          prev.map((entry) =>
+            entry.id === quote.referenceSalesOrderId
+              ? {
+                  ...entry,
+                  invoiceStatus: "INVOICED",
+                  referenceInvoiceId: invoiceId,
+                  updatedAt: new Date().toISOString(),
+                }
+              : entry,
+          ),
+        );
+      }
+
+      logSalesActivity({
+        entityType: "quote",
+        entityId: quoteId,
+        action: "CONVERTED",
+        actor,
+        message: `Quote ${quote.quoteNumber} converted to Invoice ${invoiceNumber}`,
+      });
+      return invoiceId;
+    },
+    [logSalesActivity, salesQuotes],
+  );
+
+  const sendEmail = useCallback(
+    (args: {
+      entityType: "quote" | "sales_order" | "invoice";
+      entityId: string;
+      to: string[];
+      actor?: string;
+      subject?: string;
+    }) => {
+      const actor = args.actor || "System";
+      logSalesActivity({
+        entityType: args.entityType,
+        entityId: args.entityId,
+        action: "SENT",
+        actor,
+        message: `${args.subject || "Email"} sent to ${args.to.join(", ")}`,
+      });
+      addAuditEntry({
+        user: actor,
+        action: "Document Email Sent",
+        module: "Transactions",
+        details: `${args.entityType} ${args.entityId} emailed to ${args.to.join(", ")}`,
+        ipAddress: "10.0.0.22",
+        status: "success",
+      });
+    },
+    [addAuditEntry, logSalesActivity],
+  );
+
+  const getActivities = useCallback(
+    (entityType: SalesActivity["entityType"], entityId: string) =>
+      salesActivities.filter(
+        (entry) =>
+          entry.entityType === entityType && entry.entityId === entityId,
+      ),
+    [salesActivities],
   );
 
   const getDefaultGeneralSettings = (): GeneralSettings => ({
@@ -2921,6 +3523,227 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     [taxSettings],
   );
 
+  const searchAll = useCallback(
+    (query: string) => {
+      const normalized = query.trim().toLowerCase();
+      if (!normalized) return [];
+
+      const scoreMatch = (value?: string) => {
+        if (!value) return 0;
+        const normalizedValue = value.toLowerCase();
+        const matchIndex = normalizedValue.indexOf(normalized);
+        if (matchIndex === -1) return 0;
+        if (normalizedValue === normalized) return 100;
+        if (normalizedValue.startsWith(normalized)) return 85;
+        return Math.max(30, 60 - matchIndex);
+      };
+
+      const collectBestScore = (values: Array<string | undefined>) =>
+        values.reduce((best, value) => Math.max(best, scoreMatch(value)), 0);
+
+      const groupedResults: Record<
+        GlobalSearchResult["group"],
+        GlobalSearchResult[]
+      > = {
+        Users: [],
+        Orders: [],
+        Vendors: [],
+        Clients: [],
+        Invoices: [],
+      };
+
+      appUsers.forEach((appUser) => {
+        const score = collectBestScore([
+          appUser.fullName,
+          appUser.username,
+          appUser.email,
+          appUser.jobTitle,
+          appUser.department,
+          appUser.roleId,
+          appUser.organizationAccess,
+          appUser.userType,
+          appUser.status,
+        ]);
+        if (!score) return;
+        groupedResults.Users.push({
+          group: "Users",
+          title: appUser.fullName,
+          subtitle: [appUser.jobTitle, appUser.organizationAccess]
+            .filter(Boolean)
+            .join(" • "),
+          badge: appUser.status || "user",
+          path: "/users",
+          id: appUser.id,
+          score,
+        });
+      });
+
+      const authUsers = safeReadJson<
+        Array<{
+          id: string;
+          name?: string;
+          email?: string;
+          role?: string;
+          organization?: string;
+          status?: string;
+          jobTitle?: string;
+          department?: string;
+        }>
+      >("nido_users", []);
+
+      authUsers.forEach((authUser) => {
+        const score = collectBestScore([
+          authUser.name,
+          authUser.email,
+          authUser.role,
+          authUser.organization,
+          authUser.status,
+          authUser.jobTitle,
+          authUser.department,
+        ]);
+        if (!score) return;
+        groupedResults.Users.push({
+          group: "Users",
+          title: authUser.name || authUser.email || authUser.id,
+          subtitle: [authUser.role, authUser.organization]
+            .filter(Boolean)
+            .join(" • "),
+          badge: authUser.status || "user",
+          path: "/users",
+          id: `auth-${authUser.id}`,
+          score,
+        });
+      });
+
+      orders.forEach((order) => {
+        const score = collectBestScore([
+          order.orderNumber,
+          order.organization,
+          order.requestingUser,
+          order.approvingUser,
+          order.status,
+          order.assignedUser,
+          order.assignedAnalyst,
+          order.analystTeam,
+          order.serviceType,
+        ]);
+        if (!score) return;
+        groupedResults.Orders.push({
+          group: "Orders",
+          title: order.orderNumber,
+          subtitle: [order.organization, order.status]
+            .filter(Boolean)
+            .join(" • "),
+          badge: order.slaStatus.replaceAll("_", " "),
+          path: `/orders/${order.id}`,
+          id: order.id,
+          score,
+        });
+      });
+
+      vendors.forEach((vendor) => {
+        const score = collectBestScore([
+          vendor.name,
+          vendor.category,
+          vendor.contactEmail,
+          vendor.contactPhone,
+          vendor.address,
+          vendor.status,
+        ]);
+        if (!score) return;
+        groupedResults.Vendors.push({
+          group: "Vendors",
+          title: vendor.name,
+          subtitle: [vendor.category, vendor.status]
+            .filter(Boolean)
+            .join(" • "),
+          badge: `Rating ${vendor.rating.toFixed(1)}`,
+          path: `/vendors/${vendor.id}`,
+          id: vendor.id,
+          score,
+        });
+      });
+
+      clients.forEach((client) => {
+        const score = collectBestScore([
+          client.name,
+          client.companyName,
+          client.clientCode,
+          client.contactPerson,
+          client.contactEmployeeId,
+          client.contactNumber,
+          client.jobTitle,
+          client.email,
+          client.industryType,
+          client.businessType,
+        ]);
+        if (!score) return;
+        groupedResults.Clients.push({
+          group: "Clients",
+          title: client.name,
+          subtitle: [client.companyName, client.clientCode]
+            .filter(Boolean)
+            .join(" • "),
+          badge: client.businessType || client.industryType || "client",
+          path: `/clients/${client.id}`,
+          id: client.id,
+          score,
+        });
+      });
+
+      const invoiceRecords = safeReadJson<
+        Array<{
+          id: string;
+          invoiceNumber?: string;
+          vendorOrClient?: string;
+          type?: string;
+          status?: string;
+          dueDate?: string;
+          issueDate?: string;
+          totalAmount?: number;
+        }>
+      >("nido_invoices", []);
+
+      invoiceRecords.forEach((invoice) => {
+        const score = collectBestScore([
+          invoice.invoiceNumber,
+          invoice.vendorOrClient,
+          invoice.type,
+          invoice.status,
+          invoice.dueDate,
+          invoice.issueDate,
+          invoice.totalAmount !== undefined
+            ? String(invoice.totalAmount)
+            : undefined,
+        ]);
+        if (!score) return;
+        groupedResults.Invoices.push({
+          group: "Invoices",
+          title: invoice.invoiceNumber || invoice.vendorOrClient || invoice.id,
+          subtitle: [invoice.vendorOrClient, invoice.status]
+            .filter(Boolean)
+            .join(" • "),
+          badge: invoice.type || "invoice",
+          path: "/invoices",
+          id: invoice.id,
+          score,
+        });
+      });
+
+      return (
+        Object.keys(groupedResults) as GlobalSearchResult["group"][]
+      ).flatMap((group) =>
+        groupedResults[group]
+          .sort(
+            (left, right) =>
+              right.score - left.score || left.title.localeCompare(right.title),
+          )
+          .slice(0, 10),
+      );
+    },
+    [appUsers, clients, orders, vendors],
+  );
+
   const computeOrderPricing = useCallback(
     ({
       amount,
@@ -3006,6 +3829,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         taxSettings,
         couponCodes,
         couponCodeRules,
+        salesQuotes,
+        salesOrders,
+        salesActivities,
 
         roles,
         addOrder: orderCrud.add,
@@ -3057,8 +3883,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         addTaxSetting,
         updateTaxSetting,
         upsertPrimaryTaxSetting,
+        createQuote,
+        updateQuote,
+        createSalesOrder,
+        updateSalesOrder,
+        convertQuoteToOrder,
+        convertQuoteToInvoice,
+        sendEmail,
+        getActivities,
         autoConfigurePricingAndDiscountRules,
         autoGenerateCouponCampaign,
+        searchAll,
         exportRuleTemplate,
         importRuleTemplate,
         detectRuleConflicts,

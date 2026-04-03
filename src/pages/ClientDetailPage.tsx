@@ -54,6 +54,7 @@ import {
   FileText,
   Image as ImageIcon,
   AlertTriangle,
+  Sparkles,
   X,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -212,6 +213,7 @@ export default function ClientDetailPage() {
   const {
     clients,
     orders,
+    orderStatuses,
     updateOrder,
     bulkUpdateOrders,
     addOrder,
@@ -254,6 +256,12 @@ export default function ClientDetailPage() {
   const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
   const [createOrderOpen, setCreateOrderOpen] = useState(false);
   const [bulkComments, setBulkComments] = useState("");
+  const [bulkTemplateReport, setBulkTemplateReport] = useState<{
+    updated: number;
+    skipped: number;
+    invalidStatus: number;
+    unmatched: string[];
+  } | null>(null);
   const [bulkTemplateTab, setBulkTemplateTab] = useState("download");
   const [newOrderTemplateTab, setNewOrderTemplateTab] = useState("download");
   const bulkTemplateInputRef = useRef<HTMLInputElement>(null);
@@ -695,16 +703,72 @@ export default function ClientDetailPage() {
     toast({ title: "Bulk order update applied" });
     setSelectedOrders([]);
     setBulkComments("");
+    setBulkTemplateReport(null);
     setBulkUpdateOpen(false);
+  };
+
+  const parseCsvRow = (line: string) => {
+    const cells: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let idx = 0; idx < line.length; idx += 1) {
+      const char = line[idx];
+      if (char === '"') {
+        const nextChar = line[idx + 1];
+        if (inQuotes && nextChar === '"') {
+          current += '"';
+          idx += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+        continue;
+      }
+
+      if (char === "," && !inQuotes) {
+        cells.push(current.trim());
+        current = "";
+        continue;
+      }
+
+      current += char;
+    }
+
+    cells.push(current.trim());
+    return cells.map((value) => value.replace(/^"|"$/g, ""));
+  };
+
+  const resolveTemplateStatus = (rawStatus: string, currentStatus: string) => {
+    const normalized = rawStatus.trim().toLowerCase();
+    if (!normalized) {
+      return { status: currentStatus, isValid: true };
+    }
+
+    const allStatuses = Array.from(
+      new Set([
+        ...orderStatuses.map((entry) => entry.name),
+        ...clientOrders.map((order) => order.status),
+      ]),
+    );
+    const matched = allStatuses.find(
+      (candidate) => candidate.toLowerCase() === normalized,
+    );
+
+    if (!matched) {
+      return { status: currentStatus, isValid: false };
+    }
+
+    return { status: matched, isValid: true };
   };
 
   const downloadOrderTemplate = () => {
     const csv = [
-      ["OrderID", "Status", "Comments"],
+      ["OrderID", "Status", "Comments", "Action"],
       ...clientOrders.map((order) => [
         order.orderNumber,
         order.status,
         order.comments || "",
+        "Update",
       ]),
     ]
       .map((row) => row.join(","))
@@ -727,6 +791,8 @@ export default function ClientDetailPage() {
       toast({ title: "Only CSV files are allowed" });
       return;
     }
+    setBulkTemplateReport(null);
+
     const reader = new FileReader();
     reader.onload = () => {
       const text = String(reader.result || "");
@@ -735,29 +801,52 @@ export default function ClientDetailPage() {
         toast({ title: "Template is empty" });
         return;
       }
-      const headers = lines[0]
-        .split(",")
-        .map((header) => header.trim().toLowerCase());
-      const orderIdx = headers.indexOf("orderid");
-      const statusIdx = headers.indexOf("status");
-      const commentIdx = headers.indexOf("comments");
+      const headers = parseCsvRow(lines[0]).map((header) =>
+        header.trim().toLowerCase(),
+      );
+      const orderIdx = headers.findIndex((header) =>
+        ["orderid", "order #", "ordernumber", "order_number"].includes(header),
+      );
+      const statusIdx = headers.findIndex((header) => header === "status");
+      const commentIdx = headers.findIndex((header) =>
+        ["comments", "comment", "note", "notes"].includes(header),
+      );
+
+      if (orderIdx === -1) {
+        toast({ title: "Template must include OrderID column" });
+        return;
+      }
+
       let updated = 0;
+      let skipped = 0;
+      let invalidStatus = 0;
+      const unmatched: string[] = [];
 
       lines.slice(1).forEach((line) => {
-        const cols = line
-          .split(",")
-          .map((value) => value.trim().replace(/^"|"$/g, ""));
+        const cols = parseCsvRow(line);
         const orderNumber = cols[orderIdx];
         if (!orderNumber) return;
         const target = clientOrders.find(
           (order) => order.orderNumber === orderNumber,
         );
-        if (!target) return;
-        const nextStatus = cols[statusIdx] || target.status;
+        if (!target) {
+          skipped += 1;
+          unmatched.push(orderNumber);
+          return;
+        }
+        const resolvedStatus = resolveTemplateStatus(
+          statusIdx >= 0 ? cols[statusIdx] || "" : "",
+          target.status,
+        );
+        if (!resolvedStatus.isValid) {
+          invalidStatus += 1;
+        }
         const nextComment =
-          cols[commentIdx] || target.comments || "Template update";
+          (commentIdx >= 0 ? cols[commentIdx] : "") ||
+          target.comments ||
+          "Template update";
         updateOrder(target.id, {
-          status: nextStatus,
+          status: resolvedStatus.status,
           comments: nextComment,
           commentHistory: [
             ...target.commentHistory,
@@ -773,15 +862,31 @@ export default function ClientDetailPage() {
         updated += 1;
       });
 
+      setBulkTemplateReport({
+        updated,
+        skipped,
+        invalidStatus,
+        unmatched: unmatched.slice(0, 5),
+      });
+
       if (updated > 0) {
-        toast({ title: `${updated} order(s) updated from template` });
+        toast({
+          title: `${updated} order(s) updated from template`,
+          description:
+            skipped > 0
+              ? `${skipped} row(s) were skipped. Check summary below.`
+              : undefined,
+        });
         setSelectedOrders([]);
-        setBulkUpdateOpen(false);
       } else {
-        toast({ title: "No matching orders found" });
+        toast({
+          title: "No matching orders were updated",
+          description: "Review template values and try again.",
+        });
       }
     };
     reader.readAsText(file);
+    evt.target.value = "";
   };
 
   const handleCreateOrder = () => {
@@ -916,13 +1021,8 @@ export default function ClientDetailPage() {
   };
 
   const saveCatalogItem = () => {
-    if (!catalogForm.name.trim()) {
-      toast({ title: "Item name is required" });
-      return;
-    }
-
-    if (!catalogForm.productCode.trim()) {
-      toast({ title: "Product code is required" });
+    if (!selectedMasterProduct) {
+      toast({ title: "Select a master catalog item first" });
       return;
     }
 
@@ -932,33 +1032,38 @@ export default function ClientDetailPage() {
     }
 
     const payload = {
-      masterProductId: selectedMasterProduct?.id || selectedMasterProductId,
-      productCode: catalogForm.productCode,
-      name: catalogForm.name,
-      category: catalogForm.category,
-      subCategory: catalogForm.subCategory,
-      brand: catalogForm.brand,
-      productType: catalogForm.productType,
-      physicalType: catalogForm.physicalType,
-      price: catalogForm.price,
+      masterProductId: selectedMasterProduct.id,
+      productCode: selectedMasterProduct.productCode,
+      name: selectedMasterProduct.name,
+      category: selectedMasterProduct.category,
+      subCategory: selectedMasterProduct.subCategory,
+      brand: selectedMasterProduct.brand,
+      productType: selectedMasterProduct.productType,
+      physicalType: selectedMasterProduct.physicalType,
+      price: catalogForm.price || selectedMasterProduct.price,
       discountPrice: catalogForm.discountPrice
         ? Number(catalogForm.discountPrice)
-        : undefined,
+        : selectedMasterProduct.discountPrice,
       status: catalogForm.status,
-      image: catalogImages[0] || selectedMasterProduct?.image,
-      description: catalogForm.description,
+      image: catalogImages[0] || selectedMasterProduct.image,
+      description: selectedMasterProduct.description || catalogForm.description,
       initialStock: catalogForm.initialStock,
       minStockThreshold: catalogForm.minStockThreshold,
       stock: catalogForm.stock,
       minStock: catalogForm.minStock,
-      tags: catalogForm.tags,
-      specification: catalogForm.specification,
-      warranty: catalogForm.warranty,
-      hsnCode: catalogForm.hsnCode,
-      customsDeclaration: catalogForm.customsDeclaration,
-      primaryVendor: catalogForm.primaryVendor,
-      vendorSku: catalogForm.vendorSku,
-      leadTime: catalogForm.leadTime,
+      tags: selectedMasterProduct.tags || catalogForm.tags,
+      specification:
+        selectedMasterProduct.specification || catalogForm.specification,
+      warranty: selectedMasterProduct.warranty || catalogForm.warranty,
+      hsnCode: selectedMasterProduct.hsnCode || catalogForm.hsnCode,
+      customsDeclaration:
+        selectedMasterProduct.customsDeclaration ||
+        catalogForm.customsDeclaration,
+      primaryVendor:
+        catalogForm.primaryVendor || selectedMasterProduct.primaryVendor || "",
+      vendorSku: catalogForm.vendorSku || selectedMasterProduct.vendorSku || "",
+      leadTime:
+        catalogForm.leadTime || selectedMasterProduct.leadTime || "10 Days",
       vendorContact: catalogForm.vendorContact,
       vendorEmail: catalogForm.vendorEmail,
       vendorPhone: catalogForm.vendorPhone,
@@ -1670,6 +1775,9 @@ export default function ClientDetailPage() {
                         <TableRow>
                           <TableHead>Name</TableHead>
                           <TableHead>Description</TableHead>
+                          <TableHead className="text-center">
+                            No. of Users
+                          </TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Action</TableHead>
                         </TableRow>
@@ -1679,6 +1787,20 @@ export default function ClientDetailPage() {
                           <TableRow key={role.id}>
                             <TableCell>{role.name}</TableCell>
                             <TableCell>{role.description}</TableCell>
+                            <TableCell className="text-center font-semibold">
+                              {
+                                clientUsers.filter(
+                                  (clientUser) =>
+                                    clientUser.status !== "inactive" &&
+                                    clientUser.status !== "suspended" &&
+                                    clientUser.role
+                                      .replace(/[_-]/g, " ")
+                                      .toLowerCase()
+                                      .trim() ===
+                                      role.name.toLowerCase().trim(),
+                                ).length
+                              }
+                            </TableCell>
                             <TableCell>{role.status}</TableCell>
                             <TableCell className="flex gap-1">
                               <Button
@@ -1802,7 +1924,6 @@ export default function ClientDetailPage() {
                               onCheckedChange={toggleAllOrders}
                             />
                           </TableHead>
-                          <TableHead>Select</TableHead>
                           <TableHead>Order #</TableHead>
                           <TableHead>Date</TableHead>
                           <TableHead>Organization</TableHead>
@@ -2821,6 +2942,21 @@ export default function ClientDetailPage() {
             </TabsList>
 
             <TabsContent value="download" className="mt-4 space-y-4">
+              <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 via-card to-secondary/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                      Bulk Operations Workspace
+                    </p>
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedOrders.length} order(s) selected for update
+                    </p>
+                  </div>
+                  <Badge className="bg-primary/10 text-primary hover:bg-primary/10">
+                    <Sparkles className="mr-1 h-3.5 w-3.5" /> Flexible Mode
+                  </Badge>
+                </div>
+              </div>
               <Textarea
                 placeholder="Add a common comment for the selected orders"
                 value={bulkComments}
@@ -2854,7 +2990,8 @@ export default function ClientDetailPage() {
                 <Upload className="h-8 w-8 mx-auto text-primary" />
                 <p className="text-sm font-medium">Upload CSV Template</p>
                 <p className="text-xs text-muted-foreground">
-                  Expected columns: OrderID, Status, Comments
+                  Expected columns: OrderID, Status, Comments. Quoted CSV values
+                  are supported.
                 </p>
                 <input
                   ref={bulkTemplateInputRef}
@@ -2870,6 +3007,38 @@ export default function ClientDetailPage() {
                   Select CSV File
                 </Button>
               </div>
+
+              {bulkTemplateReport ? (
+                <div className="mt-3 rounded-lg border bg-card p-3">
+                  <p className="text-sm font-medium">Upload Summary</p>
+                  <div className="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                    <p>
+                      Updated:{" "}
+                      <span className="font-semibold text-foreground">
+                        {bulkTemplateReport.updated}
+                      </span>
+                    </p>
+                    <p>
+                      Skipped:{" "}
+                      <span className="font-semibold text-foreground">
+                        {bulkTemplateReport.skipped}
+                      </span>
+                    </p>
+                    <p>
+                      Invalid Status Fallbacks:{" "}
+                      <span className="font-semibold text-foreground">
+                        {bulkTemplateReport.invalidStatus}
+                      </span>
+                    </p>
+                  </div>
+                  {bulkTemplateReport.unmatched.length > 0 ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Unmatched Order IDs:{" "}
+                      {bulkTemplateReport.unmatched.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </TabsContent>
           </Tabs>
 
@@ -3106,190 +3275,149 @@ export default function ClientDetailPage() {
               </div>
 
               <div className="space-y-5 rounded-lg border p-4">
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    General Details
-                  </h3>
-                  <div className="space-y-2">
-                    <Label>
-                      Item Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      value={catalogForm.name}
-                      onChange={(e) =>
-                        setCatalogForm((prev) => ({
-                          ...prev,
-                          name: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g., Apple MacBook Air M3"
-                    />
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                        Selected Master Product
+                      </p>
+                      <h3 className="text-sm font-semibold text-foreground">
+                        {selectedMasterProduct?.name || "Choose a catalog item"}
+                      </h3>
+                    </div>
+                    <Badge variant="secondary" className="rounded-full">
+                      {selectedMasterProduct
+                        ? selectedMasterProduct.productCode
+                        : "Required"}
+                    </Badge>
                   </div>
-                  <div className="space-y-2 mt-2">
-                    <Label>
-                      Product Code <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      value={catalogForm.productCode}
-                      onChange={(e) =>
-                        setCatalogForm((prev) => ({
-                          ...prev,
-                          productCode: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g., LAP-1002"
-                    />
-                  </div>
-                  <div className="space-y-2 mt-2">
-                    <Label>Short Description</Label>
-                    <Textarea
-                      value={catalogForm.description}
-                      onChange={(e) =>
-                        setCatalogForm((prev) => ({
-                          ...prev,
-                          description: e.target.value,
-                        }))
-                      }
-                      className="min-h-[60px]"
-                    />
-                  </div>
+                  {selectedMasterProduct ? (
+                    <div className="grid gap-3 rounded-lg border bg-white p-3 text-xs text-muted-foreground sm:grid-cols-2">
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                          Category
+                        </span>
+                        <span className="font-medium text-slate-700">
+                          {selectedMasterProduct.category}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                          Brand
+                        </span>
+                        <span className="font-medium text-slate-700">
+                          {selectedMasterProduct.brand || "-"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                          Product Type
+                        </span>
+                        <span className="font-medium text-slate-700">
+                          {selectedMasterProduct.productType}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                          Base Price
+                        </span>
+                        <span className="font-medium text-slate-700">
+                          ₹{selectedMasterProduct.price.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div>
                   <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Category & Classification
+                    Client Overrides
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>Category</Label>
+                      <Label>
+                        Vendor SKU <span className="text-destructive">*</span>
+                      </Label>
                       <Input
-                        value={catalogForm.category}
+                        value={catalogForm.vendorSku}
                         onChange={(e) =>
                           setCatalogForm((prev) => ({
                             ...prev,
-                            category: e.target.value,
+                            vendorSku: e.target.value,
                           }))
                         }
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Sub-category</Label>
-                      <Input
-                        value={catalogForm.subCategory}
-                        onChange={(e) =>
+                      <Label>Primary Vendor</Label>
+                      <Select
+                        value={catalogForm.primaryVendor}
+                        onValueChange={(value) =>
                           setCatalogForm((prev) => ({
                             ...prev,
-                            subCategory: e.target.value,
+                            primaryVendor: value,
                           }))
                         }
-                      />
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Vendor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATALOG_DEFAULT_VENDORS.map((vendor) => (
+                            <SelectItem key={vendor} value={vendor}>
+                              {vendor}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Brand</Label>
-                      <Input
-                        value={catalogForm.brand}
-                        onChange={(e) =>
+                      <Label>Lead Time</Label>
+                      <Select
+                        value={catalogForm.leadTime}
+                        onValueChange={(value) =>
                           setCatalogForm((prev) => ({
                             ...prev,
-                            brand: e.target.value,
+                            leadTime: value,
                           }))
                         }
-                      />
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATALOG_LEAD_TIME_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Product Type</Label>
-                      <Input
-                        value={catalogForm.productType}
-                        onChange={(e) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            productType: e.target.value,
-                          }))
+                      <Label>Inventory Status</Label>
+                      <Select
+                        value={catalogForm.status}
+                        onValueChange={(
+                          value: "In Stock" | "Low Stock" | "Out of Stock",
+                        ) =>
+                          setCatalogForm((prev) => ({ ...prev, status: value }))
                         }
-                      />
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="In Stock">In Stock</SelectItem>
+                          <SelectItem value="Low Stock">Low Stock</SelectItem>
+                          <SelectItem value="Out of Stock">
+                            Out of Stock
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  </div>
-                  <div className="space-y-2 mt-2">
-                    <Label>Physical Type</Label>
-                    <Input
-                      value={catalogForm.physicalType}
-                      onChange={(e) =>
-                        setCatalogForm((prev) => ({
-                          ...prev,
-                          physicalType: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2 mt-2">
-                    <Label>Tags</Label>
-                    <div className="flex flex-wrap gap-1 mb-1">
-                      {catalogForm.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="gap-1">
-                          {tag}
-                          <X
-                            size={10}
-                            className="cursor-pointer"
-                            onClick={() =>
-                              setCatalogForm((prev) => ({
-                                ...prev,
-                                tags: prev.tags.filter(
-                                  (entry) => entry !== tag,
-                                ),
-                              }))
-                            }
-                          />
-                        </Badge>
-                      ))}
-                    </div>
-                    <Input
-                      placeholder="Tags..."
-                      value={catalogTagInput}
-                      onChange={(e) => setCatalogTagInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          const next = catalogTagInput.trim();
-                          if (next && !catalogForm.tags.includes(next)) {
-                            setCatalogForm((prev) => ({
-                              ...prev,
-                              tags: [...prev.tags, next],
-                            }));
-                            setCatalogTagInput("");
-                          }
-                        }
-                      }}
-                      className="h-8"
-                    />
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {CATALOG_DEFAULT_TAGS.filter(
-                        (tag) => !catalogForm.tags.includes(tag),
-                      ).map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="outline"
-                          className="cursor-pointer text-xs"
-                          onClick={() =>
-                            setCatalogForm((prev) => ({
-                              ...prev,
-                              tags: [...prev.tags, tag],
-                            }))
-                          }
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Pricing & Inventory
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>Regular Price</Label>
+                      <Label>Price Override</Label>
                       <Input
                         type="number"
                         value={catalogForm.price}
@@ -3313,28 +3441,6 @@ export default function ClientDetailPage() {
                           }))
                         }
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Inventory Status</Label>
-                      <Select
-                        value={catalogForm.status}
-                        onValueChange={(
-                          value: "In Stock" | "Low Stock" | "Out of Stock",
-                        ) =>
-                          setCatalogForm((prev) => ({ ...prev, status: value }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="In Stock">In Stock</SelectItem>
-                          <SelectItem value="Low Stock">Low Stock</SelectItem>
-                          <SelectItem value="Out of Stock">
-                            Out of Stock
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>Initial Stock</Label>
@@ -3364,169 +3470,7 @@ export default function ClientDetailPage() {
                         }
                       />
                     </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Product Specifics & Media
-                  </h3>
-                  <div className="space-y-2">
-                    <Label>Detailed Specification</Label>
-                    <Textarea
-                      value={catalogForm.specification}
-                      onChange={(e) =>
-                        setCatalogForm((prev) => ({
-                          ...prev,
-                          specification: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2 mt-2">
-                    <Label>Warranty Information</Label>
-                    <Textarea
-                      value={catalogForm.warranty}
-                      onChange={(e) =>
-                        setCatalogForm((prev) => ({
-                          ...prev,
-                          warranty: e.target.value,
-                        }))
-                      }
-                      className="min-h-[60px]"
-                    />
-                  </div>
-                  <div className="space-y-2 mt-2">
-                    <Label>Add Image</Label>
-                    <div
-                      className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => catalogImageInputRef.current?.click()}
-                    >
-                      <ImageIcon
-                        size={20}
-                        className="mx-auto text-muted-foreground mb-2"
-                      />
-                      <p className="text-xs">Click to Upload or Drag Images</p>
-                    </div>
-                    <input
-                      ref={catalogImageInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        const files = e.target.files;
-                        if (!files) return;
-                        Array.from(files).forEach((file) => {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            if (event.target?.result) {
-                              setCatalogImages((prev) => [
-                                ...prev,
-                                event.target?.result as string,
-                              ]);
-                            }
-                          };
-                          reader.readAsDataURL(file);
-                        });
-                      }}
-                    />
-                    {catalogImages.length > 0 && (
-                      <div className="flex gap-2 mt-2 flex-wrap">
-                        {catalogImages.map((img, index) => (
-                          <div
-                            key={`${img}-${index}`}
-                            className="relative w-14 h-14 rounded overflow-hidden border"
-                          >
-                            <img
-                              src={img}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                            <button
-                              type="button"
-                              className="absolute top-0 right-0 bg-destructive text-destructive-foreground rounded-bl p-0.5"
-                              onClick={() =>
-                                setCatalogImages((prev) =>
-                                  prev.filter((_, idx) => idx !== index),
-                                )
-                              }
-                            >
-                              <X size={10} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Vendor & Sourcing
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>Primary Vendor</Label>
-                      <Select
-                        value={catalogForm.primaryVendor}
-                        onValueChange={(value) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            primaryVendor: value,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Vendor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATALOG_DEFAULT_VENDORS.map((vendor) => (
-                            <SelectItem key={vendor} value={vendor}>
-                              {vendor}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>
-                        Vendor SKU <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        value={catalogForm.vendorSku}
-                        onChange={(e) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            vendorSku: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Estimated Lead Time</Label>
-                      <Select
-                        value={catalogForm.leadTime}
-                        onValueChange={(value) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            leadTime: value,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATALOG_LEAD_TIME_OPTIONS.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 col-span-2">
                       <Label>Vendor Contact</Label>
                       <Input
                         value={catalogForm.vendorContact}
@@ -3538,84 +3482,109 @@ export default function ClientDetailPage() {
                         }
                       />
                     </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Logistics & Customs
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label>HSN/SAC Code</Label>
-                      <Input
-                        value={catalogForm.hsnCode}
-                        onChange={(e) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            hsnCode: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Customs Declaration</Label>
-                      <Select
-                        value={catalogForm.customsDeclaration}
-                        onValueChange={(value) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            customsDeclaration: value,
-                          }))
-                        }
+                    <div className="col-span-2 space-y-2">
+                      <Label>Image</Label>
+                      <div
+                        className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => catalogImageInputRef.current?.click()}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATALOG_CUSTOMS_OPTIONS.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
+                        <ImageIcon
+                          size={20}
+                          className="mx-auto text-muted-foreground mb-2"
+                        />
+                        <p className="text-xs">
+                          Click to upload an override image
+                        </p>
+                      </div>
+                      <input
+                        ref={catalogImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          const files = e.target.files;
+                          if (!files) return;
+                          Array.from(files).forEach((file) => {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              if (event.target?.result) {
+                                setCatalogImages((prev) => [
+                                  ...prev,
+                                  event.target?.result as string,
+                                ]);
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          });
+                        }}
+                      />
+                      {catalogImages.length > 0 && (
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                          {catalogImages.map((img, index) => (
+                            <div
+                              key={`${img}-${index}`}
+                              className="relative w-14 h-14 rounded overflow-hidden border"
+                            >
+                              <img
+                                src={img}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                className="absolute top-0 right-0 bg-destructive text-destructive-foreground rounded-bl p-0.5"
+                                onClick={() =>
+                                  setCatalogImages((prev) =>
+                                    prev.filter((_, idx) => idx !== index),
+                                  )
+                                }
+                              >
+                                <X size={10} />
+                              </button>
+                            </div>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Track Vendor Performance
-                  </h3>
-                  <div className="flex items-center gap-3">
-                    <Label>Track Performance</Label>
-                    <Switch
-                      checked={catalogForm.trackPerformance}
-                      onCheckedChange={(value) =>
-                        setCatalogForm((prev) => ({
-                          ...prev,
-                          trackPerformance: value,
-                        }))
-                      }
-                    />
-                    <Label className="ml-4">Performance Rating (1-5)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={5}
-                      className="w-20"
-                      value={catalogForm.performanceRating}
-                      onChange={(e) =>
-                        setCatalogForm((prev) => ({
-                          ...prev,
-                          performanceRating: Math.max(
-                            1,
-                            Math.min(5, Number(e.target.value) || 1),
-                          ),
-                        }))
-                      }
-                    />
+                    <div className="col-span-2 space-y-2">
+                      <Label>Track Vendor Performance</Label>
+                      <div className="flex items-center gap-3 rounded-lg border bg-white px-3 py-2">
+                        <Switch
+                          checked={catalogForm.trackPerformance}
+                          onCheckedChange={(value) =>
+                            setCatalogForm((prev) => ({
+                              ...prev,
+                              trackPerformance: value,
+                            }))
+                          }
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {catalogForm.trackPerformance
+                            ? "Enabled"
+                            : "Disabled"}
+                        </span>
+                        <div className="ml-auto flex items-center gap-2">
+                          <Label className="text-xs">Rating</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={5}
+                            className="w-20"
+                            value={catalogForm.performanceRating}
+                            onChange={(e) =>
+                              setCatalogForm((prev) => ({
+                                ...prev,
+                                performanceRating: Math.max(
+                                  1,
+                                  Math.min(5, Number(e.target.value) || 1),
+                                ),
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,5 @@
 import { useCallback, useMemo } from "react";
 import {
-  Search,
   Bell,
   Settings,
   ArrowLeft,
@@ -13,10 +12,10 @@ import {
   Building2,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useData } from "@/contexts/DataContext";
+import GlobalSearch from "@/components/shared/GlobalSearch";
 import { useTheme, ThemeMode } from "@/contexts/ThemeContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -109,14 +108,10 @@ export default function Header({ title }: HeaderProps) {
         </h2>
       </div>
 
-      <div className="flex items-center gap-1.5 sm:gap-3">
+      <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-3">
         {!isMobile && (
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
-              className="h-9 w-48 border-0 bg-muted/50 pl-9 text-sm transition-all focus:ring-2 focus:ring-primary/20 lg:w-64"
-            />
+          <div className="hidden flex-1 px-4 md:block">
+            <GlobalSearch />
           </div>
         )}
 

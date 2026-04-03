@@ -37,6 +37,11 @@ import UserRolesTab from "@/components/configuration/UserRolesTab";
 import IntegrationsPage from "@/pages/IntegrationsPage";
 import SupportPage from "@/pages/SupportPage";
 import InvoicesPage from "@/pages/InvoicesPage";
+import SalesQuotesPage from "@/pages/SalesQuotesPage";
+import SalesQuoteDetailPage from "@/pages/SalesQuoteDetailPage";
+import SalesOrdersPage from "@/pages/SalesOrdersPage";
+import SalesOrderDetailPage from "@/pages/SalesOrderDetailPage";
+import SalesModulePlaceholderPage from "@/pages/SalesModulePlaceholderPage";
 import HomePage from "@/pages/HomePage";
 import CategoriesPage from "@/pages/CategoriesPage";
 import CartPage from "@/pages/CartPage";
@@ -46,6 +51,12 @@ import TicketTrackingPage from "@/pages/TicketTrackingPage";
 import PricingDiscountsPage from "@/pages/PricingDiscountsPage";
 import MasterCataloguePage from "@/pages/MasterCataloguePage";
 import NotFound from "@/pages/NotFound";
+import SalesQuoteFormPage from "@/pages/SalesQuoteFormPage";
+import RecurringInvoicesPage from "@/pages/RecurringInvoicesPage";
+import DeliveryChallansPage from "@/pages/DeliveryChallansPage";
+import PaymentReceiptsPage from "@/pages/PaymentReceiptsPage";
+import CreditNotesPage from "@/pages/CreditNotesPage";
+import EWayBillsPage from "@/pages/EWayBillsPage";
 
 const queryClient = new QueryClient();
 
@@ -93,7 +104,10 @@ function AppRoutes() {
         <Route path="permissions" element={<PermissionsPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="configuration" element={<ConfigurationHubPage />} />
-        <Route path="configuration/general" element={<ConfigurationPage />} />
+        <Route
+          path="configuration/general"
+          element={<Navigate to="/configuration" replace />}
+        />
         <Route
           path="configuration/general-settings"
           element={<GeneralSettingsTab />}
@@ -127,8 +141,73 @@ function AppRoutes() {
         <Route path="shop/cart" element={<CartPage />} />
         <Route path="services" element={<MainDashboard />} />
         <Route path="support" element={<SupportPage />} />
-        <Route path="transactions" element={<AuditTrailPage />} />
-        <Route path="invoices" element={<InvoicesPage />} />
+        <Route
+          path="transactions"
+          element={<Navigate to="/sales/quotes" replace />}
+        />
+        <Route
+          path="transactions/sales"
+          element={<Navigate to="/sales/quotes" replace />}
+        />
+        <Route path="transactions/purchase" element={<OrdersPage />} />
+        <Route path="sales" element={<Navigate to="/sales/quotes" replace />} />
+        <Route path="sales/quotes" element={<SalesQuotesPage />} />
+        <Route path="sales/quotes/create" element={<SalesQuoteFormPage />} />
+        <Route path="sales/quotes/:id" element={<SalesQuoteDetailPage />} />
+        <Route path="sales/quotes/:id/edit" element={<SalesQuoteFormPage />} />
+        <Route path="sales/orders" element={<SalesOrdersPage />} />
+        <Route path="sales/orders/:id" element={<SalesOrderDetailPage />} />
+        <Route path="sales/invoices" element={<InvoicesPage />} />
+        <Route
+          path="sales/recurring-invoices"
+          element={<RecurringInvoicesPage />}
+        />
+        <Route
+          path="sales/recurring-invoices/create"
+          element={<RecurringInvoicesPage />}
+        />
+        <Route
+          path="sales/recurring-invoices/:id/edit"
+          element={<RecurringInvoicesPage />}
+        />
+        <Route
+          path="sales/delivery-challans"
+          element={<DeliveryChallansPage />}
+        />
+        <Route
+          path="sales/delivery-challans/create"
+          element={<DeliveryChallansPage />}
+        />
+        <Route
+          path="sales/delivery-challans/:id"
+          element={<DeliveryChallansPage />}
+        />
+        <Route
+          path="sales/payment-receipts"
+          element={<PaymentReceiptsPage />}
+        />
+        <Route
+          path="sales/payment-receipts/create"
+          element={<PaymentReceiptsPage />}
+        />
+        <Route
+          path="sales/payment-receipts/:id"
+          element={<PaymentReceiptsPage />}
+        />
+        <Route path="sales/credit-notes" element={<CreditNotesPage />} />
+        <Route path="sales/credit-notes/create" element={<CreditNotesPage />} />
+        <Route path="sales/credit-notes/:id" element={<CreditNotesPage />} />
+        <Route
+          path="sales/credit-notes/:id/edit"
+          element={<CreditNotesPage />}
+        />
+        <Route path="sales/e-way-bills" element={<EWayBillsPage />} />
+        <Route path="sales/e-way-bills/create" element={<EWayBillsPage />} />
+        <Route path="sales/e-way-bills/:id" element={<EWayBillsPage />} />
+        <Route
+          path="invoices"
+          element={<Navigate to="/sales/invoices" replace />}
+        />
         <Route path="procure/requests" element={<OrdersPage />} />
         <Route path="procure/approvals" element={<ApprovalWorkflowsPage />} />
         <Route path="organizations" element={<OrganizationsPage />} />

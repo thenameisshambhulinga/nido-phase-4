@@ -13,7 +13,6 @@ import {
   Settings,
   UserCog,
   Shield,
-  FileText,
   CreditCard,
   ChevronDown,
   ChevronRight,
@@ -24,7 +23,6 @@ import {
   Tags,
   Workflow,
   LogOut,
-  Plug,
   X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,8 +32,14 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   path?: string;
-  children?: { label: string; path: string }[];
+  children?: NavChildItem[];
   module?: string;
+}
+
+interface NavChildItem {
+  label: string;
+  path?: string;
+  children?: NavChildItem[];
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -98,18 +102,26 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: "Integrations",
-    icon: Plug,
-    module: "configuration",
-    path: "/integrations",
-  },
-  {
     label: "Transactions",
     icon: CreditCard,
     module: "transactions",
-    path: "/transactions",
+    children: [
+      {
+        label: "Sales",
+        children: [
+          { label: "Quotes", path: "/sales/quotes" },
+          { label: "Sales Orders", path: "/sales/orders" },
+          { label: "Invoices", path: "/sales/invoices" },
+          { label: "Recurring Invoices", path: "/sales/recurring-invoices" },
+          { label: "Delivery Challans", path: "/sales/delivery-challans" },
+          { label: "Payment Receipt", path: "/sales/payment-receipts" },
+          { label: "Credit Notes", path: "/sales/credit-notes" },
+          { label: "e-Way Bills", path: "/sales/e-way-bills" },
+        ],
+      },
+      { label: "Purchase", path: "/transactions/purchase" },
+    ],
   },
-  { label: "Invoices", icon: FileText, module: "reports", path: "/invoices" },
   {
     label: "Configuration",
     icon: Settings,
@@ -148,9 +160,18 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
     );
   };
 
-  const isActive = (path: string) => location.pathname === path;
+  const isPathActive = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(`${path}/`);
+
+  const isChildActive = (child: NavChildItem): boolean => {
+    if (child.path && isPathActive(child.path)) return true;
+    return (
+      child.children?.some((nestedChild) => isChildActive(nestedChild)) || false
+    );
+  };
+
   const isParentActive = (item: NavItem) =>
-    item.children?.some((c) => location.pathname.startsWith(c.path)) || false;
+    item.children?.some((child) => isChildActive(child)) || false;
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -195,7 +216,66 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
           const Icon = item.icon;
           const expanded = expandedItems.includes(item.label);
           const parentActive = isParentActive(item);
-          const active = item.path ? isActive(item.path) : false;
+          const active = item.path ? isPathActive(item.path) : false;
+
+          const renderChildren = (
+            children: NavChildItem[],
+            parentKey: string,
+            depth: number,
+          ) => (
+            <div className={cn("space-y-0.5", depth === 0 ? "ml-9" : "ml-4")}>
+              {children.map((child) => {
+                const childKey = `${parentKey}-${child.label}`;
+                const childExpanded = expandedItems.includes(childKey);
+                const childActive = isChildActive(child);
+
+                return (
+                  <div key={childKey}>
+                    <button
+                      onClick={() => {
+                        if (child.children) {
+                          toggleExpand(childKey);
+                          return;
+                        }
+                        if (child.path) handleNavigate(child.path);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-2 text-left px-4 py-2 transition-all duration-150 hover:text-sidebar-primary-foreground hover:bg-sidebar-accent",
+                        depth === 0 ? "text-xs" : "text-[11px]",
+                        childActive
+                          ? "text-sidebar-primary bg-sidebar-accent/50 font-medium"
+                          : "text-sidebar-foreground/70",
+                      )}
+                    >
+                      <span className="flex-1">{child.label}</span>
+                      {child.children && (
+                        <ChevronDown
+                          className={cn(
+                            "h-3 w-3 transition-transform duration-200",
+                            !childExpanded && "-rotate-90",
+                          )}
+                        />
+                      )}
+                    </button>
+
+                    {child.children && (
+                      <div
+                        className={cn(
+                          "border-l border-sidebar-border overflow-hidden transition-all duration-200",
+                          childExpanded
+                            ? "max-h-96 opacity-100"
+                            : "max-h-0 opacity-0",
+                          "ml-2",
+                        )}
+                      >
+                        {renderChildren(child.children, childKey, depth + 1)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
 
           return (
             <div key={item.label}>
@@ -235,20 +315,7 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
                     : "max-h-0 opacity-0",
                 )}
               >
-                {item.children?.map((child) => (
-                  <button
-                    key={child.path}
-                    onClick={() => handleNavigate(child.path)}
-                    className={cn(
-                      "w-full text-left px-4 py-2 text-xs transition-all duration-150 hover:text-sidebar-primary-foreground hover:bg-sidebar-accent hover:pl-5",
-                      isActive(child.path)
-                        ? "text-sidebar-primary bg-sidebar-accent/50 font-medium pl-5"
-                        : "text-sidebar-foreground/70",
-                    )}
-                  >
-                    {child.label}
-                  </button>
-                ))}
+                {item.children && renderChildren(item.children, item.label, 0)}
               </div>
             </div>
           );

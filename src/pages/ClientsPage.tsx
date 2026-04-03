@@ -28,9 +28,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { Edit, Trash2, Search, Download, Mail, Plus } from "lucide-react";
+import {
+  Edit,
+  Trash2,
+  Search,
+  Download,
+  Mail,
+  Plus,
+  FileJson,
+} from "lucide-react";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
 import { toast } from "@/hooks/use-toast";
 
@@ -104,7 +117,8 @@ export default function ClientsPage() {
     [clients],
   );
 
-  const handleExportCSV = () => {
+  const exportClients = (format: "csv" | "json", scope: "filtered" | "all") => {
+    const source = scope === "all" ? clients : filtered;
     const headers = [
       "Client ID",
       "Company Name",
@@ -115,7 +129,7 @@ export default function ClientsPage() {
       "Status",
     ];
 
-    const rows = filtered.map((c) => [
+    const rows = source.map((c) => [
       c.clientCode || c.id,
       c.name,
       c.contactPerson,
@@ -125,15 +139,42 @@ export default function ClientsPage() {
       c.status,
     ]);
 
-    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    const blob =
+      format === "csv"
+        ? new Blob([[headers, ...rows].map((r) => r.join(",")).join("\n")], {
+            type: "text/csv",
+          })
+        : new Blob(
+            [
+              JSON.stringify(
+                source.map((client) => ({
+                  id: client.id,
+                  clientCode: client.clientCode,
+                  name: client.name,
+                  contactPerson: client.contactPerson,
+                  email: client.email,
+                  contractStart: client.contractStart,
+                  contractEnd: client.contractEnd,
+                  totalOrders: client.totalOrders,
+                  status: client.status,
+                })),
+                null,
+                2,
+              ),
+            ],
+            { type: "application/json" },
+          );
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "clients.csv";
+    a.download = `clients-${scope}.${format}`;
     a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Exported client list" });
+    toast({
+      title: `Exported ${source.length} client record(s)`,
+      description: `${scope === "all" ? "All" : "Filtered"} list as ${format.toUpperCase()}`,
+    });
   };
 
   const handleEdit = (id: string) => {
@@ -197,14 +238,50 @@ export default function ClientsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-display font-bold">Client Management</h1>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={handleExportCSV}
-            >
-              <Download className="h-4 w-4" /> Export
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Download className="h-4 w-4" /> Export
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-72 p-2">
+                <p className="px-2 pb-2 text-xs font-medium text-muted-foreground">
+                  Flexible Export Options
+                </p>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
+                  onClick={() => exportClients("csv", "filtered")}
+                >
+                  <span>Filtered Clients (CSV)</span>
+                  <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+                <button
+                  type="button"
+                  className="mt-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
+                  onClick={() => exportClients("csv", "all")}
+                >
+                  <span>All Clients (CSV)</span>
+                  <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+                <button
+                  type="button"
+                  className="mt-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
+                  onClick={() => exportClients("json", "filtered")}
+                >
+                  <span>Filtered Clients (JSON)</span>
+                  <FileJson className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+                <button
+                  type="button"
+                  className="mt-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
+                  onClick={() => exportClients("json", "all")}
+                >
+                  <span>All Clients (JSON)</span>
+                  <FileJson className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </PopoverContent>
+            </Popover>
             <Button
               size="sm"
               className="gap-2"
