@@ -3,7 +3,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { CartProvider } from "@/contexts/CartContext";
@@ -30,17 +36,19 @@ import ClientsPage from "@/pages/ClientsPage";
 import AddClient from "@/pages/AddClient";
 import ClientDetailPage from "@/pages/ClientDetailPage";
 import UsersPage from "@/pages/UsersPage";
+import UserProfilePage from "@/pages/UserProfilePage";
 import ConfigurationPage from "@/pages/ConfigurationPage";
 import ConfigurationHubPage from "@/pages/ConfigurationHubPage";
 import GeneralSettingsTab from "@/components/configuration/GeneralSettingsTab";
 import UserRolesTab from "@/components/configuration/UserRolesTab";
 import IntegrationsPage from "@/pages/IntegrationsPage";
 import SupportPage from "@/pages/SupportPage";
-import InvoicesPage from "@/pages/InvoicesPage";
+import InvoicePage from "@/pages/InvoicePage";
+import InvoiceDetails from "@/pages/InvoiceDetails";
 import SalesQuotesPage from "@/pages/SalesQuotesPage";
 import SalesQuoteDetailPage from "@/pages/SalesQuoteDetailPage";
 import SalesOrdersPage from "@/pages/SalesOrdersPage";
-import SalesOrderDetailPage from "@/pages/SalesOrderDetailPage";
+import SalesOrderDetails from "@/pages/SalesOrderDetails";
 import SalesModulePlaceholderPage from "@/pages/SalesModulePlaceholderPage";
 import HomePage from "@/pages/HomePage";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -57,6 +65,7 @@ import DeliveryChallansPage from "@/pages/DeliveryChallansPage";
 import PaymentReceiptsPage from "@/pages/PaymentReceiptsPage";
 import CreditNotesPage from "@/pages/CreditNotesPage";
 import EWayBillsPage from "@/pages/EWayBillsPage";
+import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -68,12 +77,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
   return (
     <Routes>
       <Route
         path="/login"
         element={
-          isAuthenticated ? <Navigate to="/home" replace /> : <LoginPage />
+          isAuthenticated ? (
+            <Navigate to="/home" replace />
+          ) : (
+            <PageErrorBoundary
+              title="Login failed to load"
+              resetKey={location.pathname}
+            >
+              <LoginPage />
+            </PageErrorBoundary>
+          )
         }
       />
       <Route path="/support/track/:ticketId" element={<TicketTrackingPage />} />
@@ -91,8 +110,28 @@ function AppRoutes() {
         <Route path="dashboard" element={<MainDashboard />} />
         <Route path="dashboard/vendor" element={<VendorDashboard />} />
         <Route path="dashboard/sla" element={<SLAOverview />} />
-        <Route path="orders" element={<OrdersPage />} />
-        <Route path="orders/:id" element={<OrderDetailsPage />} />
+        <Route
+          path="orders"
+          element={
+            <PageErrorBoundary
+              title="Orders failed to load"
+              resetKey={location.pathname}
+            >
+              <OrdersPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="orders/:id"
+          element={
+            <PageErrorBoundary
+              title="Order details failed to load"
+              resetKey={location.pathname}
+            >
+              <OrderDetailsPage />
+            </PageErrorBoundary>
+          }
+        />
         <Route path="vendors" element={<VendorsPage />} />
         <Route path="vendors/categories" element={<VendorCategoriesPage />} />
         <Route path="vendors/onboarding" element={<VendorOnboardingPage />} />
@@ -100,6 +139,7 @@ function AppRoutes() {
         <Route path="clients" element={<ClientsPage />} />
         <Route path="clients/add" element={<AddClient />} />
         <Route path="clients/:id" element={<ClientDetailPage />} />
+        <Route path="clients/:id/users/:userId" element={<UserProfilePage />} />
         <Route path="clients/contracts" element={<ClientsPage />} />
         <Route path="permissions" element={<PermissionsPage />} />
         <Route path="users" element={<UsersPage />} />
@@ -137,7 +177,17 @@ function AppRoutes() {
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="reports" element={<MainDashboard />} />
         <Route path="reports/audit" element={<AuditTrailPage />} />
-        <Route path="shop" element={<OrdersPage />} />
+        <Route
+          path="shop"
+          element={
+            <PageErrorBoundary
+              title="Orders failed to load"
+              resetKey={location.pathname}
+            >
+              <OrdersPage />
+            </PageErrorBoundary>
+          }
+        />
         <Route path="shop/cart" element={<CartPage />} />
         <Route path="services" element={<MainDashboard />} />
         <Route path="support" element={<SupportPage />} />
@@ -149,15 +199,120 @@ function AppRoutes() {
           path="transactions/sales"
           element={<Navigate to="/sales/quotes" replace />}
         />
-        <Route path="transactions/purchase" element={<OrdersPage />} />
+        <Route
+          path="transactions/purchase"
+          element={
+            <PageErrorBoundary
+              title="Orders failed to load"
+              resetKey={location.pathname}
+            >
+              <OrdersPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="transactions/purchase/recurring-expenses"
+          element={
+            <SalesModulePlaceholderPage
+              title="Recurring Expenses"
+              description="Manage and review recurring expense schedules."
+            />
+          }
+        />
+        <Route
+          path="transactions/purchase/purchase-orders"
+          element={
+            <SalesModulePlaceholderPage
+              title="Purchase Orders"
+              description="Create and track purchase orders for vendor procurement."
+            />
+          }
+        />
+        <Route
+          path="transactions/purchase/bills"
+          element={
+            <SalesModulePlaceholderPage
+              title="Bills"
+              description="View, verify, and process vendor bills."
+            />
+          }
+        />
+        <Route
+          path="transactions/purchase/recurring-bills"
+          element={
+            <SalesModulePlaceholderPage
+              title="Recurring Bills"
+              description="Track recurring billing cycles and due dates."
+            />
+          }
+        />
+        <Route
+          path="transactions/purchase/payments-made"
+          element={
+            <SalesModulePlaceholderPage
+              title="Payments Made"
+              description="Review completed payments made to vendors."
+            />
+          }
+        />
+        <Route
+          path="transactions/purchase/vendor-credits"
+          element={
+            <SalesModulePlaceholderPage
+              title="Vendor Credits"
+              description="Manage credit notes and balances from vendors."
+            />
+          }
+        />
         <Route path="sales" element={<Navigate to="/sales/quotes" replace />} />
-        <Route path="sales/quotes" element={<SalesQuotesPage />} />
-        <Route path="sales/quotes/create" element={<SalesQuoteFormPage />} />
-        <Route path="sales/quotes/:id" element={<SalesQuoteDetailPage />} />
-        <Route path="sales/quotes/:id/edit" element={<SalesQuoteFormPage />} />
+        <Route
+          path="sales/quotes"
+          element={
+            <PageErrorBoundary
+              title="Quotes failed to load"
+              resetKey={location.pathname}
+            >
+              <SalesQuotesPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="sales/quotes/create"
+          element={
+            <PageErrorBoundary
+              title="Quote form failed to load"
+              resetKey={location.pathname}
+            >
+              <SalesQuoteFormPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="sales/quotes/:id"
+          element={
+            <PageErrorBoundary
+              title="Quote details failed to load"
+              resetKey={location.pathname}
+            >
+              <SalesQuoteDetailPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="sales/quotes/:id/edit"
+          element={
+            <PageErrorBoundary
+              title="Quote form failed to load"
+              resetKey={location.pathname}
+            >
+              <SalesQuoteFormPage />
+            </PageErrorBoundary>
+          }
+        />
         <Route path="sales/orders" element={<SalesOrdersPage />} />
-        <Route path="sales/orders/:id" element={<SalesOrderDetailPage />} />
-        <Route path="sales/invoices" element={<InvoicesPage />} />
+        <Route path="sales/orders/:id" element={<SalesOrderDetails />} />
+        <Route path="sales/invoices" element={<InvoicePage />} />
+        <Route path="sales/invoices/:id" element={<InvoiceDetails />} />
         <Route
           path="sales/recurring-invoices"
           element={<RecurringInvoicesPage />}

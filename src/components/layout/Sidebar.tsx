@@ -119,7 +119,38 @@ const NAV_ITEMS: NavItem[] = [
           { label: "e-Way Bills", path: "/sales/e-way-bills" },
         ],
       },
-      { label: "Purchase", path: "/transactions/purchase" },
+      {
+        label: "Purchase",
+        children: [
+          { label: "Vendors", path: "/vendors" },
+          {
+            label: "Expenses",
+            children: [
+              {
+                label: "Recurring Expenses",
+                path: "/transactions/purchase/recurring-expenses",
+              },
+              {
+                label: "Purchase Orders",
+                path: "/transactions/purchase/purchase-orders",
+              },
+              { label: "Bills", path: "/transactions/purchase/bills" },
+              {
+                label: "Recurring Bills",
+                path: "/transactions/purchase/recurring-bills",
+              },
+              {
+                label: "Payments Made",
+                path: "/transactions/purchase/payments-made",
+              },
+              {
+                label: "Vendor Credits",
+                path: "/transactions/purchase/vendor-credits",
+              },
+            ],
+          },
+        ],
+      },
     ],
   },
   {
