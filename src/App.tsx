@@ -50,6 +50,7 @@ import SalesQuoteDetailPage from "@/pages/SalesQuoteDetailPage";
 import SalesOrdersPage from "@/pages/SalesOrdersPage";
 import SalesOrderDetails from "@/pages/SalesOrderDetails";
 import SalesModulePlaceholderPage from "@/pages/SalesModulePlaceholderPage";
+import ExpensesPage from "@/pages/ExpensesPage";
 import HomePage from "@/pages/HomePage";
 import CategoriesPage from "@/pages/CategoriesPage";
 import CartPage from "@/pages/CartPage";
@@ -65,6 +66,9 @@ import DeliveryChallansPage from "@/pages/DeliveryChallansPage";
 import PaymentReceiptsPage from "@/pages/PaymentReceiptsPage";
 import CreditNotesPage from "@/pages/CreditNotesPage";
 import EWayBillsPage from "@/pages/EWayBillsPage";
+import RecurringExpensesPage from "@/pages/RecurringExpensesPage";
+import PurchaseOrdersPage from "@/pages/PurchaseOrdersPage";
+import BillsPage from "@/pages/BillsPage";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -252,30 +256,59 @@ function AppRoutes() {
         />
         <Route
           path="transactions/purchase/recurring-expenses"
-          element={
-            <SalesModulePlaceholderPage
-              title="Recurring Expenses"
-              description="Manage and review recurring expense schedules."
-            />
-          }
+          element={<RecurringExpensesPage />}
+        />
+        <Route
+          path="transactions/purchase/recurring-expenses/create"
+          element={<RecurringExpensesPage />}
+        />
+        <Route
+          path="transactions/purchase/recurring-expenses/:id/edit"
+          element={<RecurringExpensesPage />}
+        />
+        <Route
+          path="transactions/purchase/expenses"
+          element={<ExpensesPage />}
+        />
+        <Route
+          path="transactions/purchase/expenses/create"
+          element={<ExpensesPage />}
+        />
+        <Route
+          path="transactions/purchase/expenses/:id"
+          element={<ExpensesPage />}
         />
         <Route
           path="transactions/purchase/purchase-orders"
-          element={
-            <SalesModulePlaceholderPage
-              title="Purchase Orders"
-              description="Create and track purchase orders for vendor procurement."
-            />
-          }
+          element={<PurchaseOrdersPage />}
+        />
+        <Route
+          path="transactions/purchase/purchase-orders/create"
+          element={<PurchaseOrdersPage />}
+        />
+        <Route
+          path="transactions/purchase/purchase-orders/:id"
+          element={<PurchaseOrdersPage />}
+        />
+        <Route
+          path="transactions/purchase/purchase-orders/:id/edit"
+          element={<PurchaseOrdersPage />}
         />
         <Route
           path="transactions/purchase/bills"
-          element={
-            <SalesModulePlaceholderPage
-              title="Bills"
-              description="View, verify, and process vendor bills."
-            />
-          }
+          element={<BillsPage />}
+        />
+        <Route
+          path="transactions/purchase/bills/create"
+          element={<BillsPage />}
+        />
+        <Route
+          path="transactions/purchase/bills/:id"
+          element={<BillsPage />}
+        />
+        <Route
+          path="transactions/purchase/bills/:id/edit"
+          element={<BillsPage />}
         />
         <Route
           path="transactions/purchase/recurring-bills"

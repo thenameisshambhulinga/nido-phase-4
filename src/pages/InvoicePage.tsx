@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -31,7 +32,7 @@ import {
 } from "@/components/ui/table";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Search, Trash2 } from "lucide-react";
+import { Paperclip, Plus, Search, Trash2 } from "lucide-react";
 import type { Invoice, SalesLineItem } from "@/contexts/DataContext";
 
 type InvoiceDraftItem = SalesLineItem & { catalogItemId?: string };
@@ -39,6 +40,8 @@ type InvoiceDraftItem = SalesLineItem & { catalogItemId?: string };
 type InvoiceDraft = {
   customerId: string;
   customerName: string;
+  customerGst: string;
+  customerBusinessType: "Registered" | "Unregistered" | "Consumer";
   invoiceNumber: string;
   referenceSalesOrderId: string;
   invoiceDate: string;
@@ -53,6 +56,9 @@ type InvoiceDraft = {
   bankDetails: string;
   shippingCharges: number;
   adjustment: number;
+  attachments: string[];
+  attachCustomerStatement: boolean;
+  attachInvoicePdf: boolean;
   items: InvoiceDraftItem[];
 };
 
@@ -104,17 +110,32 @@ const emptyItem = (): InvoiceDraftItem => ({
   amount: 0,
 });
 
+const gstTreatmentLabel = (value: InvoiceDraft["customerBusinessType"]) => {
+  if (value === "Consumer") return "Consumer";
+  if (value === "Unregistered") return "Unregistered Business";
+  return "Registered Business - Regular";
+};
+
 export default function InvoicePage() {
   const navigate = useNavigate();
-  const { invoices, salesOrders, clients, masterCatalogItems, createInvoice } =
-    useData();
+  const {
+    invoices,
+    salesOrders,
+    clients,
+    masterCatalogItems,
+    createInvoice,
+    sendEmail,
+  } = useData();
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const deferredSearch = useDeferredValue(search);
   const [customerQuery, setCustomerQuery] = useState("");
+  const [attachmentDraft, setAttachmentDraft] = useState("");
   const [draft, setDraft] = useState<InvoiceDraft>(() => ({
     customerId: "",
     customerName: "",
+    customerGst: "",
+    customerBusinessType: "Registered",
     invoiceNumber: nextNumber(
       "INV",
       invoices.map((entry) => entry.invoiceNumber),
@@ -132,15 +153,21 @@ export default function InvoicePage() {
     bankDetails: "",
     shippingCharges: 0,
     adjustment: 0,
+    attachments: [],
+    attachCustomerStatement: false,
+    attachInvoicePdf: true,
     items: [emptyItem()],
   }));
 
   useEffect(() => {
     if (!showCreate) return;
     const firstCustomer = clients[0];
+    setAttachmentDraft("");
     setDraft({
       customerId: firstCustomer?.id || "",
       customerName: firstCustomer?.name || "",
+      customerGst: firstCustomer?.gst || "",
+      customerBusinessType: firstCustomer?.businessType || "Registered",
       invoiceNumber: nextNumber(
         "INV",
         invoices.map((entry) => entry.invoiceNumber),
@@ -160,6 +187,9 @@ export default function InvoicePage() {
       bankDetails: "",
       shippingCharges: 0,
       adjustment: 0,
+      attachments: [],
+      attachCustomerStatement: false,
+      attachInvoicePdf: true,
       items: [emptyItem()],
     });
     setCustomerQuery(firstCustomer?.name || "");
@@ -204,6 +234,11 @@ export default function InvoicePage() {
       })
       .slice(0, 8);
   }, [clients, customerQuery]);
+
+  const selectedCustomer = useMemo(
+    () => clients.find((client) => client.id === draft.customerId) || null,
+    [clients, draft.customerId],
+  );
 
   const selectedSalesOrder = useMemo(
     () => salesOrders.find((order) => order.id === draft.referenceSalesOrderId),
@@ -250,6 +285,9 @@ export default function InvoicePage() {
       ...current,
       customerId: selected.id,
       customerName: selected.name,
+      customerGst: selected.gst || current.customerGst,
+      customerBusinessType:
+        selected.businessType || current.customerBusinessType,
       billingAddress: address,
       shippingAddress: address,
       placeOfSupply: selected.locationDetails?.state || current.placeOfSupply,
@@ -274,6 +312,8 @@ export default function InvoicePage() {
       referenceSalesOrderId: selected.id,
       customerId: selected.customerId || current.customerId,
       customerName: selected.customerName,
+      customerGst: current.customerGst,
+      customerBusinessType: current.customerBusinessType,
       invoiceDate: today(),
       dueDate: selected.expectedShipmentDate || today(),
       paymentTerms: selected.paymentTerms,
@@ -290,6 +330,9 @@ export default function InvoicePage() {
       })),
       shippingCharges: selected.shippingCharges ?? 0,
       adjustment: selected.adjustment,
+      attachments: current.attachments,
+      attachCustomerStatement: current.attachCustomerStatement,
+      attachInvoicePdf: current.attachInvoicePdf,
     }));
     setCustomerQuery(selected.customerName);
   };
@@ -326,6 +369,23 @@ export default function InvoicePage() {
           : [emptyItem()],
     }));
 
+  const addAttachment = () => {
+    const value = attachmentDraft.trim();
+    if (!value) return;
+    setDraft((current) => ({
+      ...current,
+      attachments: [...current.attachments, value],
+    }));
+    setAttachmentDraft("");
+  };
+
+  const removeAttachment = (attachment: string) => {
+    setDraft((current) => ({
+      ...current,
+      attachments: current.attachments.filter((entry) => entry !== attachment),
+    }));
+  };
+
   const saveInvoice = (status: Invoice["status"]) => {
     if (!draft.customerName.trim()) {
       toast({ title: "Select a customer before saving" });
@@ -347,6 +407,8 @@ export default function InvoicePage() {
       billingAddress: draft.billingAddress,
       shippingAddress: draft.shippingAddress,
       placeOfSupply: draft.placeOfSupply,
+      customerGst: draft.customerGst,
+      customerBusinessType: draft.customerBusinessType,
       emailRecipients: draft.emailRecipients
         .split(",")
         .map((entry) => entry.trim())
@@ -380,10 +442,34 @@ export default function InvoicePage() {
       notes: draft.notes,
       termsAndConditions: draft.termsAndConditions,
       bankDetails: draft.bankDetails,
+      attachments: draft.attachments,
+      attachCustomerStatement: draft.attachCustomerStatement,
+      attachInvoicePdf: draft.attachInvoicePdf,
       createdBy: "System",
     });
 
-    toast({ title: `Invoice ${created.invoiceNumber} created` });
+    const recipients = draft.emailRecipients
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+    if (recipients.length > 0) {
+      sendEmail({
+        entityType: "invoice",
+        entityId: created.id,
+        to: recipients,
+        actor: "System",
+        subject: `Invoice ${created.invoiceNumber} from Nido Technologies`,
+      });
+    }
+
+    toast({
+      title: `Invoice ${created.invoiceNumber} created`,
+      description:
+        recipients.length > 0
+          ? `Mail queued for ${recipients.join(", ")}`
+          : "No customer email configured for auto send",
+    });
     setShowCreate(false);
     navigate(`/sales/invoices/${created.id}`);
   };
@@ -536,6 +622,80 @@ export default function InvoicePage() {
                     </div>
                   </div>
 
+                  <Card className="border-border/60 bg-muted/20 shadow-sm lg:col-span-2">
+                    <CardContent className="grid gap-4 p-4 lg:grid-cols-2">
+                      <div className="rounded-xl border bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                          Billing Address
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                          {selectedCustomer?.name || draft.customerName || "-"}
+                          {"\n"}
+                          {draft.billingAddress ||
+                            "No billing address selected"}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                          Shipping Address
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                          {selectedCustomer?.name || draft.customerName || "-"}
+                          {"\n"}
+                          {draft.shippingAddress ||
+                            "No shipping address selected"}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                          GST Treatment
+                        </p>
+                        <Select
+                          value={draft.customerBusinessType}
+                          onValueChange={(value) =>
+                            setDraft((current) => ({
+                              ...current,
+                              customerBusinessType:
+                                value as InvoiceDraft["customerBusinessType"],
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="mt-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Registered">
+                              Registered
+                            </SelectItem>
+                            <SelectItem value="Unregistered">
+                              Unregistered
+                            </SelectItem>
+                            <SelectItem value="Consumer">Consumer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {gstTreatmentLabel(draft.customerBusinessType)}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border bg-white p-4 shadow-sm">
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                          GSTIN
+                        </p>
+                        <Input
+                          className="mt-2"
+                          value={draft.customerGst}
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              customerGst: event.target.value,
+                            }))
+                          }
+                          placeholder="GSTIN"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
                   <div>
                     <Label>Invoice#</Label>
                     <Input
@@ -614,12 +774,25 @@ export default function InvoicePage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="lg:col-span-2">
+                    <Label>Place of Supply</Label>
+                    <Input
+                      value={draft.placeOfSupply}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          placeOfSupply: event.target.value,
+                        }))
+                      }
+                      placeholder="[KA] - Karnataka"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div>
                     <Label>Billing Address</Label>
-                    <textarea
+                    <Textarea
                       value={draft.billingAddress}
                       onChange={(event) =>
                         setDraft((current) => ({
@@ -627,12 +800,12 @@ export default function InvoicePage() {
                           billingAddress: event.target.value,
                         }))
                       }
-                      className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                      className="min-h-28"
                     />
                   </div>
                   <div>
                     <Label>Shipping Address</Label>
-                    <textarea
+                    <Textarea
                       value={draft.shippingAddress}
                       onChange={(event) =>
                         setDraft((current) => ({
@@ -640,7 +813,7 @@ export default function InvoicePage() {
                           shippingAddress: event.target.value,
                         }))
                       }
-                      className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                      className="min-h-28"
                     />
                   </div>
                 </div>
@@ -784,11 +957,103 @@ export default function InvoicePage() {
                   </Table>
                 </div>
 
+                <Card className="border-border/60 shadow-sm">
+                  <CardContent className="space-y-4 p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold">Additional Fields</p>
+                        <p className="text-xs text-muted-foreground">
+                          Keep these on the invoice so the generated PDF and the
+                          create form stay aligned.
+                        </p>
+                      </div>
+                      <Paperclip className="h-4 w-4 text-muted-foreground" />
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="flex items-center gap-3 rounded-xl border bg-muted/20 px-4 py-3 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={draft.attachCustomerStatement}
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              attachCustomerStatement: event.target.checked,
+                            }))
+                          }
+                        />
+                        Attach Customer Statement
+                      </label>
+                      <label className="flex items-center gap-3 rounded-xl border bg-muted/20 px-4 py-3 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={draft.attachInvoicePdf}
+                          onChange={(event) =>
+                            setDraft((current) => ({
+                              ...current,
+                              attachInvoicePdf: event.target.checked,
+                            }))
+                          }
+                        />
+                        Attach Invoice PDF
+                      </label>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Attachments</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={attachmentDraft}
+                          onChange={(event) =>
+                            setAttachmentDraft(event.target.value)
+                          }
+                          placeholder="Add attachment name"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={addAttachment}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {draft.attachments.map((attachment) => (
+                          <Badge
+                            key={attachment}
+                            variant="secondary"
+                            className="gap-2 px-3 py-1"
+                          >
+                            {attachment}
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:text-foreground"
+                              onClick={() => removeAttachment(attachment)}
+                            >
+                              ×
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-slate-700">
+                      <p className="font-medium text-slate-900">
+                        Want to get paid faster?
+                      </p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Configure payment gateways and display payment
+                        instructions in the invoice PDF.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="space-y-4">
                     <div>
                       <Label>Customer Notes</Label>
-                      <textarea
+                      <Textarea
                         value={draft.notes}
                         onChange={(event) =>
                           setDraft((current) => ({
@@ -796,12 +1061,12 @@ export default function InvoicePage() {
                             notes: event.target.value,
                           }))
                         }
-                        className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                        className="min-h-28"
                       />
                     </div>
                     <div>
                       <Label>Terms & Conditions</Label>
-                      <textarea
+                      <Textarea
                         value={draft.termsAndConditions}
                         onChange={(event) =>
                           setDraft((current) => ({
@@ -809,12 +1074,12 @@ export default function InvoicePage() {
                             termsAndConditions: event.target.value,
                           }))
                         }
-                        className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                        className="min-h-28"
                       />
                     </div>
                     <div>
                       <Label>Bank Details</Label>
-                      <textarea
+                      <Textarea
                         value={draft.bankDetails}
                         onChange={(event) =>
                           setDraft((current) => ({
@@ -822,7 +1087,7 @@ export default function InvoicePage() {
                             bankDetails: event.target.value,
                           }))
                         }
-                        className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                        className="min-h-28"
                       />
                     </div>
                   </div>

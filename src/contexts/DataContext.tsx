@@ -419,6 +419,8 @@ export interface Invoice {
   customerId?: string;
   vendorOrClient?: string;
   type?: "client" | "vendor";
+  customerGst?: string;
+  customerBusinessType?: "Registered" | "Unregistered" | "Consumer";
   invoiceDate: string;
   issueDate?: string;
   dueDate: string;
@@ -441,6 +443,9 @@ export interface Invoice {
   notes: string;
   termsAndConditions: string;
   bankDetails: string;
+  attachments?: string[];
+  attachCustomerStatement?: boolean;
+  attachInvoicePdf?: boolean;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

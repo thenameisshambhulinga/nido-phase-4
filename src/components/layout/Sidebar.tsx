@@ -120,33 +120,30 @@ const NAV_ITEMS: NavItem[] = [
         ],
       },
       {
-        label: "Purchase",
+        label: "Purchases",
         children: [
+          { label: "Vendors", path: "/vendors" },
+          { label: "Expenses", path: "/transactions/purchase/expenses" },
           {
-            label: "Expenses",
-            children: [
-              {
-                label: "Recurring Expenses",
-                path: "/transactions/purchase/recurring-expenses",
-              },
-              {
-                label: "Purchase Orders",
-                path: "/transactions/purchase/purchase-orders",
-              },
-              { label: "Bills", path: "/transactions/purchase/bills" },
-              {
-                label: "Recurring Bills",
-                path: "/transactions/purchase/recurring-bills",
-              },
-              {
-                label: "Payments Made",
-                path: "/transactions/purchase/payments-made",
-              },
-              {
-                label: "Vendor Credits",
-                path: "/transactions/purchase/vendor-credits",
-              },
-            ],
+            label: "Recurring Expenses",
+            path: "/transactions/purchase/recurring-expenses",
+          },
+          {
+            label: "Purchase Orders",
+            path: "/transactions/purchase/purchase-orders",
+          },
+          { label: "Bills", path: "/transactions/purchase/bills" },
+          {
+            label: "Recurring Bills",
+            path: "/transactions/purchase/recurring-bills",
+          },
+          {
+            label: "Payments Made",
+            path: "/transactions/purchase/payments-made",
+          },
+          {
+            label: "Vendor Credits",
+            path: "/transactions/purchase/vendor-credits",
           },
         ],
       },

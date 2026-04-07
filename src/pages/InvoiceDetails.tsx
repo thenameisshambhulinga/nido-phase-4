@@ -450,7 +450,7 @@ export default function InvoiceDetails() {
               <Printer className="mr-2 h-4 w-4" /> Print
             </Button>
             <Button className="rounded-xl" onClick={() => setPaymentOpen(true)}>
-              <Wallet className="mr-2 h-4 w-4" /> Record Payment
+              <Wallet className="mr-2 h-4 w-4" /> Payment Receipt
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -555,7 +555,7 @@ export default function InvoiceDetails() {
       <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
+            <DialogTitle>Payment Receipt</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>

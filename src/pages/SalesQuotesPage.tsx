@@ -125,10 +125,12 @@ export default function SalesQuotesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Date</TableHead>
                   <TableHead>Quote #</TableHead>
+                  <TableHead>Reference #</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Quote Date</TableHead>
+                  <TableHead>Valid Till</TableHead>
                   <TableHead>Total</TableHead>
                 </TableRow>
               </TableHeader>
@@ -139,9 +141,11 @@ export default function SalesQuotesPage() {
                     className="cursor-pointer"
                     onClick={() => navigate(`/sales/quotes/${quote.id}`)}
                   >
+                    <TableCell>{quote.quoteDate}</TableCell>
                     <TableCell className="font-medium">
                       {quote.quoteNumber}
                     </TableCell>
+                    <TableCell>{quote.referenceNumber || "-"}</TableCell>
                     <TableCell>{quote.customerName}</TableCell>
                     <TableCell>
                       <Badge
@@ -152,7 +156,7 @@ export default function SalesQuotesPage() {
                         {quote.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>{quote.quoteDate}</TableCell>
+                    <TableCell>{quote.validTillDate || "-"}</TableCell>
                     <TableCell>
                       INR{" "}
                       {Number(
