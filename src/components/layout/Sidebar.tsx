@@ -122,7 +122,6 @@ const NAV_ITEMS: NavItem[] = [
       {
         label: "Purchase",
         children: [
-          { label: "Vendors", path: "/vendors" },
           {
             label: "Expenses",
             children: [
