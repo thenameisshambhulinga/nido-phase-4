@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -42,12 +43,56 @@ import {
   Download,
   Mail,
   Plus,
-  FileJson,
+  MoreVertical,
 } from "lucide-react";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
 import { toast } from "@/hooks/use-toast";
 
 const EMPTY_FILTER = "all";
+const STATUS_TABS = ["All", "Active", "Pending", "Inactive"] as const;
+
+const safeNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+// Helper to generate avatar letters from name
+const getInitials = (name: string): string => {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+const getCompanyInitials = (name: string): string => {
+  const tokens = name.split(" ").filter(Boolean);
+  if (tokens.length === 0) return "--";
+  if (tokens.length === 1) return tokens[0].slice(0, 2).toUpperCase();
+  return `${tokens[0][0] || ""}${tokens[tokens.length - 1][0] || ""}`.toUpperCase();
+};
+
+// Helper to get avatar color based on initials - More vibrant colors matching the reference
+const getAvatarColor = (name: string): string => {
+  const colors = [
+    "bg-blue-200 text-blue-900", // Light blue
+    "bg-cyan-200 text-cyan-900", // Cyan
+    "bg-teal-200 text-teal-900", // Teal
+    "bg-purple-200 text-purple-900", // Purple
+    "bg-pink-200 text-pink-900", // Pink;
+    "bg-orange-200 text-orange-900", // Orange
+    "bg-amber-200 text-amber-900", // Amber
+    "bg-indigo-200 text-indigo-900", // Indigo
+    "bg-green-200 text-green-900", // Green
+    "bg-rose-200 text-rose-900", // Rose
+    "bg-fuchsia-200 text-fuchsia-900", // Fuchsia
+    "bg-sky-200 text-sky-900", // Sky
+  ];
+  const hash = name.charCodeAt(0) + name.charCodeAt(name.length - 1);
+  return colors[hash % colors.length];
+};
 
 export default function ClientsPage() {
   const { clients, updateClient, deleteClient, addAuditEntry } = useData();
@@ -55,9 +100,10 @@ export default function ClientsPage() {
   const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState(EMPTY_FILTER);
+  const [statusFilter, setStatusFilter] =
+    useState<(typeof STATUS_TABS)[number]>("All");
   const [contractTypeFilter, setContractTypeFilter] = useState(EMPTY_FILTER);
-  const [businessTypeFilter, setBusinessTypeFilter] = useState(EMPTY_FILTER);
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
 
   const [showMailComposer, setShowMailComposer] = useState(false);
   const [mailTo, setMailTo] = useState("");
@@ -76,30 +122,48 @@ export default function ClientsPage() {
     businessType: "",
   });
 
+  // Filter clients
   const filtered = useMemo(() => {
     return clients.filter((c) => {
       const searchText = search.toLowerCase();
+      const name = String(c.name ?? "");
+      const contactPerson = String(c.contactPerson ?? "");
+      const email = String(c.email ?? "");
+      const clientCode = String(c.clientCode ?? "");
+
       const matchSearch =
-        c.name.toLowerCase().includes(searchText) ||
-        c.contactPerson.toLowerCase().includes(searchText) ||
-        c.email.toLowerCase().includes(searchText) ||
-        (c.clientCode || "").toLowerCase().includes(searchText) ||
-        c.id.toLowerCase().includes(searchText);
+        name.toLowerCase().includes(searchText) ||
+        contactPerson.toLowerCase().includes(searchText) ||
+        email.toLowerCase().includes(searchText) ||
+        clientCode.toLowerCase().includes(searchText);
 
       const matchStatus =
-        statusFilter === EMPTY_FILTER || c.status === statusFilter;
+        statusFilter === "All" ||
+        (statusFilter === "Active" && c.status === "active") ||
+        (statusFilter === "Pending" &&
+          c.status !== "active" &&
+          c.status !== "inactive") ||
+        (statusFilter === "Inactive" && c.status === "inactive");
+
       const matchContractType =
         contractTypeFilter === EMPTY_FILTER ||
         c.contractType === contractTypeFilter;
-      const matchBusinessType =
-        businessTypeFilter === EMPTY_FILTER ||
-        c.businessType === businessTypeFilter;
 
-      return (
-        matchSearch && matchStatus && matchContractType && matchBusinessType
-      );
+      return matchSearch && matchStatus && matchContractType;
     });
-  }, [businessTypeFilter, clients, contractTypeFilter, search, statusFilter]);
+  }, [clients, search, statusFilter, contractTypeFilter]);
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const premium = clients.filter((c) => c.totalOrders > 10).length;
+    const active = clients.filter((c) => c.status === "active").length;
+    const pending = clients.filter(
+      (c) => c.status !== "active" && c.status !== "inactive",
+    ).length;
+    const inactive = clients.filter((c) => c.status === "inactive").length;
+
+    return { premium, active, pending, inactive, total: clients.length };
+  }, [clients]);
 
   const contractTypes = useMemo(
     () =>
@@ -109,13 +173,19 @@ export default function ClientsPage() {
     [clients],
   );
 
-  const businessTypes = useMemo(
-    () =>
-      Array.from(
-        new Set(clients.map((c) => c.businessType).filter(Boolean)),
-      ) as string[],
-    [clients],
-  );
+  const handleSelectAll = () => {
+    if (selectedClientIds.length === filtered.length) {
+      setSelectedClientIds([]);
+    } else {
+      setSelectedClientIds(filtered.map((c) => c.id));
+    }
+  };
+
+  const toggleClientSelection = (id: string) => {
+    setSelectedClientIds((prev) =>
+      prev.includes(id) ? prev.filter((cid) => cid !== id) : [...prev, id],
+    );
+  };
 
   const exportClients = (format: "csv" | "json", scope: "filtered" | "all") => {
     const source = scope === "all" ? clients : filtered;
@@ -124,9 +194,8 @@ export default function ClientsPage() {
       "Company Name",
       "Contact Person",
       "Email",
-      "Contract Period",
-      "Orders",
       "Status",
+      "Total Orders",
     ];
 
     const rows = source.map((c) => [
@@ -134,9 +203,8 @@ export default function ClientsPage() {
       c.name,
       c.contactPerson,
       c.email,
-      `${c.contractStart || ""} - ${c.contractEnd || ""}`,
-      c.totalOrders,
       c.status,
+      c.totalOrders,
     ]);
 
     const blob =
@@ -144,36 +212,18 @@ export default function ClientsPage() {
         ? new Blob([[headers, ...rows].map((r) => r.join(",")).join("\n")], {
             type: "text/csv",
           })
-        : new Blob(
-            [
-              JSON.stringify(
-                source.map((client) => ({
-                  id: client.id,
-                  clientCode: client.clientCode,
-                  name: client.name,
-                  contactPerson: client.contactPerson,
-                  email: client.email,
-                  contractStart: client.contractStart,
-                  contractEnd: client.contractEnd,
-                  totalOrders: client.totalOrders,
-                  status: client.status,
-                })),
-                null,
-                2,
-              ),
-            ],
-            { type: "application/json" },
-          );
+        : new Blob([JSON.stringify(source, null, 2)], {
+            type: "application/json",
+          });
 
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `clients-${scope}.${format}`;
+    a.download = `clients-${scope}-${Date.now()}.${format}`;
     a.click();
     URL.revokeObjectURL(url);
     toast({
-      title: `Exported ${source.length} client record(s)`,
-      description: `${scope === "all" ? "All" : "Filtered"} list as ${format.toUpperCase()}`,
+      title: `Exported ${source.length} client(s)`,
     });
   };
 
@@ -198,7 +248,7 @@ export default function ClientsPage() {
   const handleSaveEdit = () => {
     if (!editId) return;
     if (!form.name.trim() || !form.contactPerson.trim() || !form.email.trim()) {
-      toast({ title: "Company, contact person, and email are required" });
+      toast({ title: "Required fields are missing" });
       return;
     }
 
@@ -231,12 +281,29 @@ export default function ClientsPage() {
     setEditId(null);
   };
 
+  const handleDelete = (id: string) => {
+    deleteClient(id);
+    toast({ title: "Client deleted" });
+    setSelectedClientIds((prev) => prev.filter((cid) => cid !== id));
+  };
+
+  const allChecked =
+    filtered.length > 0 && selectedClientIds.length === filtered.length;
+  const someChecked =
+    selectedClientIds.length > 0 && selectedClientIds.length < filtered.length;
+
   return (
     <div>
       <Header title="Clients" />
-      <div className="p-6 space-y-4 animate-fade-in">
+      <div className="p-6 space-y-6 animate-fade-in">
+        {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-display font-bold">Client Management</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Clients</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage all your client accounts
+            </p>
+          </div>
           <div className="flex gap-2">
             <Popover>
               <PopoverTrigger asChild>
@@ -244,42 +311,30 @@ export default function ClientsPage() {
                   <Download className="h-4 w-4" /> Export
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-72 p-2">
-                <p className="px-2 pb-2 text-xs font-medium text-muted-foreground">
-                  Flexible Export Options
-                </p>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
-                  onClick={() => exportClients("csv", "filtered")}
-                >
-                  <span>Filtered Clients (CSV)</span>
-                  <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
-                <button
-                  type="button"
-                  className="mt-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
-                  onClick={() => exportClients("csv", "all")}
-                >
-                  <span>All Clients (CSV)</span>
-                  <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
-                <button
-                  type="button"
-                  className="mt-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
-                  onClick={() => exportClients("json", "filtered")}
-                >
-                  <span>Filtered Clients (JSON)</span>
-                  <FileJson className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
-                <button
-                  type="button"
-                  className="mt-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
-                  onClick={() => exportClients("json", "all")}
-                >
-                  <span>All Clients (JSON)</span>
-                  <FileJson className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
+              <PopoverContent align="end" className="w-48">
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted rounded"
+                    onClick={() => exportClients("csv", "filtered")}
+                  >
+                    Filtered CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted rounded"
+                    onClick={() => exportClients("csv", "all")}
+                  >
+                    All CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted rounded"
+                    onClick={() => exportClients("json", "filtered")}
+                  >
+                    Filtered JSON
+                  </button>
+                </div>
               </PopoverContent>
             </Popover>
             <Button
@@ -292,251 +347,365 @@ export default function ClientsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div className="relative md:col-span-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by client ID, company, contact, email"
-              className="pl-9"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={EMPTY_FILTER}>All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={contractTypeFilter}
-            onValueChange={setContractTypeFilter}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Contract Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={EMPTY_FILTER}>All Contract Types</SelectItem>
-              {contractTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={businessTypeFilter}
-            onValueChange={setBusinessTypeFilter}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Business Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={EMPTY_FILTER}>All Business Types</SelectItem>
-              {businessTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold">{stats.premium}</p>
+              <p className="text-xs text-muted-foreground">Premium Clients</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold">{stats.active}</p>
+              <p className="text-xs text-muted-foreground">Active Clients</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold">{stats.pending}</p>
+              <p className="text-xs text-muted-foreground">Pending</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <p className="text-2xl font-bold">{stats.inactive}</p>
+              <p className="text-xs text-muted-foreground">Inactive</p>
+            </CardContent>
+          </Card>
         </div>
 
-        <Card>
-          <CardContent className="p-0">
+        {/* Search & Filter Tabs */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search client name, representative, email..."
+                className="pl-9 h-10"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select
+              value={contractTypeFilter}
+              onValueChange={setContractTypeFilter}
+            >
+              <SelectTrigger className="w-48 h-10">
+                <SelectValue placeholder="Contract Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMPTY_FILTER}>All Contract Types</SelectItem>
+                {contractTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status Tabs */}
+          <div className="flex gap-2 border-b">
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setStatusFilter(tab)}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  statusFilter === tab
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Table */}
+        <Card className="border-0 shadow-sm rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Client ID</TableHead>
-                  <TableHead>Company Name</TableHead>
-                  <TableHead>Contact Person</TableHead>
-                  <TableHead>Email ID</TableHead>
-                  <TableHead>Contract Period</TableHead>
-                  <TableHead>Orders</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Action</TableHead>
+              <TableHeader className="bg-gray-50">
+                <TableRow className="border-b border-gray-200 hover:bg-gray-50">
+                  <TableHead className="w-12 px-4 py-4">
+                    <Checkbox
+                      checked={allChecked}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </TableHead>
+                  <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                    Client Name
+                  </TableHead>
+                  <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                    Representative
+                  </TableHead>
+                  <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                    Email
+                  </TableHead>
+                  <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700 text-right">
+                    Total Spend (USD)
+                  </TableHead>
+                  <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                    Status
+                  </TableHead>
+                  <TableHead className="px-4 py-4"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((c) => (
+                {filtered.map((client) => (
                   <TableRow
-                    key={c.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/clients/${c.id}`)}
+                    key={client.id}
+                    className="border-b border-gray-100 hover:bg-gray-50/80 transition-colors cursor-pointer"
                   >
-                    <TableCell className="font-mono text-xs">
-                      {c.clientCode || c.id}
+                    <TableCell
+                      className="px-4 py-4"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Checkbox
+                        checked={selectedClientIds.includes(client.id)}
+                        onCheckedChange={() => toggleClientSelection(client.id)}
+                      />
                     </TableCell>
-                    <TableCell className="font-medium text-primary">
-                      {c.name}
-                    </TableCell>
-                    <TableCell>{c.contactPerson}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {c.email}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {c.contractStart || "-"} - {c.contractEnd || "-"}
-                    </TableCell>
-                    <TableCell>{c.totalOrders}</TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          c.status === "active"
-                            ? "bg-success text-success-foreground"
-                            : "bg-muted text-muted-foreground"
-                        }
-                      >
-                        {c.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div
-                        className="flex gap-1"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => {
-                            setMailTo(c.email);
-                            setShowMailComposer(true);
-                          }}
+                    <TableCell
+                      className="px-4 py-4 cursor-pointer"
+                      onClick={() => navigate(`/clients/${client.id}`)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-base flex-shrink-0 shadow-sm ${getAvatarColor(client.name)}`}
                         >
-                          <Mail className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => handleEdit(c.id)}
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => {
-                            deleteClient(c.id);
-                            toast({ title: "Client deleted" });
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                          {getCompanyInitials(client.name)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-gray-900 truncate">
+                            {client.name}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {client.clientCode || client.id}
+                          </p>
+                        </div>
                       </div>
+                    </TableCell>
+                    <TableCell
+                      className="px-4 py-4 cursor-pointer"
+                      onClick={() => navigate(`/clients/${client.id}`)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-sm ${getAvatarColor(client.contactPerson)}`}
+                        >
+                          {getInitials(client.contactPerson)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {client.contactPerson}
+                          </p>
+                          {client.jobTitle && (
+                            <p className="text-xs text-gray-500 truncate">
+                              {client.jobTitle}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell
+                      className="px-4 py-4 text-sm text-gray-600 cursor-pointer"
+                      onClick={() => navigate(`/clients/${client.id}`)}
+                    >
+                      {client.email}
+                    </TableCell>
+                    <TableCell
+                      className="px-4 py-4 text-sm font-semibold text-gray-900 text-right cursor-pointer"
+                      onClick={() => navigate(`/clients/${client.id}`)}
+                    >
+                      $
+                      {(safeNumber(client.totalOrders) * 5000).toLocaleString()}
+                    </TableCell>
+                    <TableCell
+                      className="px-4 py-4 cursor-pointer"
+                      onClick={() => navigate(`/clients/${client.id}`)}
+                    >
+                      <div className="inline-flex">
+                        <Badge
+                          className={`rounded-full text-xs font-semibold px-3 py-1 ${
+                            client.status === "active"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {client.status === "active" ? "●" : "●"}{" "}
+                          {client.status === "active" ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell
+                      className="px-4 py-4 text-right"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-40 p-0">
+                          <div className="flex flex-col">
+                            <button
+                              type="button"
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
+                              onClick={() => {
+                                setMailTo(client.email);
+                                setShowMailComposer(true);
+                              }}
+                            >
+                              <Mail className="h-4 w-4" /> Send Email
+                            </button>
+                            <button
+                              type="button"
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
+                              onClick={() => handleEdit(client.id)}
+                            >
+                              <Edit className="h-4 w-4" /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                              onClick={() => handleDelete(client.id)}
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </TableCell>
                   </TableRow>
                 ))}
-                {filtered.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={8}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      No clients found.
-                    </TableCell>
-                  </TableRow>
-                )}
               </TableBody>
             </Table>
-          </CardContent>
+          </div>
+
+          {filtered.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-sm text-muted-foreground">No clients found</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Try adjusting your filters
+              </p>
+            </div>
+          )}
+
+          {filtered.length > 0 && (
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between text-xs text-muted-foreground">
+              <div>
+                {selectedClientIds.length > 0 && (
+                  <span>{selectedClientIds.length} selected</span>
+                )}
+              </div>
+              <div>
+                1-{Math.min(10, filtered.length)} of {filtered.length} clients
+              </div>
+            </div>
+          )}
         </Card>
-
-        <Dialog open={showEdit} onOpenChange={setShowEdit}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Client</DialogTitle>
-              <DialogDescription>
-                Update client profile details.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label>Company Name</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, name: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Client Code</Label>
-                <Input
-                  value={form.clientCode}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, clientCode: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Contact Person</Label>
-                <Input
-                  value={form.contactPerson}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, contactPerson: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, email: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label>Contract Start</Label>
-                  <Input
-                    type="date"
-                    value={form.contractStart}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, contractStart: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Contract End</Label>
-                  <Input
-                    type="date"
-                    value={form.contractEnd}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, contractEnd: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowEdit(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveEdit}>Save Changes</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <QuickMailComposer
-          open={showMailComposer}
-          onClose={() => setShowMailComposer(false)}
-          recipientType="client"
-          defaultTo={mailTo}
-        />
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Client</DialogTitle>
+            <DialogDescription>Update client profile details</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Company Name</Label>
+              <Input
+                id="name"
+                value={form.name}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, name: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="clientCode">Client Code</Label>
+              <Input
+                id="clientCode"
+                value={form.clientCode}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, clientCode: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contactPerson">Contact Person</Label>
+              <Input
+                id="contactPerson"
+                value={form.contactPerson}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, contactPerson: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={form.email}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, email: e.target.value }))
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <Label htmlFor="contractStart">Contract Start</Label>
+                <Input
+                  id="contractStart"
+                  type="date"
+                  value={form.contractStart}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, contractStart: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contractEnd">Contract End</Label>
+                <Input
+                  id="contractEnd"
+                  type="date"
+                  value={form.contractEnd}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, contractEnd: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setShowEdit(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit}>Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mail Composer */}
+      <QuickMailComposer
+        open={showMailComposer}
+        onClose={() => setShowMailComposer(false)}
+        recipientType="client"
+        defaultTo={mailTo}
+      />
     </div>
   );
 }

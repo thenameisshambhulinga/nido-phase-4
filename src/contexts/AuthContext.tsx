@@ -168,13 +168,15 @@ const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [user, setUser] = useState<User | null>(() =>
-    safeReadJson<User | null>("nido_user", null),
-  );
+  const [user, setUser] = useState<User | null>(() => {
+    const parsed = safeReadJson<User | null>("nido_user", null);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  });
 
-  const [users, setUsers] = useState<User[]>(() =>
-    safeReadJson<User[]>("nido_users", DEFAULT_USERS),
-  );
+  const [users, setUsers] = useState<User[]>(() => {
+    const parsed = safeReadJson<User[]>("nido_users", DEFAULT_USERS);
+    return Array.isArray(parsed) ? parsed : DEFAULT_USERS;
+  });
 
   useEffect(() => {
     if (user) localStorage.setItem("nido_user", JSON.stringify(user));

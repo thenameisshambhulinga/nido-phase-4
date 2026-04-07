@@ -114,7 +114,7 @@ export default function SalesQuotesPage() {
                 Quick Create
               </Button>
               <Button onClick={() => navigate("/sales/quotes/create")}>
-                Create Quote
+                + New Quote
               </Button>
             </div>
           </CardContent>
@@ -153,7 +153,12 @@ export default function SalesQuotesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>{quote.quoteDate}</TableCell>
-                    <TableCell>INR {quote.total.toLocaleString()}</TableCell>
+                    <TableCell>
+                      INR{" "}
+                      {Number(
+                        quote.total ?? quote.subtotal ?? 0,
+                      ).toLocaleString()}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

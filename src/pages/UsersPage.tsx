@@ -59,8 +59,12 @@ export default function UsersPage() {
 
   const filtered = users.filter(
     (u) =>
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()),
+      String(u.name ?? "")
+        .toLowerCase()
+        .includes(search.toLowerCase()) ||
+      String(u.email ?? "")
+        .toLowerCase()
+        .includes(search.toLowerCase()),
   );
 
   const sendWelcomeEmail = (email: string, name: string) => {

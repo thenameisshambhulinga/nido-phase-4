@@ -48,7 +48,6 @@ import {
   Plus,
   Pencil,
   Search,
-  Star,
   Trash2,
   Upload,
   FileText,
@@ -59,32 +58,6 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
-
-const FEEDBACK: Record<
-  string,
-  { id: string; text: string; date: string; ref: string }[]
-> = {
-  cl1: [
-    {
-      id: "f1",
-      text: "Excellent delivery speed on the last batch of iPhones. Very satisfied with the packaging quality.",
-      date: "2026-02-15",
-      ref: "#2498563",
-    },
-    {
-      id: "f2",
-      text: "Minor delay on laptop order but communication was good throughout.",
-      date: "2026-01-20",
-      ref: "#2498564",
-    },
-    {
-      id: "f3",
-      text: "Product quality is consistently high. Would appreciate volume discounts for larger orders.",
-      date: "2025-12-10",
-      ref: "#2498560",
-    },
-  ],
-};
 
 const SERVICE_TYPES = [
   "Installation",
@@ -609,11 +582,12 @@ export default function ClientDetailPage() {
     );
   }
 
-  const initials = client.contactPerson
+  const initials = client.name
     .split(" ")
+    .filter(Boolean)
     .map((s) => s[0])
     .join("")
-    .slice(0, 2)
+    .slice(0, 3)
     .toUpperCase();
 
   const daysRemaining = Math.max(
@@ -642,7 +616,132 @@ export default function ClientDetailPage() {
     0,
   );
 
-  const feedbackList = FEEDBACK[client.id] || [];
+  const activeClientUsers = clientUsers.filter(
+    (entry) => entry.status === "active",
+  ).length;
+
+  const openOrdersCount = clientOrders.filter((order) => {
+    const normalized = order.status.toLowerCase();
+    return !["delivered", "cancelled"].includes(normalized);
+  }).length;
+
+  const spendCategories = useMemo(() => {
+    const categoryTotals = {
+      Hardware: 0,
+      Software: 0,
+      Service: 0,
+      Other: 0,
+    };
+
+    clientOrders.forEach((order) => {
+      order.items.forEach((item) => {
+        const name = item.name.toLowerCase();
+        if (
+          name.includes("laptop") ||
+          name.includes("phone") ||
+          name.includes("hardware") ||
+          name.includes("device")
+        ) {
+          categoryTotals.Hardware += item.totalCost;
+        } else if (
+          name.includes("license") ||
+          name.includes("software") ||
+          name.includes("subscription")
+        ) {
+          categoryTotals.Software += item.totalCost;
+        } else if (
+          name.includes("service") ||
+          name.includes("support") ||
+          name.includes("maintenance")
+        ) {
+          categoryTotals.Service += item.totalCost;
+        } else {
+          categoryTotals.Other += item.totalCost;
+        }
+      });
+    });
+
+    const total = Object.values(categoryTotals).reduce(
+      (sum, value) => sum + value,
+      0,
+    );
+    const fallback = totalSpend || 1;
+
+    if (total === 0) {
+      return [
+        {
+          name: "Hardware",
+          value: Math.round(fallback * 0.45),
+          color: "#4169e1",
+        },
+        {
+          name: "Software",
+          value: Math.round(fallback * 0.3),
+          color: "#4aa8f0",
+        },
+        {
+          name: "Service",
+          value: Math.round(fallback * 0.15),
+          color: "#9f7aea",
+        },
+        { name: "Other", value: Math.round(fallback * 0.1), color: "#7a8498" },
+      ];
+    }
+
+    return [
+      { name: "Hardware", value: categoryTotals.Hardware, color: "#4169e1" },
+      { name: "Software", value: categoryTotals.Software, color: "#4aa8f0" },
+      { name: "Service", value: categoryTotals.Service, color: "#9f7aea" },
+      { name: "Other", value: categoryTotals.Other, color: "#7a8498" },
+    ];
+  }, [clientOrders, totalSpend]);
+
+  const monthlySpendSeries = useMemo(() => {
+    const buckets = new Map<string, number>();
+    clientOrders.forEach((order) => {
+      const key = order.orderDate.slice(0, 7);
+      buckets.set(key, (buckets.get(key) || 0) + order.totalAmount);
+    });
+
+    return Array.from(buckets.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-6)
+      .map(([month, amount]) => ({
+        month: month.slice(5),
+        amount,
+      }));
+  }, [clientOrders]);
+
+  const overviewSpendBars =
+    monthlySpendSeries.length > 0
+      ? monthlySpendSeries
+      : [
+          { month: "01", amount: 22000 },
+          { month: "02", amount: 31000 },
+          { month: "03", amount: 42000 },
+          { month: "04", amount: 56000 },
+          { month: "05", amount: 64000 },
+          { month: "06", amount: 78000 },
+        ];
+
+  const overviewSpendPeak = Math.max(
+    ...overviewSpendBars.map((entry) => entry.amount),
+    1,
+  );
+
+  const donutGradient = useMemo(() => {
+    const total =
+      spendCategories.reduce((sum, entry) => sum + entry.value, 0) || 1;
+    let cursor = 0;
+    const segments = spendCategories.map((entry) => {
+      const from = (cursor / total) * 100;
+      cursor += entry.value;
+      const to = (cursor / total) * 100;
+      return `${entry.color} ${from}% ${to}%`;
+    });
+    return `conic-gradient(${segments.join(", ")})`;
+  }, [spendCategories]);
+
   const ruleConflicts = detectRuleConflicts();
 
   const pricingSimulation = computeOrderPricing({
@@ -1574,9 +1673,7 @@ export default function ClientDetailPage() {
               <p className="text-xs text-muted-foreground">
                 Clients / {client.name}
               </p>
-              <h1 className="text-2xl font-display font-bold">
-                {client.contactPerson}
-              </h1>
+              <h1 className="text-2xl font-display font-bold">{client.name}</h1>
             </div>
             <Badge
               className={
@@ -1616,10 +1713,10 @@ export default function ClientDetailPage() {
                 {initials}
               </div>
               <div>
-                <h3 className="font-semibold text-lg">
-                  {client.contactPerson}
-                </h3>
-                <p className="text-xs text-muted-foreground">Representative</p>
+                <h3 className="font-semibold text-lg">{client.name}</h3>
+                <p className="text-xs text-muted-foreground">
+                  Premium Client • Since 2024
+                </p>
               </div>
               <div className="space-y-2.5 text-sm text-left">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -1694,72 +1791,268 @@ export default function ClientDetailPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="flex flex-wrap h-auto">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="roles">Add/Manage Roles</TabsTrigger>
-                <TabsTrigger value="users">Add/Manage Users</TabsTrigger>
+                <TabsTrigger value="roles">Roles</TabsTrigger>
+                <TabsTrigger value="users">Users</TabsTrigger>
                 <TabsTrigger value="orders">Order Details</TabsTrigger>
                 <TabsTrigger value="service">Service History</TabsTrigger>
                 <TabsTrigger value="catalog">Catalog Items</TabsTrigger>
                 <TabsTrigger value="config">Configuration</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="overview" className="space-y-4 mt-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <Card>
-                    <CardContent className="pt-4">
-                      <p className="text-xs text-muted-foreground">
-                        Total Orders
+              <TabsContent value="overview" className="space-y-6 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white">
+                    <CardContent className="p-5">
+                      <p className="text-sm text-muted-foreground">
+                        Total Users
                       </p>
-                      <p className="text-3xl font-bold">
-                        {clientOrders.length}
+                      <p className="text-4xl font-semibold mt-1">
+                        {clientUsers.length}
+                      </p>
+                      <p className="text-xs text-emerald-700 mt-1">
+                        {activeClientUsers} active users
                       </p>
                     </CardContent>
                   </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <p className="text-xs text-muted-foreground">
-                        Total Spend
+                  <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white">
+                    <CardContent className="p-5">
+                      <p className="text-sm text-muted-foreground">
+                        Total Spends
                       </p>
-                      <p className="text-3xl font-bold">
+                      <p className="text-4xl font-semibold mt-1">
                         ${totalSpend.toLocaleString()}
                       </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Year to date
+                      </p>
                     </CardContent>
                   </Card>
-                  <Card>
-                    <CardContent className="pt-4">
-                      <p className="text-xs text-muted-foreground">
-                        Contract Products
+                  <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white">
+                    <CardContent className="p-5">
+                      <p className="text-sm text-muted-foreground">
+                        Open Orders
                       </p>
-                      <p className="text-3xl font-bold">
-                        {clientCatalog.length}
+                      <p className="text-4xl font-semibold mt-1">
+                        {openOrdersCount}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        $
+                        {clientOrders
+                          .reduce((sum, order) => {
+                            const normalized = order.status.toLowerCase();
+                            return !["delivered", "cancelled"].includes(
+                              normalized,
+                            )
+                              ? sum + order.totalAmount
+                              : sum;
+                          }, 0)
+                          .toLocaleString()}{" "}
+                        value
                       </p>
                     </CardContent>
                   </Card>
                 </div>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Recent Feedback</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {feedbackList.map((feedback) => (
-                      <div key={feedback.id} className="rounded-md border p-3">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                          <div className="flex items-center gap-1 text-amber-500">
-                            <Star className="h-3 w-3 fill-current" />
-                            <Star className="h-3 w-3 fill-current" />
-                            <Star className="h-3 w-3 fill-current" />
-                            <Star className="h-3 w-3 fill-current" />
-                            <Star className="h-3 w-3 fill-current" />
-                          </div>
-                          <span>
-                            {feedback.date} - {feedback.ref}
-                          </span>
-                        </div>
-                        <p className="text-sm">{feedback.text}</p>
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                  <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">Company Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Building2 className="h-4 w-4" />
+                        <span className="text-foreground font-medium">
+                          {client.name}
+                        </span>
                       </div>
-                    ))}
-                  </CardContent>
-                </Card>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        <span>{client.address}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Mail className="h-4 w-4" />
+                        <span>{client.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Phone className="h-4 w-4" />
+                        <span>{client.phone}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        <span>
+                          {client.contractStart} - {client.contractEnd}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">
+                        Spending Overview
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-semibold">
+                        ${totalSpend.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Total Spend
+                      </p>
+                      <div className="mt-4 h-36 rounded-xl bg-gradient-to-b from-blue-50 to-white border border-gray-100 p-3 flex items-end gap-2">
+                        {overviewSpendBars.map((entry) => {
+                          const height = Math.max(
+                            12,
+                            Math.round(
+                              (entry.amount / overviewSpendPeak) * 100,
+                            ),
+                          );
+                          return (
+                            <div
+                              key={entry.month}
+                              className="flex-1 flex flex-col items-center gap-1"
+                            >
+                              <div
+                                className="w-full rounded-t-md bg-blue-500/80"
+                                style={{ height: `${height}%` }}
+                              />
+                              <span className="text-[10px] text-muted-foreground">
+                                {entry.month}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">
+                        Top Spend Categories
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-4">
+                        <div
+                          className="h-24 w-24 rounded-full relative"
+                          style={{ background: donutGradient }}
+                        >
+                          <div className="absolute inset-5 rounded-full bg-white" />
+                        </div>
+                        <div className="space-y-2 text-xs w-full">
+                          {spendCategories.map((entry) => {
+                            const total =
+                              spendCategories.reduce(
+                                (sum, item) => sum + item.value,
+                                0,
+                              ) || 1;
+                            const percent = Math.round(
+                              (entry.value / total) * 100,
+                            );
+                            return (
+                              <div
+                                key={entry.name}
+                                className="flex items-center justify-between"
+                              >
+                                <span className="flex items-center gap-2 text-muted-foreground">
+                                  <span
+                                    className="h-2.5 w-2.5 rounded-full"
+                                    style={{ backgroundColor: entry.color }}
+                                  />
+                                  {entry.name}
+                                </span>
+                                <span className="font-medium text-foreground">
+                                  {percent}%
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">User Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm">
+                      <p>
+                        <span className="text-muted-foreground">
+                          Total Users:{" "}
+                        </span>
+                        <span className="font-semibold">
+                          {clientUsers.length}
+                        </span>
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Active: </span>
+                        <span className="font-semibold text-emerald-700">
+                          {activeClientUsers}
+                        </span>
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">
+                          Inactive:{" "}
+                        </span>
+                        <span className="font-semibold text-rose-700">
+                          {clientUsers.length - activeClientUsers}
+                        </span>
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Recent Orders</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm">
+                      <p>
+                        <span className="text-muted-foreground">
+                          Open Orders:{" "}
+                        </span>
+                        <span className="font-semibold">{openOrdersCount}</span>
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">
+                          Total Value:{" "}
+                        </span>
+                        <span className="font-semibold">
+                          ${totalSpend.toLocaleString()}
+                        </span>
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-2xl border border-gray-100 shadow-sm bg-white">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">
+                        Active Services
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm">
+                      <p>
+                        <span className="text-muted-foreground">
+                          Contract Products:{" "}
+                        </span>
+                        <span className="font-semibold">
+                          {clientCatalog.length}
+                        </span>
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">
+                          Until Renewal:{" "}
+                        </span>
+                        <span className="font-semibold text-amber-600">
+                          {daysRemaining} days
+                        </span>
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
 
               <TabsContent value="roles" className="space-y-3 mt-4">
@@ -1852,8 +2145,18 @@ export default function ClientDetailPage() {
                       </TableHeader>
                       <TableBody>
                         {clientUsers.map((clientUser) => (
-                          <TableRow key={clientUser.id}>
-                            <TableCell>{clientUser.name}</TableCell>
+                          <TableRow
+                            key={clientUser.id}
+                            className="cursor-pointer"
+                            onClick={() =>
+                              navigate(
+                                `/clients/${client.id}/users/${clientUser.id}`,
+                              )
+                            }
+                          >
+                            <TableCell className="font-medium text-primary">
+                              {clientUser.name}
+                            </TableCell>
                             <TableCell>{clientUser.email}</TableCell>
                             <TableCell>{client.name}</TableCell>
                             <TableCell>{clientUser.role}</TableCell>
@@ -1862,7 +2165,10 @@ export default function ClientDetailPage() {
                               {clientUser.department || "-"}
                             </TableCell>
                             <TableCell>{clientUser.status}</TableCell>
-                            <TableCell className="flex gap-1">
+                            <TableCell
+                              className="flex gap-1"
+                              onClick={(event) => event.stopPropagation()}
+                            >
                               <Button
                                 variant="outline"
                                 size="sm"

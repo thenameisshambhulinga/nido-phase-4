@@ -136,13 +136,53 @@ function AppRoutes() {
         <Route path="vendors/categories" element={<VendorCategoriesPage />} />
         <Route path="vendors/onboarding" element={<VendorOnboardingPage />} />
         <Route path="vendors/:id" element={<VendorDetailPage />} />
-        <Route path="clients" element={<ClientsPage />} />
+        <Route
+          path="clients"
+          element={
+            <PageErrorBoundary
+              title="Clients failed to load"
+              resetKey={location.pathname}
+            >
+              <ClientsPage />
+            </PageErrorBoundary>
+          }
+        />
         <Route path="clients/add" element={<AddClient />} />
-        <Route path="clients/:id" element={<ClientDetailPage />} />
-        <Route path="clients/:id/users/:userId" element={<UserProfilePage />} />
+        <Route
+          path="clients/:id"
+          element={
+            <PageErrorBoundary
+              title="Client profile failed to load"
+              resetKey={location.pathname}
+            >
+              <ClientDetailPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="clients/:id/users/:userId"
+          element={
+            <PageErrorBoundary
+              title="User profile failed to load"
+              resetKey={location.pathname}
+            >
+              <UserProfilePage />
+            </PageErrorBoundary>
+          }
+        />
         <Route path="clients/contracts" element={<ClientsPage />} />
         <Route path="permissions" element={<PermissionsPage />} />
-        <Route path="users" element={<UsersPage />} />
+        <Route
+          path="users"
+          element={
+            <PageErrorBoundary
+              title="Users failed to load"
+              resetKey={location.pathname}
+            >
+              <UsersPage />
+            </PageErrorBoundary>
+          }
+        />
         <Route path="configuration" element={<ConfigurationHubPage />} />
         <Route
           path="configuration/general"
@@ -311,8 +351,28 @@ function AppRoutes() {
         />
         <Route path="sales/orders" element={<SalesOrdersPage />} />
         <Route path="sales/orders/:id" element={<SalesOrderDetails />} />
-        <Route path="sales/invoices" element={<InvoicePage />} />
-        <Route path="sales/invoices/:id" element={<InvoiceDetails />} />
+        <Route
+          path="sales/invoices"
+          element={
+            <PageErrorBoundary
+              title="Invoices failed to load"
+              resetKey={location.pathname}
+            >
+              <InvoicePage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="sales/invoices/:id"
+          element={
+            <PageErrorBoundary
+              title="Invoice details failed to load"
+              resetKey={location.pathname}
+            >
+              <InvoiceDetails />
+            </PageErrorBoundary>
+          }
+        />
         <Route
           path="sales/recurring-invoices"
           element={<RecurringInvoicesPage />}

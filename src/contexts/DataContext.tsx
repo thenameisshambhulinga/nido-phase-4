@@ -361,6 +361,7 @@ export interface SalesQuote {
   cgst: number;
   sgst: number;
   adjustment: number;
+  shippingCharges?: number;
   total: number;
   customerNotes: string;
   termsAndConditions: string;
@@ -397,6 +398,7 @@ export interface SalesOrder {
   cgst: number;
   sgst: number;
   adjustment: number;
+  shippingCharges?: number;
   total: number;
   customerNotes: string;
   termsAndConditions: string;
@@ -406,6 +408,42 @@ export interface SalesOrder {
   createdAt: string;
   updatedAt: string;
   referenceInvoiceId?: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  referenceQuoteId?: string;
+  referenceSalesOrderId?: string;
+  customerName?: string;
+  customerId?: string;
+  vendorOrClient?: string;
+  type?: "client" | "vendor";
+  invoiceDate: string;
+  issueDate?: string;
+  dueDate: string;
+  paymentTerms: string;
+  billingAddress: string;
+  shippingAddress: string;
+  placeOfSupply: string;
+  emailRecipients: string[];
+  items: SalesLineItem[];
+  subtotal: number;
+  cgst: number;
+  sgst: number;
+  adjustment: number;
+  shippingCharges?: number;
+  total: number;
+  amountPaid: number;
+  balanceDue: number;
+  status: "DRAFT" | "SENT" | "PARTIALLY PAID" | "PAID" | "OVERDUE";
+  paymentStatus: "UNPAID" | "PARTIALLY PAID" | "PAID";
+  notes: string;
+  termsAndConditions: string;
+  bankDetails: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SalesActivity {
@@ -443,6 +481,7 @@ interface DataContextType {
   couponCodeRules: CouponCodeRule[];
   salesQuotes: SalesQuote[];
   salesOrders: SalesOrder[];
+  invoices: Invoice[];
   salesActivities: SalesActivity[];
   addOrder: (order: Partial<Order>) => void;
   updateOrder: (id: string, data: Partial<Order>) => void;
@@ -554,8 +593,9 @@ interface DataContextType {
   createQuote: (
     quote: Omit<
       SalesQuote,
-      "id" | "createdAt" | "updatedAt" | "createdBy" | "status"
+      "id" | "createdAt" | "updatedAt" | "createdBy" | "status" | "quoteNumber"
     > & {
+      quoteNumber?: string;
       status?: SalesQuote["status"];
       createdBy?: string;
     },
@@ -564,15 +604,51 @@ interface DataContextType {
   createSalesOrder: (
     order: Omit<
       SalesOrder,
-      "id" | "createdAt" | "updatedAt" | "createdBy" | "invoiceStatus"
+      | "id"
+      | "createdAt"
+      | "updatedAt"
+      | "createdBy"
+      | "invoiceStatus"
+      | "salesOrderNumber"
     > & {
+      salesOrderNumber?: string;
       invoiceStatus?: SalesOrder["invoiceStatus"];
       createdBy?: string;
     },
   ) => SalesOrder;
   updateSalesOrder: (id: string, data: Partial<SalesOrder>) => void;
+  createInvoice: (
+    invoice: Omit<
+      Invoice,
+      | "id"
+      | "createdAt"
+      | "updatedAt"
+      | "createdBy"
+      | "invoiceNumber"
+      | "balanceDue"
+      | "amountPaid"
+      | "status"
+      | "paymentStatus"
+    > & {
+      invoiceNumber?: string;
+      amountPaid?: number;
+      balanceDue?: number;
+      status?: Invoice["status"];
+      paymentStatus?: Invoice["paymentStatus"];
+      createdBy?: string;
+    },
+  ) => Invoice;
+  updateInvoice: (id: string, data: Partial<Invoice>) => void;
+  convertQuoteToSalesOrder: (
+    quoteId: string,
+    actor?: string,
+  ) => SalesOrder | null;
   convertQuoteToOrder: (quoteId: string, actor?: string) => SalesOrder | null;
   convertQuoteToInvoice: (quoteId: string, actor?: string) => string | null;
+  convertSalesOrderToInvoice: (
+    salesOrderId: string,
+    actor?: string,
+  ) => string | null;
   sendEmail: (args: {
     entityType: "quote" | "sales_order" | "invoice";
     entityId: string;
@@ -584,6 +660,12 @@ interface DataContextType {
     entityType: SalesActivity["entityType"],
     entityId: string,
   ) => SalesActivity[];
+  getAllData: () => {
+    salesQuotes: SalesQuote[];
+    salesOrders: SalesOrder[];
+    invoices: Invoice[];
+    salesActivities: SalesActivity[];
+  };
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -592,9 +674,22 @@ function usePersistedState<T>(
   key: string,
   defaultValue: T,
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
-  const [state, setState] = useState<T>(() =>
-    safeReadJson<T>(key, defaultValue),
-  );
+  const [state, setState] = useState<T>(() => {
+    const parsed = safeReadJson<T>(key, defaultValue);
+
+    // Prevent runtime crashes from malformed persisted values.
+    if (Array.isArray(defaultValue)) {
+      return (Array.isArray(parsed) ? parsed : defaultValue) as T;
+    }
+
+    if (defaultValue && typeof defaultValue === "object") {
+      return (
+        parsed && typeof parsed === "object" ? parsed : defaultValue
+      ) as T;
+    }
+
+    return (typeof parsed === typeof defaultValue ? parsed : defaultValue) as T;
+  });
   useEffect(() => {
     localStorage.setItem(key, JSON.stringify(state));
   }, [key, state]);
@@ -2229,6 +2324,7 @@ const DEFAULT_SALES_QUOTES: SalesQuote[] = [
     cgst: 36,
     sgst: 36,
     adjustment: 0,
+    shippingCharges: 0,
     total: 472,
     customerNotes:
       "BANK NAME:- IDFC\nA/c Payee Name: Nido Technologies\nBank A/C No.: 10028186411",
@@ -2282,6 +2378,7 @@ const DEFAULT_SALES_ORDERS: SalesOrder[] = [
     cgst: 36,
     sgst: 36,
     adjustment: 0,
+    shippingCharges: 0,
     total: 472,
     customerNotes: "Customer prefers afternoon dispatch window",
     termsAndConditions:
@@ -2292,6 +2389,61 @@ const DEFAULT_SALES_ORDERS: SalesOrder[] = [
     createdBy: "System Owner",
     createdAt: "2026-03-30T11:00:00.000Z",
     updatedAt: "2026-03-30T11:00:00.000Z",
+  },
+];
+
+const DEFAULT_INVOICES: Invoice[] = [
+  {
+    id: "inv-1",
+    invoiceNumber: "INV-00064",
+    referenceQuoteId: "sq-1",
+    referenceSalesOrderId: "so-1",
+    customerName: "Nido Technologies",
+    customerId: "cl1",
+    vendorOrClient: "Nido Technologies",
+    type: "client",
+    invoiceDate: "2026-04-02",
+    issueDate: "2026-04-02",
+    dueDate: "2026-04-02",
+    paymentTerms: "Due on Receipt",
+    billingAddress:
+      "Nido Technologies, 41/1 2nd Floor 10th Cross, Wilson Garden, Bengaluru",
+    shippingAddress:
+      "Nido Technologies, 41/1 2nd Floor 10th Cross, Wilson Garden, Bengaluru",
+    placeOfSupply: "Karnataka (29)",
+    emailRecipients: ["pavannido@gmail.com"],
+    items: [
+      {
+        id: "invli-1",
+        itemName: "3D Design Model",
+        description: "3D model mould designs for handle",
+        hsnSac: "9983",
+        quantity: 1,
+        rate: 400,
+        discount: 0,
+        taxRate: 18,
+        amount: 400,
+      },
+    ],
+    subtotal: 400,
+    cgst: 36,
+    sgst: 36,
+    adjustment: 0,
+    shippingCharges: 0,
+    total: 472,
+    amountPaid: 0,
+    balanceDue: 472,
+    status: "SENT",
+    paymentStatus: "UNPAID",
+    notes:
+      "BANK NAME:- IDFC\nA/c Payee Name: Nido Technologies\nBank A/C No.: 10028186411",
+    termsAndConditions:
+      "Payment of 50% post approval of quote, 30% against trial component and 20% before delivery.",
+    bankDetails:
+      "BANK NAME:- IDFC\nA/c Payee Name: Nido Technologies\nBank IFSC Code: IDFB0080154",
+    createdBy: "System Owner",
+    createdAt: "2026-04-02T09:00:00.000Z",
+    updatedAt: "2026-04-02T09:00:00.000Z",
   },
 ];
 
@@ -2316,14 +2468,79 @@ const DEFAULT_SALES_ACTIVITIES: SalesActivity[] = [
   },
 ];
 
-const computeSalesTotals = (items: SalesLineItem[], adjustment = 0) => {
-  const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
-  const totalTax = items.reduce(
-    (sum, item) => sum + (item.amount * item.taxRate) / 100,
+const nextDocumentNumber = (
+  prefix: string,
+  existingNumbers: Array<string | undefined>,
+) => {
+  const highest = existingNumbers.reduce((max, value) => {
+    if (!value) return max;
+    const match = value.match(new RegExp(`^${prefix}-(\\d+)$`));
+    if (!match) return max;
+    return Math.max(max, Number(match[1]));
+  }, 0);
+  return `${prefix}-${String(highest + 1).padStart(5, "0")}`;
+};
+
+const resolveDocumentNumber = (
+  prefix: string,
+  requested: string | undefined,
+  existingNumbers: Array<string | undefined>,
+) => {
+  if (requested && !existingNumbers.includes(requested)) {
+    return requested;
+  }
+  return nextDocumentNumber(prefix, existingNumbers);
+};
+
+const lineItemsFromSalesItems = (items: SalesLineItem[]) =>
+  items.map((item, index) => ({
+    ...item,
+    id: `${item.id || "li"}-${Date.now()}-${index}`,
+  }));
+
+const safeSalesNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeSalesLineItem = (item: SalesLineItem): SalesLineItem => {
+  const quantity = safeSalesNumber(item.quantity);
+  const rate = safeSalesNumber(item.rate);
+  const amountFromFields = quantity * rate;
+  const amount = safeSalesNumber(item.amount, amountFromFields);
+  return {
+    ...item,
+    quantity,
+    rate,
+    discount: safeSalesNumber(item.discount),
+    taxRate: safeSalesNumber(item.taxRate),
+    amount: Math.round(amount * 100) / 100,
+  };
+};
+
+const computeSalesTotals = (
+  items: SalesLineItem[],
+  adjustment = 0,
+  shippingCharges = 0,
+) => {
+  const normalizedItems = items.map(normalizeSalesLineItem);
+  const subtotal = normalizedItems.reduce(
+    (sum, item) => sum + safeSalesNumber(item.amount),
     0,
   );
+  const totalTax = normalizedItems.reduce(
+    (sum, item) =>
+      sum +
+      (safeSalesNumber(item.amount) * safeSalesNumber(item.taxRate)) / 100,
+    0,
+  );
+  const nextAdjustment = safeSalesNumber(adjustment);
+  const nextShippingCharges = safeSalesNumber(shippingCharges);
   const halfTax = Math.round((totalTax / 2) * 100) / 100;
-  const total = Math.round((subtotal + totalTax + adjustment) * 100) / 100;
+  const total =
+    Math.round(
+      (subtotal + totalTax + nextAdjustment + nextShippingCharges) * 100,
+    ) / 100;
   return {
     subtotal: Math.round(subtotal * 100) / 100,
     cgst: halfTax,
@@ -2421,10 +2638,78 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     "nido_sales_orders",
     DEFAULT_SALES_ORDERS,
   );
+  const [invoices, setInvoices] = usePersistedState(
+    "nido_invoices",
+    DEFAULT_INVOICES,
+  );
   const [salesActivities, setSalesActivities] = usePersistedState(
     "nido_sales_activities",
     DEFAULT_SALES_ACTIVITIES,
   );
+
+  useEffect(() => {
+    setSalesQuotes((prev) =>
+      prev.map((quote) => {
+        const nextItems = quote.items.map(normalizeSalesLineItem);
+        const totals = computeSalesTotals(
+          nextItems,
+          quote.adjustment,
+          quote.shippingCharges ?? 0,
+        );
+        const nextQuote = {
+          ...quote,
+          items: nextItems,
+          ...totals,
+        };
+        return JSON.stringify(nextQuote) === JSON.stringify(quote)
+          ? quote
+          : nextQuote;
+      }),
+    );
+    setSalesOrders((prev) =>
+      prev.map((order) => {
+        const nextItems = order.items.map(normalizeSalesLineItem);
+        const totals = computeSalesTotals(
+          nextItems,
+          order.adjustment,
+          order.shippingCharges ?? 0,
+        );
+        const nextOrder = {
+          ...order,
+          items: nextItems,
+          ...totals,
+        };
+        return JSON.stringify(nextOrder) === JSON.stringify(order)
+          ? order
+          : nextOrder;
+      }),
+    );
+    setInvoices((prev) =>
+      prev.map((invoice) => {
+        const nextItems = invoice.items.map(normalizeSalesLineItem);
+        const totals = computeSalesTotals(
+          nextItems,
+          invoice.adjustment,
+          invoice.shippingCharges ?? 0,
+        );
+        const amountPaid = safeSalesNumber(invoice.amountPaid);
+        const balanceDue = safeSalesNumber(
+          invoice.balanceDue,
+          Math.max(0, totals.total - amountPaid),
+        );
+        const nextInvoice = {
+          ...invoice,
+          items: nextItems,
+          ...totals,
+          amountPaid,
+          balanceDue: Math.round(balanceDue * 100) / 100,
+        };
+        return JSON.stringify(nextInvoice) === JSON.stringify(invoice)
+          ? invoice
+          : nextInvoice;
+      }),
+    );
+  }, [setInvoices, setSalesOrders, setSalesQuotes]);
 
   const makeCrud = <T extends { id: string }>(
     setter: React.Dispatch<React.SetStateAction<T[]>>,
@@ -2519,16 +2804,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     (
       quote: Omit<
         SalesQuote,
-        "id" | "createdAt" | "updatedAt" | "createdBy" | "status"
+        | "id"
+        | "createdAt"
+        | "updatedAt"
+        | "createdBy"
+        | "status"
+        | "quoteNumber"
       > & {
+        quoteNumber?: string;
         status?: SalesQuote["status"];
         createdBy?: string;
       },
     ) => {
-      const totals = computeSalesTotals(quote.items, quote.adjustment);
+      const quoteNumber = resolveDocumentNumber(
+        "EST",
+        quote.quoteNumber,
+        salesQuotes.map((entry) => entry.quoteNumber),
+      );
+      const totals = computeSalesTotals(
+        quote.items,
+        quote.adjustment,
+        quote.shippingCharges ?? 0,
+      );
       const nextQuote: SalesQuote = {
         ...quote,
         ...totals,
+        quoteNumber,
         status: quote.status || "DRAFT",
         id: `sq-${Date.now()}`,
         createdBy: quote.createdBy || "System",
@@ -2546,7 +2847,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       return nextQuote;
     },
-    [logSalesActivity, setSalesQuotes],
+    [logSalesActivity, salesQuotes, setSalesQuotes],
   );
 
   const updateQuote = useCallback(
@@ -2556,7 +2857,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           if (quote.id !== id) return quote;
           const nextItems = data.items || quote.items;
           const nextAdjustment = data.adjustment ?? quote.adjustment;
-          const totals = computeSalesTotals(nextItems, nextAdjustment);
+          const nextShipping =
+            data.shippingCharges ?? quote.shippingCharges ?? 0;
+          const totals = computeSalesTotals(
+            nextItems,
+            nextAdjustment,
+            nextShipping,
+          );
           return {
             ...quote,
             ...data,
@@ -2580,16 +2887,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     (
       order: Omit<
         SalesOrder,
-        "id" | "createdAt" | "updatedAt" | "createdBy" | "invoiceStatus"
+        | "id"
+        | "createdAt"
+        | "updatedAt"
+        | "createdBy"
+        | "invoiceStatus"
+        | "salesOrderNumber"
       > & {
+        salesOrderNumber?: string;
         invoiceStatus?: SalesOrder["invoiceStatus"];
         createdBy?: string;
       },
     ) => {
-      const totals = computeSalesTotals(order.items, order.adjustment);
+      const salesOrderNumber = resolveDocumentNumber(
+        "SO",
+        order.salesOrderNumber,
+        salesOrders.map((entry) => entry.salesOrderNumber),
+      );
+      const totals = computeSalesTotals(
+        order.items,
+        order.adjustment,
+        order.shippingCharges ?? 0,
+      );
       const nextOrder: SalesOrder = {
         ...order,
         ...totals,
+        salesOrderNumber,
         invoiceStatus: order.invoiceStatus || "NOT INVOICED",
         id: `so-${Date.now()}`,
         createdBy: order.createdBy || "System",
@@ -2607,7 +2930,83 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       return nextOrder;
     },
-    [logSalesActivity, setSalesOrders],
+    [logSalesActivity, salesOrders, setSalesOrders],
+  );
+
+  const createInvoice = useCallback(
+    (
+      invoice: Omit<
+        Invoice,
+        | "id"
+        | "createdAt"
+        | "updatedAt"
+        | "createdBy"
+        | "invoiceNumber"
+        | "balanceDue"
+        | "amountPaid"
+        | "status"
+        | "paymentStatus"
+      > & {
+        invoiceNumber?: string;
+        amountPaid?: number;
+        balanceDue?: number;
+        status?: Invoice["status"];
+        paymentStatus?: Invoice["paymentStatus"];
+        createdBy?: string;
+      },
+    ) => {
+      const invoiceNumber = resolveDocumentNumber(
+        "INV",
+        invoice.invoiceNumber,
+        invoices.map((entry) => entry.invoiceNumber),
+      );
+      const totals = computeSalesTotals(
+        invoice.items,
+        invoice.adjustment,
+        invoice.shippingCharges ?? 0,
+      );
+      const amountPaid = invoice.amountPaid ?? 0;
+      const nextStatus =
+        invoice.status ||
+        (amountPaid >= totals.total
+          ? "PAID"
+          : amountPaid > 0
+            ? "PARTIALLY PAID"
+            : "SENT");
+      const nextPaymentStatus =
+        invoice.paymentStatus ||
+        (amountPaid >= totals.total
+          ? "PAID"
+          : amountPaid > 0
+            ? "PARTIALLY PAID"
+            : "UNPAID");
+      const balanceDue =
+        invoice.balanceDue ?? Math.max(0, totals.total - amountPaid);
+      const nextInvoice: Invoice = {
+        ...invoice,
+        ...totals,
+        invoiceNumber,
+        amountPaid,
+        balanceDue: Math.round(balanceDue * 100) / 100,
+        status: nextStatus,
+        paymentStatus: nextPaymentStatus,
+        id: `inv-${Date.now()}`,
+        createdBy: invoice.createdBy || "System",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      setInvoices((prev) => [nextInvoice, ...prev]);
+      logSalesActivity({
+        entityType: "invoice",
+        entityId: nextInvoice.id,
+        action: "CREATED",
+        actor: nextInvoice.createdBy,
+        message: `Invoice ${nextInvoice.invoiceNumber} created`,
+      });
+      return nextInvoice;
+    },
+    [invoices, logSalesActivity, setInvoices],
   );
 
   const updateSalesOrder = useCallback(
@@ -2617,7 +3016,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           if (order.id !== id) return order;
           const nextItems = data.items || order.items;
           const nextAdjustment = data.adjustment ?? order.adjustment;
-          const totals = computeSalesTotals(nextItems, nextAdjustment);
+          const nextShipping =
+            data.shippingCharges ?? order.shippingCharges ?? 0;
+          const totals = computeSalesTotals(
+            nextItems,
+            nextAdjustment,
+            nextShipping,
+          );
           return {
             ...order,
             ...data,
@@ -2637,14 +3042,65 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     [logSalesActivity, setSalesOrders],
   );
 
-  const convertQuoteToOrder = useCallback(
+  const updateInvoice = useCallback(
+    (id: string, data: Partial<Invoice>) => {
+      setInvoices((prev) =>
+        prev.map((invoice) => {
+          if (invoice.id !== id) return invoice;
+          const nextItems = data.items || invoice.items;
+          const nextAdjustment = data.adjustment ?? invoice.adjustment;
+          const nextShipping =
+            data.shippingCharges ?? invoice.shippingCharges ?? 0;
+          const totals = computeSalesTotals(
+            nextItems,
+            nextAdjustment,
+            nextShipping,
+          );
+          const amountPaid = data.amountPaid ?? invoice.amountPaid ?? 0;
+          const balanceDue =
+            data.balanceDue ?? Math.max(0, totals.total - amountPaid);
+          return {
+            ...invoice,
+            ...data,
+            ...totals,
+            amountPaid,
+            balanceDue: Math.round(balanceDue * 100) / 100,
+            status:
+              data.status ||
+              (amountPaid >= totals.total
+                ? "PAID"
+                : amountPaid > 0
+                  ? "PARTIALLY PAID"
+                  : invoice.status),
+            paymentStatus:
+              data.paymentStatus ||
+              (amountPaid >= totals.total
+                ? "PAID"
+                : amountPaid > 0
+                  ? "PARTIALLY PAID"
+                  : invoice.paymentStatus),
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      );
+      logSalesActivity({
+        entityType: "invoice",
+        entityId: id,
+        action: "EDITED",
+        actor: data.createdBy || "System",
+        message: `Invoice updated`,
+      });
+    },
+    [logSalesActivity, setInvoices],
+  );
+
+  const convertQuoteToSalesOrder = useCallback(
     (quoteId: string, actor = "System") => {
       const quote = salesQuotes.find((entry) => entry.id === quoteId);
       if (!quote || quote.status !== "ACCEPTED") return null;
 
-      const nextOrderNumber = `SO-${String(Date.now()).slice(-5)}`;
       const newOrder = createSalesOrder({
-        salesOrderNumber: nextOrderNumber,
+        salesOrderNumber: undefined,
         referenceQuoteId: quote.id,
         referenceNumber: quote.quoteNumber,
         customerName: quote.customerName,
@@ -2665,6 +3121,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         cgst: quote.cgst,
         sgst: quote.sgst,
         adjustment: quote.adjustment,
+        shippingCharges: quote.shippingCharges ?? 0,
         total: quote.total,
         customerNotes: quote.customerNotes,
         termsAndConditions: quote.termsAndConditions,
@@ -2697,44 +3154,40 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     [createSalesOrder, logSalesActivity, salesQuotes],
   );
 
+  const convertQuoteToOrder = convertQuoteToSalesOrder;
+
   const convertQuoteToInvoice = useCallback(
     (quoteId: string, actor = "System") => {
       const quote = salesQuotes.find((entry) => entry.id === quoteId);
       if (!quote || quote.status !== "ACCEPTED") return null;
 
-      const invoices = safeReadJson<Array<Record<string, unknown>>>(
-        "nido_invoices",
-        [],
-      );
-      const invoiceId = `inv-${Date.now()}`;
-      const invoiceNumber = `INV-${String(Date.now()).slice(-6)}`;
-
-      const newInvoice = {
-        id: invoiceId,
-        invoiceNumber,
+      const newInvoice = createInvoice({
+        invoiceNumber: undefined,
+        referenceQuoteId: quote.id,
+        customerName: quote.customerName,
+        customerId: quote.customerId,
         vendorOrClient: quote.customerName,
         type: "client",
+        invoiceDate: new Date().toISOString().slice(0, 10),
         issueDate: new Date().toISOString().slice(0, 10),
         dueDate: quote.validTillDate,
-        amount: quote.subtotal,
-        tax: quote.cgst + quote.sgst,
-        totalAmount: quote.total,
-        status: "sent",
-        items: quote.items.map((item) => ({
-          description: item.itemName,
-          quantity: item.quantity,
-          unitPrice: item.rate,
-          total: item.amount,
-        })),
+        paymentTerms: "Due on Receipt",
+        billingAddress: quote.billingAddress,
+        shippingAddress: quote.shippingAddress,
+        placeOfSupply: quote.placeOfSupply,
+        emailRecipients: quote.emailRecipients,
+        items: lineItemsFromSalesItems(quote.items),
+        adjustment: quote.adjustment,
+        shippingCharges: quote.shippingCharges ?? 0,
         notes: quote.customerNotes,
-        autoReminder: true,
-        referenceQuoteId: quote.id,
-      };
-
-      localStorage.setItem(
-        "nido_invoices",
-        JSON.stringify([newInvoice, ...invoices]),
-      );
+        termsAndConditions: quote.termsAndConditions,
+        bankDetails: quote.bankDetails,
+        amountPaid: 0,
+        balanceDue: quote.total,
+        status: "SENT",
+        paymentStatus: "UNPAID",
+        createdBy: actor,
+      });
 
       setSalesQuotes((prev) =>
         prev.map((entry) =>
@@ -2742,7 +3195,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
             ? {
                 ...entry,
                 status: "CONVERTED",
-                referenceInvoiceId: invoiceId,
+                referenceInvoiceId: newInvoice.id,
                 updatedAt: new Date().toISOString(),
               }
             : entry,
@@ -2756,7 +3209,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
               ? {
                   ...entry,
                   invoiceStatus: "INVOICED",
-                  referenceInvoiceId: invoiceId,
+                  referenceInvoiceId: newInvoice.id,
                   updatedAt: new Date().toISOString(),
                 }
               : entry,
@@ -2769,11 +3222,95 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         entityId: quoteId,
         action: "CONVERTED",
         actor,
-        message: `Quote ${quote.quoteNumber} converted to Invoice ${invoiceNumber}`,
+        message: `Quote ${quote.quoteNumber} converted to Invoice ${newInvoice.invoiceNumber}`,
       });
-      return invoiceId;
+      return newInvoice.id;
     },
-    [logSalesActivity, salesQuotes],
+    [createInvoice, logSalesActivity, salesQuotes],
+  );
+
+  const convertSalesOrderToInvoice = useCallback(
+    (salesOrderId: string, actor = "System") => {
+      const order = salesOrders.find((entry) => entry.id === salesOrderId);
+      if (!order) return null;
+
+      const newInvoice = createInvoice({
+        invoiceNumber: undefined,
+        referenceSalesOrderId: order.id,
+        referenceQuoteId: order.referenceQuoteId,
+        customerName: order.customerName,
+        customerId: order.customerId,
+        vendorOrClient: order.customerName,
+        type: "client",
+        invoiceDate: new Date().toISOString().slice(0, 10),
+        issueDate: new Date().toISOString().slice(0, 10),
+        dueDate: order.expectedShipmentDate,
+        paymentTerms: order.paymentTerms,
+        billingAddress: order.billingAddress,
+        shippingAddress: order.shippingAddress,
+        placeOfSupply: order.placeOfSupply,
+        emailRecipients: order.emailRecipients,
+        items: lineItemsFromSalesItems(order.items),
+        adjustment: order.adjustment,
+        shippingCharges: order.shippingCharges ?? 0,
+        notes: order.customerNotes,
+        termsAndConditions: order.termsAndConditions,
+        bankDetails: order.bankDetails,
+        amountPaid: order.paymentStatus === "PAID" ? order.total : 0,
+        balanceDue: order.paymentStatus === "PAID" ? 0 : order.total,
+        status: order.paymentStatus === "PAID" ? "PAID" : "SENT",
+        paymentStatus:
+          order.paymentStatus === "PAID"
+            ? "PAID"
+            : order.paymentStatus === "PARTIALLY PAID"
+              ? "PARTIALLY PAID"
+              : "UNPAID",
+        createdBy: actor,
+      });
+
+      setSalesOrders((prev) =>
+        prev.map((entry) =>
+          entry.id === salesOrderId
+            ? {
+                ...entry,
+                invoiceStatus: "INVOICED",
+                referenceInvoiceId: newInvoice.id,
+                updatedAt: new Date().toISOString(),
+              }
+            : entry,
+        ),
+      );
+
+      if (order.referenceQuoteId) {
+        setSalesQuotes((prev) =>
+          prev.map((entry) =>
+            entry.id === order.referenceQuoteId
+              ? {
+                  ...entry,
+                  referenceInvoiceId: newInvoice.id,
+                  updatedAt: new Date().toISOString(),
+                }
+              : entry,
+          ),
+        );
+      }
+
+      logSalesActivity({
+        entityType: "sales_order",
+        entityId: salesOrderId,
+        action: "CONVERTED",
+        actor,
+        message: `Sales Order ${order.salesOrderNumber} converted to Invoice ${newInvoice.invoiceNumber}`,
+      });
+      return newInvoice.id;
+    },
+    [
+      createInvoice,
+      logSalesActivity,
+      salesOrders,
+      setSalesOrders,
+      setSalesQuotes,
+    ],
   );
 
   const sendEmail = useCallback(
@@ -2811,6 +3348,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           entry.entityType === entityType && entry.entityId === entityId,
       ),
     [salesActivities],
+  );
+
+  const getAllData = useCallback(
+    () => ({
+      salesQuotes,
+      salesOrders,
+      invoices,
+      salesActivities,
+    }),
+    [invoices, salesActivities, salesOrders, salesQuotes],
   );
 
   const getDefaultGeneralSettings = (): GeneralSettings => ({
@@ -3691,40 +4238,33 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         });
       });
 
-      const invoiceRecords = safeReadJson<
-        Array<{
-          id: string;
-          invoiceNumber?: string;
-          vendorOrClient?: string;
-          type?: string;
-          status?: string;
-          dueDate?: string;
-          issueDate?: string;
-          totalAmount?: number;
-        }>
-      >("nido_invoices", []);
-
-      invoiceRecords.forEach((invoice) => {
+      invoices.forEach((invoice) => {
         const score = collectBestScore([
           invoice.invoiceNumber,
+          invoice.customerName,
           invoice.vendorOrClient,
           invoice.type,
           invoice.status,
           invoice.dueDate,
           invoice.issueDate,
-          invoice.totalAmount !== undefined
-            ? String(invoice.totalAmount)
-            : undefined,
+          String(invoice.total),
         ]);
         if (!score) return;
         groupedResults.Invoices.push({
           group: "Invoices",
-          title: invoice.invoiceNumber || invoice.vendorOrClient || invoice.id,
-          subtitle: [invoice.vendorOrClient, invoice.status]
+          title:
+            invoice.invoiceNumber ||
+            invoice.customerName ||
+            invoice.vendorOrClient ||
+            invoice.id,
+          subtitle: [
+            invoice.customerName || invoice.vendorOrClient,
+            invoice.status,
+          ]
             .filter(Boolean)
             .join(" • "),
           badge: invoice.type || "invoice",
-          path: "/invoices",
+          path: `/sales/invoices/${invoice.id}`,
           id: invoice.id,
           score,
         });
@@ -3741,7 +4281,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           .slice(0, 10),
       );
     },
-    [appUsers, clients, orders, vendors],
+    [appUsers, clients, invoices, orders, vendors],
   );
 
   const computeOrderPricing = useCallback(
@@ -3831,6 +4371,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         couponCodeRules,
         salesQuotes,
         salesOrders,
+        invoices,
         salesActivities,
 
         roles,
@@ -3887,10 +4428,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         updateQuote,
         createSalesOrder,
         updateSalesOrder,
+        createInvoice,
+        updateInvoice,
+        convertQuoteToSalesOrder,
         convertQuoteToOrder,
         convertQuoteToInvoice,
+        convertSalesOrderToInvoice,
         sendEmail,
         getActivities,
+        getAllData,
         autoConfigurePricingAndDiscountRules,
         autoGenerateCouponCampaign,
         searchAll,
