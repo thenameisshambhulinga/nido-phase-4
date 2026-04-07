@@ -294,18 +294,12 @@ function AppRoutes() {
           path="transactions/purchase/purchase-orders/:id/edit"
           element={<PurchaseOrdersPage />}
         />
-        <Route
-          path="transactions/purchase/bills"
-          element={<BillsPage />}
-        />
+        <Route path="transactions/purchase/bills" element={<BillsPage />} />
         <Route
           path="transactions/purchase/bills/create"
           element={<BillsPage />}
         />
-        <Route
-          path="transactions/purchase/bills/:id"
-          element={<BillsPage />}
-        />
+        <Route path="transactions/purchase/bills/:id" element={<BillsPage />} />
         <Route
           path="transactions/purchase/bills/:id/edit"
           element={<BillsPage />}

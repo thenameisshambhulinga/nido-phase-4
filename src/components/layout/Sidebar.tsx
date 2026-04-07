@@ -122,7 +122,6 @@ const NAV_ITEMS: NavItem[] = [
       {
         label: "Purchases",
         children: [
-          { label: "Vendors", path: "/vendors" },
           { label: "Expenses", path: "/transactions/purchase/expenses" },
           {
             label: "Recurring Expenses",

@@ -315,13 +315,17 @@ function BillPdfSheet({
       <div className="mb-5 grid gap-4 md:grid-cols-2">
         <div>
           <p className="font-semibold">{companyName}</p>
-          <p className="whitespace-pre-wrap text-sm text-slate-700">{companyAddress}</p>
+          <p className="whitespace-pre-wrap text-sm text-slate-700">
+            {companyAddress}
+          </p>
           <p className="mt-1 text-sm">GSTIN {companyGst}</p>
         </div>
         <div>
           <p className="font-semibold">Bill From</p>
           <p className="text-blue-700">{bill.vendorName}</p>
-          <p className="whitespace-pre-wrap text-sm text-slate-700">{bill.vendorAddress}</p>
+          <p className="whitespace-pre-wrap text-sm text-slate-700">
+            {bill.vendorAddress}
+          </p>
           <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
             <p>Bill Date:</p>
             <p>{bill.billDate}</p>
@@ -352,11 +356,19 @@ function BillPdfSheet({
             return (
               <TableRow key={item.id}>
                 <TableCell>{index + 1}</TableCell>
-                <TableCell className="whitespace-pre-wrap">{item.itemDetails || "-"}</TableCell>
+                <TableCell className="whitespace-pre-wrap">
+                  {item.itemDetails || "-"}
+                </TableCell>
                 <TableCell>{item.account || "-"}</TableCell>
-                <TableCell className="text-right">{item.quantity.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{item.rate.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{taxable.toFixed(2)}</TableCell>
+                <TableCell className="text-right">
+                  {item.quantity.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {item.rate.toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {taxable.toFixed(2)}
+                </TableCell>
               </TableRow>
             );
           })}
@@ -366,7 +378,9 @@ function BillPdfSheet({
       <div className="mt-4 grid gap-4 md:grid-cols-[1fr_300px]">
         <div>
           <p className="text-sm font-medium">Notes</p>
-          <p className="whitespace-pre-wrap text-sm text-slate-700">{bill.notes || "-"}</p>
+          <p className="whitespace-pre-wrap text-sm text-slate-700">
+            {bill.notes || "-"}
+          </p>
         </div>
         <div>
           <div className="flex items-center justify-between py-1 text-sm">
@@ -547,14 +561,20 @@ export default function BillsPage() {
       status,
       notes: form.notes,
       attachmentType: form.attachmentType,
-      paymentMade: status === "PAID" ? getBillTotals({ items: form.items, adjustment: form.adjustment }).total : 0,
+      paymentMade:
+        status === "PAID"
+          ? getBillTotals({ items: form.items, adjustment: form.adjustment })
+              .total
+          : 0,
       items: form.items,
       tdsType: form.tdsType,
       adjustment: form.adjustment,
     };
 
     persist([created, ...bills]);
-    toast({ title: status === "DRAFT" ? "Bill saved as draft" : "Bill saved as open" });
+    toast({
+      title: status === "DRAFT" ? "Bill saved as draft" : "Bill saved as open",
+    });
     setOpenForm(false);
     navigate(`/transactions/purchase/bills/${id}`, { replace: true });
   };
@@ -641,7 +661,9 @@ export default function BillsPage() {
                   <Button
                     variant="outline"
                     onClick={() =>
-                      navigate(`/transactions/purchase/bills/${selectedBill.id}/edit`)
+                      navigate(
+                        `/transactions/purchase/bills/${selectedBill.id}/edit`,
+                      )
                     }
                   >
                     <Pencil className="mr-2 h-4 w-4" /> Edit
@@ -670,9 +692,15 @@ export default function BillsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={markPaid}>Mark as Paid</DropdownMenuItem>
-                      <DropdownMenuItem onSelect={duplicateBill}>Duplicate Bill</DropdownMenuItem>
-                      <DropdownMenuItem onSelect={deleteBill}>Delete Bill</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={markPaid}>
+                        Mark as Paid
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={duplicateBill}>
+                        Duplicate Bill
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={deleteBill}>
+                        Delete Bill
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -687,7 +715,9 @@ export default function BillsPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                      navigate("/transactions/purchase/bills", { replace: true })
+                      navigate("/transactions/purchase/bills", {
+                        replace: true,
+                      })
                     }
                   >
                     <X className="h-4 w-4" />
@@ -700,10 +730,15 @@ export default function BillsPage() {
           <Card>
             <CardContent className="space-y-3 py-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Payments Made: {money(selectedBill.paymentMade)}</p>
+                <p className="text-sm text-muted-foreground">
+                  Payments Made: {money(selectedBill.paymentMade)}
+                </p>
                 <div className="flex items-center gap-2 text-sm">
                   <span>Show PDF View</span>
-                  <Switch checked={showPdfView} onCheckedChange={setShowPdfView} />
+                  <Switch
+                    checked={showPdfView}
+                    onCheckedChange={setShowPdfView}
+                  />
                 </div>
               </div>
 
@@ -718,26 +753,37 @@ export default function BillsPage() {
                     />
                   </div>
                   <p className="text-right text-sm text-muted-foreground">
-                    PDF Template: Standard Template <span className="text-blue-600">Change</span>
+                    PDF Template: Standard Template{" "}
+                    <span className="text-blue-600">Change</span>
                   </p>
                 </>
               ) : (
                 <div className="grid gap-4 md:grid-cols-4">
                   <div className="rounded-md border p-3">
                     <p className="text-xs text-muted-foreground">Subtotal</p>
-                    <p className="text-xl font-semibold">{money(totals.subtotal)}</p>
+                    <p className="text-xl font-semibold">
+                      {money(totals.subtotal)}
+                    </p>
                   </div>
                   <div className="rounded-md border p-3">
                     <p className="text-xs text-muted-foreground">Tax</p>
                     <p className="text-xl font-semibold">{money(totals.tax)}</p>
                   </div>
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Payment Made</p>
-                    <p className="text-xl font-semibold">{money(selectedBill.paymentMade)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Payment Made
+                    </p>
+                    <p className="text-xl font-semibold">
+                      {money(selectedBill.paymentMade)}
+                    </p>
                   </div>
                   <div className="rounded-md border p-3">
                     <p className="text-xs text-muted-foreground">Balance Due</p>
-                    <p className="text-xl font-semibold">{money(Math.max(totals.total - selectedBill.paymentMade, 0))}</p>
+                    <p className="text-xl font-semibold">
+                      {money(
+                        Math.max(totals.total - selectedBill.paymentMade, 0),
+                      )}
+                    </p>
                   </div>
                 </div>
               )}
@@ -758,23 +804,31 @@ export default function BillsPage() {
                 <TableBody>
                   <TableRow>
                     <TableCell>Subcontractor</TableCell>
-                    <TableCell className="text-right">{getBillTotals(selectedBill).subtotal.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      {getBillTotals(selectedBill).subtotal.toFixed(2)}
+                    </TableCell>
                     <TableCell className="text-right">0.00</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>Input SGST</TableCell>
-                    <TableCell className="text-right">{getBillTotals(selectedBill).sgst.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      {getBillTotals(selectedBill).sgst.toFixed(2)}
+                    </TableCell>
                     <TableCell className="text-right">0.00</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>Input CGST</TableCell>
-                    <TableCell className="text-right">{getBillTotals(selectedBill).cgst.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      {getBillTotals(selectedBill).cgst.toFixed(2)}
+                    </TableCell>
                     <TableCell className="text-right">0.00</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>Accounts Payable</TableCell>
                     <TableCell className="text-right">0.00</TableCell>
-                    <TableCell className="text-right">{getBillTotals(selectedBill).total.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      {getBillTotals(selectedBill).total.toFixed(2)}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -782,7 +836,10 @@ export default function BillsPage() {
           </Card>
         </div>
 
-        <Dialog open={openForm} onOpenChange={(open) => (!open ? closeDialog() : setOpenForm(open))}>
+        <Dialog
+          open={openForm}
+          onOpenChange={(open) => (!open ? closeDialog() : setOpenForm(open))}
+        >
           <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Bill</DialogTitle>
@@ -816,7 +873,9 @@ export default function BillsPage() {
               <Button variant="outline" size="icon">
                 <Ellipsis className="h-4 w-4" />
               </Button>
-              <Button onClick={() => navigate("/transactions/purchase/bills/create")}>
+              <Button
+                onClick={() => navigate("/transactions/purchase/bills/create")}
+              >
                 <Plus className="mr-2 h-4 w-4" /> New
               </Button>
               <Button variant="outline" size="icon">
@@ -854,7 +913,9 @@ export default function BillsPage() {
                       <button
                         type="button"
                         className="text-blue-600 hover:underline"
-                        onClick={() => navigate(`/transactions/purchase/bills/${entry.id}`)}
+                        onClick={() =>
+                          navigate(`/transactions/purchase/bills/${entry.id}`)
+                        }
                       >
                         {entry.billNumber}
                       </button>
@@ -862,12 +923,20 @@ export default function BillsPage() {
                     <TableCell>{entry.referenceNumber || "-"}</TableCell>
                     <TableCell>{entry.vendorName}</TableCell>
                     <TableCell>
-                      <span className={entry.status === "PAID" ? "text-emerald-600" : "text-slate-600"}>
+                      <span
+                        className={
+                          entry.status === "PAID"
+                            ? "text-emerald-600"
+                            : "text-slate-600"
+                        }
+                      >
                         {entry.status}
                       </span>
                     </TableCell>
                     <TableCell>{entry.dueDate}</TableCell>
-                    <TableCell className="text-right">{money(getBillTotals(entry).total)}</TableCell>
+                    <TableCell className="text-right">
+                      {money(getBillTotals(entry).total)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -876,7 +945,10 @@ export default function BillsPage() {
         </Card>
       </div>
 
-      <Dialog open={openForm} onOpenChange={(open) => (!open ? closeDialog() : setOpenForm(open))}>
+      <Dialog
+        open={openForm}
+        onOpenChange={(open) => (!open ? closeDialog() : setOpenForm(open))}
+      >
         <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New Bill</DialogTitle>
@@ -973,7 +1045,12 @@ function BillFormSection({
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => toast({ title: "Search vendor" })}>Search</Button>
+            <Button
+              variant="outline"
+              onClick={() => toast({ title: "Search vendor" })}
+            >
+              Search
+            </Button>
           </div>
         </div>
 
@@ -982,7 +1059,10 @@ function BillFormSection({
           <Input
             value={form.billNumber}
             onChange={(event) =>
-              setForm((current) => ({ ...current, billNumber: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                billNumber: event.target.value,
+              }))
             }
           />
         </div>
@@ -992,7 +1072,10 @@ function BillFormSection({
           <Input
             value={form.orderNumber}
             onChange={(event) =>
-              setForm((current) => ({ ...current, orderNumber: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                orderNumber: event.target.value,
+              }))
             }
           />
         </div>
@@ -1003,7 +1086,10 @@ function BillFormSection({
             type="date"
             value={form.billDate}
             onChange={(event) =>
-              setForm((current) => ({ ...current, billDate: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                billDate: event.target.value,
+              }))
             }
           />
         </div>
@@ -1014,7 +1100,10 @@ function BillFormSection({
             type="date"
             value={form.dueDate}
             onChange={(event) =>
-              setForm((current) => ({ ...current, dueDate: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                dueDate: event.target.value,
+              }))
             }
           />
         </div>
@@ -1043,7 +1132,10 @@ function BillFormSection({
           <Input
             value={form.referenceNumber}
             onChange={(event) =>
-              setForm((current) => ({ ...current, referenceNumber: event.target.value }))
+              setForm((current) => ({
+                ...current,
+                referenceNumber: event.target.value,
+              }))
             }
           />
         </div>
@@ -1099,7 +1191,11 @@ function BillFormSection({
                       <Input
                         value={item.itemDetails}
                         onChange={(event) =>
-                          onUpdateItem(item.id, "itemDetails", event.target.value)
+                          onUpdateItem(
+                            item.id,
+                            "itemDetails",
+                            event.target.value,
+                          )
                         }
                         placeholder="Type or click to select an item"
                       />
@@ -1145,7 +1241,11 @@ function BillFormSection({
                         className="text-right"
                         value={String(item.taxPercent)}
                         onChange={(event) =>
-                          onUpdateItem(item.id, "taxPercent", event.target.value)
+                          onUpdateItem(
+                            item.id,
+                            "taxPercent",
+                            event.target.value,
+                          )
                         }
                       />
                     </TableCell>
@@ -1173,7 +1273,9 @@ function BillFormSection({
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="text-right">{taxable.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      {taxable.toFixed(2)}
+                    </TableCell>
                     <TableCell>
                       <button
                         type="button"
@@ -1190,10 +1292,18 @@ function BillFormSection({
           </Table>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => toast({ title: "Purchase discounts opened" })}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => toast({ title: "Purchase discounts opened" })}
+            >
               Purchase Discounts
             </Button>
-            <Button variant="outline" size="sm" onClick={() => toast({ title: "Reporting tags opened" })}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => toast({ title: "Reporting tags opened" })}
+            >
               Reporting Tags
             </Button>
           </div>
@@ -1212,7 +1322,9 @@ function BillFormSection({
                   <input
                     type="radio"
                     checked={form.tdsType === "TDS"}
-                    onChange={() => setForm((current) => ({ ...current, tdsType: "TDS" }))}
+                    onChange={() =>
+                      setForm((current) => ({ ...current, tdsType: "TDS" }))
+                    }
                   />
                   TDS
                 </label>
@@ -1220,7 +1332,9 @@ function BillFormSection({
                   <input
                     type="radio"
                     checked={form.tdsType === "TCS"}
-                    onChange={() => setForm((current) => ({ ...current, tdsType: "TCS" }))}
+                    onChange={() =>
+                      setForm((current) => ({ ...current, tdsType: "TCS" }))
+                    }
                   />
                   TCS
                 </label>
@@ -1240,7 +1354,10 @@ function BillFormSection({
                   className="h-8 w-24 text-right"
                   value={String(form.adjustment)}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, adjustment: toNumber(event.target.value) }))
+                    setForm((current) => ({
+                      ...current,
+                      adjustment: toNumber(event.target.value),
+                    }))
                   }
                 />
               </div>
@@ -1285,12 +1402,17 @@ function BillFormSection({
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
         <div className="flex gap-2">
-          <Button variant="outline" onClick={onSaveDraft}>Save as Draft</Button>
+          <Button variant="outline" onClick={onSaveDraft}>
+            Save as Draft
+          </Button>
           <Button onClick={onSaveOpen}>Save as Open</Button>
-          <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          PDF Template: Standard Template <span className="text-blue-600">Change</span>
+          PDF Template: Standard Template{" "}
+          <span className="text-blue-600">Change</span>
         </p>
       </div>
     </div>
