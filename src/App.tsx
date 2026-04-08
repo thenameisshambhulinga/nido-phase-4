@@ -71,6 +71,11 @@ import BillsPage from "@/pages/BillsPage";
 import RecurringBillsPage from "@/pages/RecurringBillsPage";
 import PaymentsMadePage from "@/pages/PaymentsMadePage";
 import VendorCreditsPage from "@/pages/VendorCreditsPage";
+import EnhancedUsersPage from "@/pages/EnhancedUsersPage";
+import RoleTemplatesPage from "@/pages/RoleTemplatesPage";
+import DepartmentsPage from "@/pages/DepartmentsPage";
+import UserInvitationPage from "@/pages/UserInvitationPage";
+import AuditLogPage from "@/pages/AuditLogPage";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -186,6 +191,61 @@ function AppRoutes() {
               resetKey={location.pathname}
             >
               <UsersPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="users/management"
+          element={
+            <PageErrorBoundary
+              title="User Management failed to load"
+              resetKey={location.pathname}
+            >
+              <EnhancedUsersPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="users/roles"
+          element={
+            <PageErrorBoundary
+              title="Roles failed to load"
+              resetKey={location.pathname}
+            >
+              <RoleTemplatesPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="users/departments"
+          element={
+            <PageErrorBoundary
+              title="Departments failed to load"
+              resetKey={location.pathname}
+            >
+              <DepartmentsPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="users/invitations"
+          element={
+            <PageErrorBoundary
+              title="Invitations failed to load"
+              resetKey={location.pathname}
+            >
+              <UserInvitationPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="users/audit-trail"
+          element={
+            <PageErrorBoundary
+              title="Audit Trail failed to load"
+              resetKey={location.pathname}
+            >
+              <AuditLogPage />
             </PageErrorBoundary>
           }
         />
