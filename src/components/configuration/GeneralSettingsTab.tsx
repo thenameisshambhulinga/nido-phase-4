@@ -136,6 +136,9 @@ export default function GeneralSettingsTab() {
             <TabsTrigger value="notifications" className="text-sm">
               Notification & Alerts
             </TabsTrigger>
+            <TabsTrigger value="api" className="text-sm">
+              API
+            </TabsTrigger>
             <TabsTrigger value="security" className="text-sm">
               Security
             </TabsTrigger>
@@ -420,6 +423,86 @@ export default function GeneralSettingsTab() {
                   <Label htmlFor="inAppNotif" className="text-xs">
                     Enable in-app alerts
                   </Label>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="api" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">API Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Configure API credentials and callback endpoints for
+                  integrations.
+                </p>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <Label className="text-xs">API Base URL</Label>
+                    <Input
+                      value={settings.apiBaseUrl || ""}
+                      onChange={(e) =>
+                        handleChange("apiBaseUrl", e.target.value)
+                      }
+                      placeholder="https://api.nido-tech.com/v1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Client ID</Label>
+                    <Input
+                      value={settings.apiClientId || ""}
+                      onChange={(e) =>
+                        handleChange("apiClientId", e.target.value)
+                      }
+                      placeholder="client_live_xxxxx"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">API Key Label</Label>
+                    <Input
+                      value={settings.apiKeyLabel || ""}
+                      onChange={(e) =>
+                        handleChange("apiKeyLabel", e.target.value)
+                      }
+                      placeholder="Production Key"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Webhook URL</Label>
+                    <Input
+                      value={settings.webhookUrl || ""}
+                      onChange={(e) =>
+                        handleChange("webhookUrl", e.target.value)
+                      }
+                      placeholder="https://app.nido-tech.com/webhooks/purchase"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      toast({
+                        title: "API Test Ping",
+                        description: "Connection test request queued",
+                      })
+                    }
+                  >
+                    Test Connection
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      toast({
+                        title: "API key regenerated",
+                        description: "Remember to update connected services",
+                      })
+                    }
+                  >
+                    Regenerate Key
+                  </Button>
                 </div>
               </CardContent>
             </Card>

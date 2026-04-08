@@ -49,7 +49,6 @@ import SalesQuotesPage from "@/pages/SalesQuotesPage";
 import SalesQuoteDetailPage from "@/pages/SalesQuoteDetailPage";
 import SalesOrdersPage from "@/pages/SalesOrdersPage";
 import SalesOrderDetails from "@/pages/SalesOrderDetails";
-import SalesModulePlaceholderPage from "@/pages/SalesModulePlaceholderPage";
 import ExpensesPage from "@/pages/ExpensesPage";
 import HomePage from "@/pages/HomePage";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -69,6 +68,9 @@ import EWayBillsPage from "@/pages/EWayBillsPage";
 import RecurringExpensesPage from "@/pages/RecurringExpensesPage";
 import PurchaseOrdersPage from "@/pages/PurchaseOrdersPage";
 import BillsPage from "@/pages/BillsPage";
+import RecurringBillsPage from "@/pages/RecurringBillsPage";
+import PaymentsMadePage from "@/pages/PaymentsMadePage";
+import VendorCreditsPage from "@/pages/VendorCreditsPage";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -306,30 +308,35 @@ function AppRoutes() {
         />
         <Route
           path="transactions/purchase/recurring-bills"
-          element={
-            <SalesModulePlaceholderPage
-              title="Recurring Bills"
-              description="Track recurring billing cycles and due dates."
-            />
-          }
+          element={<RecurringBillsPage />}
+        />
+        <Route
+          path="transactions/purchase/recurring-bills/create"
+          element={<RecurringBillsPage />}
+        />
+        <Route
+          path="transactions/purchase/recurring-bills/:id"
+          element={<RecurringBillsPage />}
         />
         <Route
           path="transactions/purchase/payments-made"
-          element={
-            <SalesModulePlaceholderPage
-              title="Payments Made"
-              description="Review completed payments made to vendors."
-            />
-          }
+          element={<PaymentsMadePage />}
+        />
+        <Route
+          path="transactions/purchase/payments-made/create"
+          element={<PaymentsMadePage />}
         />
         <Route
           path="transactions/purchase/vendor-credits"
-          element={
-            <SalesModulePlaceholderPage
-              title="Vendor Credits"
-              description="Manage credit notes and balances from vendors."
-            />
-          }
+          element={<VendorCreditsPage />}
+        />
+        <Route
+          path="transactions/purchase/vendor-credits/create"
+          element={<VendorCreditsPage />}
+        />
+        <Route
+          path="transactions/purchase/vendor-credits/:id"
+          element={<VendorCreditsPage />}
         />
         <Route path="sales" element={<Navigate to="/sales/quotes" replace />} />
         <Route

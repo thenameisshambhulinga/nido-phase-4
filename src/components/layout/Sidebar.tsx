@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
+import { useData } from "@/contexts/DataContext";
 
 interface NavItem {
   label: string;
@@ -178,7 +179,11 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
   const location = useLocation();
   const { user, logout, hasPermission } = useAuth();
   const { totalItems } = useCart();
+  const { organizations, generalSettings } = useData();
   const [expandedItems, setExpandedItems] = useState<string[]>(["Dashboard"]);
+
+  const primaryOrgId = organizations[0]?.id || "";
+  const branding = generalSettings[primaryOrgId];
 
   const toggleExpand = (label: string) => {
     setExpandedItems((prev) =>
@@ -208,12 +213,25 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
     <aside className="w-60 h-screen bg-sidebar text-sidebar-foreground flex flex-col">
       <div className="p-5 border-b border-sidebar-border flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-display font-bold text-sidebar-primary-foreground tracking-tight">
-            Nido Tech
-          </h1>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-sidebar-foreground/60 font-medium">
-            CorpEssentials
-          </p>
+          {branding?.companyLogo ? (
+            <img
+              src={branding.companyLogo}
+              alt={branding.companyName || "Company logo"}
+              className="h-10 w-36 rounded object-contain object-left"
+            />
+          ) : (
+            <>
+              <h1 className="text-lg font-display font-bold text-sidebar-primary-foreground tracking-tight">
+                {(branding?.companyName || "Nido Tech")
+                  .split(" ")
+                  .slice(0, 2)
+                  .join(" ")}
+              </h1>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-sidebar-foreground/60 font-medium">
+                CorpEssentials
+              </p>
+            </>
+          )}
         </div>
         {isMobile && (
           <button

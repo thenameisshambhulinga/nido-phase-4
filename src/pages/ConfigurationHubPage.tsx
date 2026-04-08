@@ -106,7 +106,7 @@ const CONFIG_CARDS: ConfigCard[] = [
   {
     label: "Integrations",
     icon: Plug,
-    description: "Select Integrations or Invoices",
+    description: "Connect external systems and APIs",
     type: "integration-switcher",
   },
   {
@@ -174,12 +174,12 @@ export default function ConfigurationHubPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium text-sm">
-                          Integrations & Invoices
+                          Integrations
                         </span>
                         <span className="text-muted-foreground text-xs">›</span>
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Smart selector for connectors and billing modules
+                        Manage connectors and API integrations
                       </p>
                     </Card>
                   </PopoverTrigger>
@@ -190,13 +190,6 @@ export default function ConfigurationHubPage() {
                       onClick={() => navigate("/integrations")}
                     >
                       Integrations
-                    </button>
-                    <button
-                      type="button"
-                      className="mt-1 w-full rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
-                      onClick={() => navigate("/invoices")}
-                    >
-                      Invoices
                     </button>
                   </PopoverContent>
                 </Popover>

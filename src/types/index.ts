@@ -2,6 +2,10 @@
 export interface GeneralSettings {
   companyName: string;
   companyLogo?: string;
+  apiBaseUrl?: string;
+  apiClientId?: string;
+  apiKeyLabel?: string;
+  webhookUrl?: string;
   currency: string;
   dateFormat: string;
   timezone: string;

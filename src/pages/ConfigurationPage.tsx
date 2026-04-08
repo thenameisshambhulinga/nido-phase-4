@@ -5,17 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
   Bell,
   BookOpen,
   ClipboardList,
   GitBranch,
   Plug,
-  Receipt,
   Settings,
   Tag,
   Users,
@@ -46,7 +40,8 @@ const CONFIG_TABS: ConfigTab[] = [
     value: "general",
     label: "General Settings",
     title: "General Settings",
-    description: "Organization defaults, localization, and platform-wide base settings.",
+    description:
+      "Organization defaults, localization, and platform-wide base settings.",
     path: "/configuration/general-settings",
     icon: Settings,
   },
@@ -109,8 +104,8 @@ const CONFIG_TABS: ConfigTab[] = [
   {
     value: "integrations",
     label: "Integrations",
-    title: "Integrations & Invoices",
-    description: "Use a smart selector to open either Integrations or Invoices.",
+    title: "Integrations",
+    description: "Connect external systems and manage API integrations.",
     icon: Plug,
   },
 ];
@@ -130,7 +125,10 @@ export default function ConfigurationPage() {
           </p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ConfigTab["value"])}>
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as ConfigTab["value"])}
+        >
           <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto bg-transparent p-0">
             {CONFIG_TABS.map((tab) => (
               <TabsTrigger
@@ -155,42 +153,24 @@ export default function ConfigurationPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground">{tab.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {tab.description}
+                    </p>
 
                     {tab.value !== "integrations" ? (
-                      <Button onClick={() => tab.path && navigate(tab.path)} className="gap-2">
+                      <Button
+                        onClick={() => tab.path && navigate(tab.path)}
+                        className="gap-2"
+                      >
                         Open Module <ArrowRight className="h-4 w-4" />
                       </Button>
                     ) : (
-                      <div className="flex flex-wrap gap-3">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button className="gap-2">
-                              Select Module <ArrowRight className="h-4 w-4" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent align="start" className="w-56 p-2">
-                            <button
-                              type="button"
-                              onClick={() => navigate("/integrations")}
-                              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
-                            >
-                              <Plug className="h-4 w-4 text-primary" />
-                              Integrations
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => navigate("/invoices")}
-                              className="mt-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted"
-                            >
-                              <Receipt className="h-4 w-4 text-primary" />
-                              Invoices
-                            </button>
-                          </PopoverContent>
-                        </Popover>
-                        <Button variant="outline" onClick={() => navigate("/integrations")}>Go To Integrations</Button>
-                        <Button variant="outline" onClick={() => navigate("/invoices")}>Go To Invoices</Button>
-                      </div>
+                      <Button
+                        onClick={() => navigate("/integrations")}
+                        className="gap-2"
+                      >
+                        Open Integrations <ArrowRight className="h-4 w-4" />
+                      </Button>
                     )}
                   </CardContent>
                 </Card>
