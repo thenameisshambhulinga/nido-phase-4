@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
+import { nextSequentialCode } from "@/lib/documentNumbering";
 import { Trash2, Plus, Save } from "lucide-react";
 
 interface QuoteFormData {
@@ -63,8 +64,20 @@ interface QuoteFormData {
 export default function SalesQuoteFormPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { salesQuotes, createQuote, updateQuote, clients, masterCatalogItems } =
-    useData();
+  const {
+    salesQuotes,
+    createQuote,
+    updateQuote,
+    clients,
+    masterCatalogItems,
+    generalSettings,
+  } = useData();
+
+  const activeSettings = Object.values(generalSettings)[0];
+  const quotePrefix =
+    activeSettings?.estimationPrefix?.trim() ||
+    activeSettings?.quotationPrefix?.trim() ||
+    "EST";
 
   const existingQuote = useMemo(
     () => salesQuotes.find((q) => q.id === id),
@@ -97,7 +110,11 @@ export default function SalesQuoteFormPage() {
         bankDetails: existingQuote.bankDetails,
       }
     : {
-        quoteNumber: `Q-${String(Date.now()).slice(-5)}`,
+        quoteNumber: nextSequentialCode(
+          quotePrefix,
+          salesQuotes.map((quote) => quote.quoteNumber),
+          5,
+        ),
         referenceNumber: "",
         customerName: "",
         customerId: "",

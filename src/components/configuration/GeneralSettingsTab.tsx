@@ -47,6 +47,16 @@ export default function GeneralSettingsTab() {
     address: nidoOrg?.address || "",
     phone: nidoOrg?.phone || "",
     email: nidoOrg?.email || "",
+    poPrefix: "PO",
+    quotationPrefix: "Q",
+    estimationPrefix: "EST",
+    invoicePrefix: "INV",
+    clientCodePrefix: "CL",
+    vendorCodePrefix: "VND",
+    productCodePrefix: "PRD",
+    salesOrderPrefix: "SO",
+    deliveryChallanPrefix: "DC",
+    creditNotePrefix: "CN",
   };
 
   const handleChange = (field: string, value: string) => {
@@ -376,7 +386,7 @@ export default function GeneralSettingsTab() {
                 <CardTitle className="text-sm">Procurement Defaults</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <Label className="text-xs">Default Approval Workflow</Label>
                     <Select defaultValue="standard">
@@ -396,7 +406,101 @@ export default function GeneralSettingsTab() {
                   </div>
                   <div>
                     <Label className="text-xs">Default PO Prefix</Label>
-                    <Input defaultValue="NT-PO" />
+                    <Input
+                      value={settings.poPrefix || ""}
+                      onChange={(e) => handleChange("poPrefix", e.target.value)}
+                      placeholder="PO"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Quotation Prefix</Label>
+                    <Input
+                      value={settings.quotationPrefix || ""}
+                      onChange={(e) =>
+                        handleChange("quotationPrefix", e.target.value)
+                      }
+                      placeholder="Q"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Estimation Prefix</Label>
+                    <Input
+                      value={settings.estimationPrefix || ""}
+                      onChange={(e) =>
+                        handleChange("estimationPrefix", e.target.value)
+                      }
+                      placeholder="EST"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Invoice Prefix</Label>
+                    <Input
+                      value={settings.invoicePrefix || ""}
+                      onChange={(e) =>
+                        handleChange("invoicePrefix", e.target.value)
+                      }
+                      placeholder="INV"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Client Code Prefix</Label>
+                    <Input
+                      value={settings.clientCodePrefix || ""}
+                      onChange={(e) =>
+                        handleChange("clientCodePrefix", e.target.value)
+                      }
+                      placeholder="CL"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Vendor Code Prefix</Label>
+                    <Input
+                      value={settings.vendorCodePrefix || ""}
+                      onChange={(e) =>
+                        handleChange("vendorCodePrefix", e.target.value)
+                      }
+                      placeholder="VND"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Product Code Prefix</Label>
+                    <Input
+                      value={settings.productCodePrefix || ""}
+                      onChange={(e) =>
+                        handleChange("productCodePrefix", e.target.value)
+                      }
+                      placeholder="PRD"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Sales Order Prefix</Label>
+                    <Input
+                      value={settings.salesOrderPrefix || ""}
+                      onChange={(e) =>
+                        handleChange("salesOrderPrefix", e.target.value)
+                      }
+                      placeholder="SO"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Delivery Challan Prefix</Label>
+                    <Input
+                      value={settings.deliveryChallanPrefix || ""}
+                      onChange={(e) =>
+                        handleChange("deliveryChallanPrefix", e.target.value)
+                      }
+                      placeholder="DC"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Credit Note Prefix</Label>
+                    <Input
+                      value={settings.creditNotePrefix || ""}
+                      onChange={(e) =>
+                        handleChange("creditNotePrefix", e.target.value)
+                      }
+                      placeholder="CN"
+                    />
                   </div>
                 </div>
               </CardContent>

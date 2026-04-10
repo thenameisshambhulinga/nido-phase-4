@@ -31,6 +31,7 @@ import { Separator } from "@/components/ui/separator";
 import { Search, Plus, Trash2 } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
+import { nextSequentialCode } from "@/lib/documentNumbering";
 import type { SalesLineItem, SalesOrder } from "@/contexts/DataContext";
 
 type OrderDraftItem = SalesLineItem & { catalogItemId?: string };
@@ -76,14 +77,6 @@ const emptyItem = (): OrderDraftItem => ({
 
 const formatDate = (date: Date) => date.toISOString().slice(0, 10);
 
-const nextNumber = (prefix: string, existing: string[]) => {
-  const highest = existing.reduce((max, value) => {
-    const match = value.match(new RegExp(`^${prefix}-(\\d+)$`));
-    return match ? Math.max(max, Number(match[1])) : max;
-  }, 0);
-  return `${prefix}-${String(highest + 1).padStart(5, "0")}`;
-};
-
 export default function NewSalesOrderModal({
   open,
   onOpenChange,
@@ -96,15 +89,19 @@ export default function NewSalesOrderModal({
     salesOrders,
     createSalesOrder,
     updateSalesOrder,
+    generalSettings,
   } = useData();
+  const activeSettings = Object.values(generalSettings)[0];
+  const salesOrderPrefix = activeSettings?.salesOrderPrefix?.trim() || "SO";
   const [customerQuery, setCustomerQuery] = useState("");
   const [draft, setDraft] = useState<SalesOrderDraft>(() => ({
     customerId: "",
     customerName: "",
     referenceNumber: "",
-    salesOrderNumber: nextNumber(
-      "SO",
+    salesOrderNumber: nextSequentialCode(
+      salesOrderPrefix,
       salesOrders.map((entry) => entry.salesOrderNumber),
+      5,
     ),
     salesOrderDate: formatDate(new Date()),
     expectedShipmentDate: formatDate(new Date(Date.now() + 7 * 86400000)),
@@ -154,9 +151,10 @@ export default function NewSalesOrderModal({
       customerId: defaultCustomer?.id || "",
       customerName: defaultCustomer?.name || "",
       referenceNumber: "",
-      salesOrderNumber: nextNumber(
-        "SO",
+      salesOrderNumber: nextSequentialCode(
+        salesOrderPrefix,
         salesOrders.map((entry) => entry.salesOrderNumber),
+        5,
       ),
       salesOrderDate: formatDate(new Date()),
       expectedShipmentDate: formatDate(new Date(Date.now() + 7 * 86400000)),
@@ -180,7 +178,7 @@ export default function NewSalesOrderModal({
       items: [emptyItem()],
     });
     setCustomerQuery(defaultCustomer?.name || "");
-  }, [clients, open, order, salesOrders]);
+  }, [clients, open, order, salesOrderPrefix, salesOrders]);
 
   const filteredClients = useMemo(() => {
     const normalized = customerQuery.trim().toLowerCase();

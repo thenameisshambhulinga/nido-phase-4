@@ -37,13 +37,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const statuses = [
-  "DRAFT",
-  "SENT",
-  "ACCEPTED",
-  "REJECTED",
-  "CONVERTED",
-] as const;
+const statuses = ["DRAFT", "SENT", "ACCEPTED", "REJECTED"] as const;
 
 export default function SalesQuoteDetailPage() {
   const navigate = useNavigate();
@@ -82,6 +76,8 @@ export default function SalesQuoteDetailPage() {
 
   const activities = getActivities("quote", quote.id);
   const canConvert = quote.status === "ACCEPTED";
+  const canConvertInvoice = canConvert && !quote.referenceInvoiceId;
+  const canConvertOrder = canConvert && !quote.referenceSalesOrderId;
   const quoteItems = Array.isArray(quote.items) ? quote.items : [];
   const quoteTotal = Number(quote.total ?? quote.subtotal ?? 0);
   const quotePdfTemplate = "Simple";
@@ -110,6 +106,10 @@ export default function SalesQuoteDetailPage() {
   };
 
   const onConvertOrder = () => {
+    if (!canConvertOrder) {
+      toast({ title: "This quote is already converted to a Sales Order" });
+      return;
+    }
     const order = convertQuoteToOrder(quote.id, "System");
     if (!order) {
       toast({ title: "Only ACCEPTED quotes can be converted" });
@@ -120,6 +120,10 @@ export default function SalesQuoteDetailPage() {
   };
 
   const onConvertInvoice = () => {
+    if (!canConvertInvoice) {
+      toast({ title: "This quote is already converted to an Invoice" });
+      return;
+    }
     const invoiceId = convertQuoteToInvoice(quote.id, "System");
     if (!invoiceId) {
       toast({ title: "Only ACCEPTED quotes can be invoiced" });
@@ -230,11 +234,17 @@ export default function SalesQuoteDetailPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuItem onSelect={onConvertInvoice}>
+                            <DropdownMenuItem
+                              onSelect={onConvertInvoice}
+                              disabled={!canConvertInvoice}
+                            >
                               <FileText className="mr-2 h-4 w-4" /> Convert to
                               Invoice
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={onConvertOrder}>
+                            <DropdownMenuItem
+                              onSelect={onConvertOrder}
+                              disabled={!canConvertOrder}
+                            >
                               <ArrowRight className="mr-2 h-4 w-4" /> Convert to
                               Sales Order
                             </DropdownMenuItem>

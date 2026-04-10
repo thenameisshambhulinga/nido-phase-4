@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
+import { nextSequentialCode } from "@/lib/documentNumbering";
 import {
   FileText,
   Mail,
@@ -481,6 +482,8 @@ export default function CreditNotesPage() {
   const companyLogoUrl = Object.values(generalSettings).find(
     (setting) => setting.companyLogo,
   )?.companyLogo;
+  const creditNotePrefix =
+    Object.values(generalSettings)[0]?.creditNotePrefix?.trim() || "CN";
 
   const persist = (next: CreditNoteEntry[]) => {
     setNotes(next);
@@ -494,12 +497,16 @@ export default function CreditNotesPage() {
         ...defaultNotes[0],
         id: `cn-${Date.now()}`,
         issueDate: today(),
-        creditNoteNumber: `CN-${String(notes.length + 1).padStart(5, "0")}`,
+        creditNoteNumber: nextSequentialCode(
+          creditNotePrefix,
+          notes.map((entry) => entry.creditNoteNumber),
+          5,
+        ),
       });
       setForm(seed);
       setOpen(true);
     }
-  }, [createMode]);
+  }, [createMode, creditNotePrefix, notes]);
 
   useEffect(() => {
     if (!editMode) return;

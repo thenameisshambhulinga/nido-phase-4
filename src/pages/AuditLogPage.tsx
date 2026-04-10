@@ -53,7 +53,7 @@ export default function AuditLogPage() {
 
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all");
-  const [userFilter, setUserFilter] = useState("");
+  const [userFilter, setUserFilter] = useState("all");
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
@@ -74,7 +74,7 @@ export default function AuditLogPage() {
       entityTypeFilter !== "all"
         ? (entityTypeFilter as AuditLog["entityType"])
         : undefined,
-    userId: userFilter || undefined,
+    userId: userFilter !== "all" ? userFilter : undefined,
   });
 
   const getActionIcon = (action: AuditLog["action"]) => {
@@ -248,7 +248,7 @@ export default function AuditLogPage() {
                     <SelectValue placeholder="All users" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All users</SelectItem>
+                    <SelectItem value="all">All users</SelectItem>
                     {uniqueUsers.map((user) => (
                       <SelectItem key={user} value={user}>
                         {user}

@@ -86,7 +86,8 @@ export default function OrderDetailsPage() {
 
   const subOrders: SubOrder[] = useMemo(() => {
     if (!order) return [];
-    return order.items.map((item, i) => {
+    const sourceItems = Array.isArray(order.items) ? order.items : [];
+    return sourceItems.map((item, i) => {
       const category =
         item.name.includes("iPhone") ||
         item.name.includes("Dell") ||
@@ -159,6 +160,14 @@ export default function OrderDetailsPage() {
       </div>
     );
 
+  const orderItems = Array.isArray(order.items) ? order.items : [];
+  const orderCommentHistory = Array.isArray(order.commentHistory)
+    ? order.commentHistory
+    : [];
+  const orderAttachments = Array.isArray(order.attachments)
+    ? order.attachments
+    : [];
+
   const handleStatusUpdate = (status: string) => {
     updateOrder(order.id, { status });
     addAuditEntry({
@@ -186,7 +195,7 @@ export default function OrderDetailsPage() {
     };
     updateOrder(order.id, {
       comments: newComment,
-      commentHistory: [...order.commentHistory, comment],
+      commentHistory: [...orderCommentHistory, comment],
     });
     setNewComment("");
     toast({ title: "Comment Added" });
@@ -210,7 +219,7 @@ export default function OrderDetailsPage() {
   const handlePreview = (filename: string) =>
     toast({ title: "Preview", description: `Previewing ${filename}` });
 
-  const filteredComments = order.commentHistory.filter(
+  const filteredComments = orderCommentHistory.filter(
     (c) => commentFilter === "all" || c.type === commentFilter,
   );
   const STATUS_COLORS: Record<string, string> = {
@@ -230,7 +239,7 @@ export default function OrderDetailsPage() {
     return <Paperclip className="h-4 w-4 text-muted-foreground" />;
   };
 
-  const isBulkOrder = order.items.length > 1;
+  const isBulkOrder = orderItems.length > 1;
   const masterOrderId = order.orderNumber;
 
   const getSlaColor = (status: string) => {
@@ -269,7 +278,7 @@ export default function OrderDetailsPage() {
                   ORD-{masterOrderId}
                 </p>
               </div>
-              <Badge className="ml-auto">{order.items.length} Sub-Orders</Badge>
+              <Badge className="ml-auto">{orderItems.length} Sub-Orders</Badge>
             </CardContent>
           </Card>
         )}
@@ -412,7 +421,7 @@ export default function OrderDetailsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {order.items.map((item, i) => (
+                {orderItems.map((item, i) => (
                   <TableRow key={item.id}>
                     <TableCell>
                       {isBulkOrder ? (
@@ -468,7 +477,7 @@ export default function OrderDetailsPage() {
             <div className="flex justify-end mt-4">
               <div className="text-sm space-y-1 text-right">
                 {isBulkOrder &&
-                  order.items.map((item, i) => (
+                  orderItems.map((item, i) => (
                     <div
                       key={i}
                       className="flex justify-between gap-8 text-xs text-muted-foreground"
@@ -560,7 +569,7 @@ export default function OrderDetailsPage() {
                   Comments & Collaboration
                 </CardTitle>
                 <Badge variant="secondary" className="text-xs">
-                  {order.commentHistory.length} messages
+                  {orderCommentHistory.length} messages
                 </Badge>
               </div>
               <div className="flex gap-2">
@@ -677,7 +686,7 @@ export default function OrderDetailsPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {order.attachments.map((a, i) => (
+              {orderAttachments.map((a, i) => (
                 <div
                   key={i}
                   className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition-colors"

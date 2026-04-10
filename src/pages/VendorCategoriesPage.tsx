@@ -300,7 +300,7 @@ export default function VendorCategoriesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Category Name</TableHead>
-                  <TableHead>Product Code</TableHead>
+                  <TableHead>Vendor Code</TableHead>;
                   <TableHead>Description</TableHead>
                   <TableHead>Approval Workflow</TableHead>
                   <TableHead>Default SLA Template</TableHead>

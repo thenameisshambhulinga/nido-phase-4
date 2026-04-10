@@ -160,10 +160,9 @@ export default function RoleTemplatesPage() {
                     </TableHeader>
                     <TableBody>
                       {AVAILABLE_MODULES.map((module) => {
-                        const permissions =
-                          role.permissions[
-                            module.id as keyof typeof role.permissions
-                          ] || [];
+                        const permissions = (role.permissions[
+                          module.id as keyof typeof role.permissions
+                        ] || []) as readonly PermissionAction[];
                         const actions: PermissionAction[] = [
                           "view",
                           "create",

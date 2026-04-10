@@ -19,6 +19,26 @@ export interface Permission {
   description: string;
 }
 
+type RoleTemplateDataVisibility = "All" | "Department Only" | "Own Only";
+
+type RoleTemplatePermissions = Partial<
+  Record<string, readonly PermissionAction[]>
+>;
+
+interface RoleTemplateDefinition {
+  name: string;
+  description: string;
+  userType: UserType;
+  permissions: RoleTemplatePermissions;
+  approvalLimit: number;
+  canApproveOrders: boolean;
+  dataVisibility: RoleTemplateDataVisibility;
+}
+
+const defineRoleTemplates = <T extends Record<string, RoleTemplateDefinition>>(
+  templates: T,
+) => templates;
+
 export const PERMISSION_ACTIONS: Record<PermissionAction, string> = {
   view: "View",
   create: "Create",
@@ -70,7 +90,7 @@ export const AVAILABLE_MODULES = [
 // ROLE TEMPLATES
 // ─────────────────────────────────────────────────────────────────
 
-export const ROLE_TEMPLATES = {
+export const ROLE_TEMPLATES = defineRoleTemplates({
   owner: {
     name: "System Owner",
     description: "Full platform access with all permissions",
@@ -282,7 +302,7 @@ export const ROLE_TEMPLATES = {
     canApproveOrders: false,
     dataVisibility: "Own Only" as const,
   },
-} as const;
+});
 
 export type RoleTemplateKey = keyof typeof ROLE_TEMPLATES;
 
@@ -298,8 +318,9 @@ export function hasPermission(
   const template = ROLE_TEMPLATES[roleTemplate as RoleTemplateKey];
   if (!template) return false;
 
-  const modulePerms =
-    template.permissions[moduleId as keyof typeof template.permissions];
+  const modulePerms = template.permissions[
+    moduleId as keyof typeof template.permissions
+  ] as readonly PermissionAction[] | undefined;
   if (!modulePerms) return false;
 
   return modulePerms.includes(action);

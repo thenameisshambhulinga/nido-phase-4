@@ -51,7 +51,7 @@ export default function SalesQuotesPage() {
       firstClient.locationDetails?.state || firstClient.address;
 
     const next = createQuote({
-      quoteNumber: `Q-${String(Date.now()).slice(-5)}`,
+      quoteNumber: undefined,
       customerName: firstClient.name,
       customerId: firstClient.id,
       quoteDate: new Date().toISOString().slice(0, 10),

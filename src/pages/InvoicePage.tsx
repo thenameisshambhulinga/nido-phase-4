@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
+import { nextSequentialCode } from "@/lib/documentNumbering";
 import { Paperclip, Plus, Search, Trash2 } from "lucide-react";
 import type { Invoice, SalesLineItem } from "@/contexts/DataContext";
 
@@ -87,14 +88,6 @@ const statusVariant: Record<
   UNPAID: "secondary",
 };
 
-const nextNumber = (prefix: string, existing: string[]) => {
-  const highest = existing.reduce((max, value) => {
-    const match = value.match(new RegExp(`^${prefix}-(\\d+)$`));
-    return match ? Math.max(max, Number(match[1])) : max;
-  }, 0);
-  return `${prefix}-${String(highest + 1).padStart(5, "0")}`;
-};
-
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (days: number) =>
   new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
@@ -125,7 +118,10 @@ export default function InvoicePage() {
     masterCatalogItems,
     createInvoice,
     sendEmail,
+    generalSettings,
   } = useData();
+  const activeSettings = Object.values(generalSettings)[0];
+  const invoicePrefix = activeSettings?.invoicePrefix?.trim() || "INV";
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const deferredSearch = useDeferredValue(search);
@@ -136,9 +132,10 @@ export default function InvoicePage() {
     customerName: "",
     customerGst: "",
     customerBusinessType: "Registered",
-    invoiceNumber: nextNumber(
-      "INV",
+    invoiceNumber: nextSequentialCode(
+      invoicePrefix,
       invoices.map((entry) => entry.invoiceNumber),
+      5,
     ),
     referenceSalesOrderId: "",
     invoiceDate: today(),
@@ -168,9 +165,10 @@ export default function InvoicePage() {
       customerName: firstCustomer?.name || "",
       customerGst: firstCustomer?.gst || "",
       customerBusinessType: firstCustomer?.businessType || "Registered",
-      invoiceNumber: nextNumber(
-        "INV",
+      invoiceNumber: nextSequentialCode(
+        invoicePrefix,
         invoices.map((entry) => entry.invoiceNumber),
+        5,
       ),
       referenceSalesOrderId: "",
       invoiceDate: today(),
@@ -193,7 +191,7 @@ export default function InvoicePage() {
       items: [emptyItem()],
     });
     setCustomerQuery(firstCustomer?.name || "");
-  }, [clients, invoices, showCreate]);
+  }, [clients, invoicePrefix, invoices, showCreate]);
 
   const filteredInvoices = useMemo(() => {
     const query = deferredSearch.trim().toLowerCase();

@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -24,7 +25,6 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,7 @@ import {
   FileDown,
   FileText,
   Image as ImageIcon,
+  MoreHorizontal,
   Pencil,
   Plus,
   Search,
@@ -54,6 +55,7 @@ import {
 interface CatalogItem {
   id: string;
   name: string;
+  productCode: string;
   sku: string;
   category: string;
   subCategory: string;
@@ -135,6 +137,7 @@ const initialItems: CatalogItem[] = [
   {
     id: "1",
     name: "HP Envy Laptop",
+    productCode: "LAP-1001",
     sku: "LAP-1001",
     category: "IT Hardware",
     subCategory: "Laptops",
@@ -150,6 +153,7 @@ const initialItems: CatalogItem[] = [
   {
     id: "2",
     name: "Sandisk 1TB SSD",
+    productCode: "SSD-2025",
     sku: "SSD-2025",
     category: "IT Hardware",
     subCategory: "Storage",
@@ -165,6 +169,7 @@ const initialItems: CatalogItem[] = [
   {
     id: "3",
     name: "Logitech Wireless Mouse",
+    productCode: "MOU-3301",
     sku: "MOU-3301",
     category: "IT Hardware",
     subCategory: "Peripherals",
@@ -180,6 +185,7 @@ const initialItems: CatalogItem[] = [
   {
     id: "4",
     name: "Apple iPad Air",
+    productCode: "TAB-1110",
     sku: "TAB-1110",
     category: "IT Hardware",
     subCategory: "Laptops",
@@ -195,6 +201,7 @@ const initialItems: CatalogItem[] = [
   {
     id: "5",
     name: "Epson Workforce Printer",
+    productCode: "PRN-3215",
     sku: "PRN-3215",
     category: "Stationery",
     subCategory: "Paper",
@@ -242,6 +249,7 @@ const auditLogs = [
 
 const emptyItem: Omit<CatalogItem, "id"> = {
   name: "",
+  productCode: "",
   sku: "",
   category: "",
   subCategory: "",
@@ -331,7 +339,8 @@ export default function MasterCataloguePage() {
     if (
       search &&
       !i.name.toLowerCase().includes(q) &&
-      !i.sku.toLowerCase().includes(q)
+      !i.sku.toLowerCase().includes(q) &&
+      !i.productCode.toLowerCase().includes(q)
     )
       return false;
     if (categoryFilter !== "all" && i.category !== categoryFilter) return false;
@@ -381,18 +390,12 @@ export default function MasterCataloguePage() {
       return;
     }
     const sku = autoSku ? generateSku() : form.sku;
-    if (!sku.trim()) {
-      toast.error("SKU is required");
-      return;
-    }
-    if (!form.vendorSku?.trim()) {
-      toast.error("Vendor SKU is required");
-      return;
-    }
+    const productCode = form.productCode.trim() || sku.trim() || generateSku();
 
     const newItem: CatalogItem = {
       ...form,
       id: editingItem ? editingItem.id : Date.now().toString(),
+      productCode,
       sku,
       image: productImages[0] || undefined,
     };
@@ -763,10 +766,18 @@ export default function MasterCataloguePage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((item) => (
-                  <TableRow key={item.id}>
+                  <TableRow
+                    key={item.id}
+                    className="cursor-pointer transition-colors hover:bg-muted/40"
+                    onClick={() => {
+                      setViewItem(item);
+                      setViewDialogOpen(true);
+                    }}
+                  >
                     <TableCell>
                       <Checkbox
                         checked={selectedIds.includes(item.id)}
+                        onClick={(e) => e.stopPropagation()}
                         onCheckedChange={() =>
                           setSelectedIds((prev) =>
                             prev.includes(item.id)
@@ -813,10 +824,10 @@ export default function MasterCataloguePage() {
                     <TableCell>
                       <div className="flex gap-1">
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => openEditDialog(item)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(item);
+                          }}
                         >
                           <Pencil size={12} />
                         </Button>
@@ -824,7 +835,8 @@ export default function MasterCataloguePage() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setViewItem(item);
                             setViewDialogOpen(true);
                           }}
@@ -835,7 +847,8 @@ export default function MasterCataloguePage() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setItems((prev) =>
                               prev.filter((i) => i.id !== item.id),
                             );
@@ -1023,64 +1036,236 @@ export default function MasterCataloguePage() {
         </Dialog>
 
         <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Item Details</DialogTitle>
-            </DialogHeader>
+          <DialogContent className="max-w-5xl">
             {viewItem && (
-              <div className="space-y-3 text-sm">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-muted-foreground">Name</Label>
-                    <p className="font-medium">{viewItem.name}</p>
+              <div className="space-y-5">
+                <DialogHeader className="space-y-3">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-1">
+                      <DialogTitle className="text-2xl">
+                        {viewItem.name}
+                      </DialogTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {viewItem.productCode || viewItem.sku}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => {
+                          openEditDialog(viewItem);
+                          setViewDialogOpen(false);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" /> Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => {
+                          openEditDialog(viewItem);
+                          setViewDialogOpen(false);
+                          toast.success(
+                            "Open the item form to manage vendor and client mapping.",
+                          );
+                        }}
+                      >
+                        <ShoppingCart className="h-4 w-4" /> Manage Mapping
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() =>
+                          toast.success(
+                            "Delete is intentionally handled from the catalogue grid.",
+                          )
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" /> Delete
+                      </Button>
+                      <Button variant="outline" size="icon">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">SKU</Label>
-                    <p>{viewItem.sku}</p>
+                </DialogHeader>
+
+                <div className="grid gap-0 overflow-hidden rounded-2xl border bg-card lg:grid-cols-[320px_1fr]">
+                  <div className="border-b bg-muted/20 p-6 lg:border-b-0 lg:border-r">
+                    <div className="flex h-full items-center justify-center rounded-2xl border bg-background p-4">
+                      <div className="aspect-square w-full max-w-[260px] overflow-hidden rounded-2xl bg-muted flex items-center justify-center">
+                        {viewItem.image ? (
+                          <img
+                            src={viewItem.image}
+                            alt={viewItem.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <ImageIcon className="h-16 w-16 text-muted-foreground" />
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Category</Label>
-                    <p>{viewItem.category}</p>
+
+                  <div className="space-y-5 p-6">
+                    <div>
+                      <h4 className="text-2xl font-semibold">Overview</h4>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Product master record and operational controls.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border bg-background p-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                          Product Code
+                        </p>
+                        <p className="mt-2 font-medium">
+                          {viewItem.productCode}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border bg-background p-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                          Brand
+                        </p>
+                        <p className="mt-2 font-medium">
+                          {viewItem.brand || "-"}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border bg-background p-4">
+                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                          Supplier
+                        </p>
+                        <p className="mt-2 font-medium">
+                          {viewItem.primaryVendor || "Not specified"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-xl border bg-background">
+                      <div className="grid grid-cols-2 border-b text-sm">
+                        <div className="border-r p-3 font-medium text-muted-foreground">
+                          SKU
+                        </div>
+                        <div className="p-3">{viewItem.sku}</div>
+                      </div>
+                      <div className="grid grid-cols-2 border-b text-sm">
+                        <div className="border-r p-3 font-medium text-muted-foreground">
+                          Category
+                        </div>
+                        <div className="p-3">{viewItem.category}</div>
+                      </div>
+                      <div className="grid grid-cols-2 border-b text-sm">
+                        <div className="border-r p-3 font-medium text-muted-foreground">
+                          Price
+                        </div>
+                        <div className="p-3">
+                          ₹{viewItem.price.toLocaleString()}
+                          {viewItem.discountPrice ? (
+                            <span className="ml-2 text-xs text-muted-foreground line-through">
+                              ₹{viewItem.discountPrice.toLocaleString()}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 border-b text-sm">
+                        <div className="border-r p-3 font-medium text-muted-foreground">
+                          Status
+                        </div>
+                        <div className="p-3">
+                          <Badge
+                            className={`${getStatusColor(viewItem.status)} border-none`}
+                          >
+                            {viewItem.status}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 text-sm">
+                        <div className="border-r p-3 font-medium text-muted-foreground">
+                          Stock Quantity
+                        </div>
+                        <div className="p-3">
+                          {viewItem.initialStock.toLocaleString()} Units
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm leading-7 text-foreground">
+                        {viewItem.description ||
+                          `${viewItem.name} is configured in the master catalogue and can be mapped with independent client and vendor pricing based on business strategy.`}
+                      </p>
+                    </div>
+
+                    <div>
+                      <h5 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Key Specifications
+                      </h5>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {[
+                          [
+                            "Display",
+                            viewItem.specification || "Not specified",
+                          ],
+                          [
+                            "Storage",
+                            viewItem.tags?.join(", ") || "Not specified",
+                          ],
+                          ["Connectivity", viewItem.hsnCode || "Not specified"],
+                          [
+                            "Battery Life",
+                            viewItem.warranty || "Not specified",
+                          ],
+                          ["Processor", viewItem.productType],
+                          ["Color", viewItem.brand || "Not specified"],
+                          [
+                            "Weight",
+                            viewItem.weight
+                              ? `${viewItem.weight}${viewItem.weightUnit ? ` ${viewItem.weightUnit}` : ""}`
+                              : "Not specified",
+                          ],
+                          ["OS", viewItem.physicalType],
+                        ].map(([label, value]) => (
+                          <div
+                            key={label}
+                            className="rounded-xl border bg-background p-3 text-sm"
+                          >
+                            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                              {label}
+                            </p>
+                            <p className="mt-1 font-medium text-foreground">
+                              {value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Brand</Label>
-                    <p>{viewItem.brand}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Product Type
-                    </Label>
-                    <p>{viewItem.productType}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">
-                      Physical Type
-                    </Label>
-                    <p>{viewItem.physicalType}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Price</Label>
-                    <p>₹{viewItem.price.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground">Status</Label>
-                    <Badge
-                      className={`${getStatusColor(viewItem.status)} border-none`}
-                    >
-                      {viewItem.status}
-                    </Badge>
-                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 border-t pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setViewDialogOpen(false)}
+                    className="gap-2"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setViewDialogOpen(false)}
+                    className="gap-2"
+                  >
+                    Close
+                  </Button>
                 </div>
               </div>
             )}
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setViewDialogOpen(false)}
-              >
-                Close
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -1130,10 +1315,18 @@ export default function MasterCataloguePage() {
                       </Select>
                     </div>
                     <div>
+                      <Label>Product Code</Label>
+                      <Input
+                        placeholder="e.g., PRD-00001"
+                        value={form.productCode}
+                        onChange={(e) =>
+                          updateForm({ productCode: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
                       <div className="flex items-center gap-2">
-                        <Label>
-                          SKU <span className="text-destructive">*</span>
-                        </Label>
+                        <Label>SKU</Label>
                         <div className="flex items-center gap-1 ml-auto">
                           <Checkbox
                             checked={autoSku}
@@ -1418,7 +1611,7 @@ export default function MasterCataloguePage() {
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <div>
-                      <Label>Regular Price</Label>
+                      <Label>Regular Price (optional)</Label>
                       <Input
                         type="number"
                         value={form.price}
@@ -1578,98 +1771,6 @@ export default function MasterCataloguePage() {
                           ))}
                         </div>
                       )}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Vendor & Sourcing
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <Label>Primary Vendor</Label>
-                      <Select
-                        value={form.primaryVendor || ""}
-                        onValueChange={(v) => updateForm({ primaryVendor: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Vendor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {defaultVendors.map((v) => (
-                            <SelectItem key={v} value={v}>
-                              {v}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>
-                        Vendor SKU <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        value={form.vendorSku || ""}
-                        onChange={(e) =>
-                          updateForm({ vendorSku: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label>Estimated Lead Time</Label>
-                      <Select
-                        value={form.leadTime || "10 Days"}
-                        onValueChange={(v) => updateForm({ leadTime: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {leadTimeOptions.map((o) => (
-                            <SelectItem key={o} value={o}>
-                              {o}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Logistics & Customs
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <Label>HSN/SAC Code</Label>
-                      <Input
-                        value={form.hsnCode || ""}
-                        onChange={(e) =>
-                          updateForm({ hsnCode: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label>Customs Declaration</Label>
-                      <Select
-                        value={form.customsDeclaration || "Exempt"}
-                        onValueChange={(v) =>
-                          updateForm({ customsDeclaration: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {customsOptions.map((o) => (
-                            <SelectItem key={o} value={o}>
-                              {o}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
                 </div>

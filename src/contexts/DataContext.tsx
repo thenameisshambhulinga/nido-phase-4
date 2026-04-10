@@ -6,6 +6,10 @@ import React, {
   useEffect,
 } from "react";
 import { safeReadJson } from "@/lib/storage";
+import {
+  nextSequentialCode,
+  resolveSequentialCode,
+} from "@/lib/documentNumbering";
 import type {
   GeneralSettings,
   UserRole,
@@ -62,6 +66,7 @@ export interface Comment {
 
 export interface Vendor {
   id: string;
+  vendorCode?: string;
   name: string;
   category: string;
   contactEmail: string;
@@ -224,6 +229,8 @@ export interface MasterCatalogItem {
 export interface ClientCatalogItem extends MasterCatalogItem {
   clientId: string;
   masterProductId: string;
+  masterBasePrice?: number;
+  priceFixedByOwner?: boolean;
   stock: number;
   minStock: number;
 }
@@ -1751,16 +1758,35 @@ const DEFAULT_ORGANIZATIONS: Organization[] = [
   },
 ];
 
+const buildDefaultGeneralSettings = (): GeneralSettings => ({
+  companyName: "Nido Tech Pvt. Ltd.",
+  currency: "INR",
+  dateFormat: "DD/MM/YYYY",
+  timezone: "Asia/Kolkata",
+  language: "English",
+  fiscalYearStart: "April",
+  taxId: "",
+  gstNumber: "",
+  panNumber: "",
+  address: "",
+  phone: "",
+  email: "",
+  poPrefix: "PO",
+  quotationPrefix: "Q",
+  estimationPrefix: "EST",
+  invoicePrefix: "INV",
+  clientCodePrefix: "CL",
+  vendorCodePrefix: "VND",
+  productCodePrefix: "PRD",
+  salesOrderPrefix: "SO",
+  deliveryChallanPrefix: "DC",
+  creditNotePrefix: "CN",
+});
+
 // ── DEFAULT GENERAL SETTINGS ───────────────────────────────────────
 const DEFAULT_GENERAL_SETTINGS: Record<string, GeneralSettings> = {
   "org-nido": {
-    companyName: "Nido Tech Pvt. Ltd.",
-    currency: "INR",
-    dateFormat: "DD/MM/YYYY",
-    timezone: "Asia/Kolkata",
-    language: "English",
-    fiscalYearStart: "April",
-    taxId: "",
+    ...buildDefaultGeneralSettings(),
     gstNumber: "27AACCN1234A11ZD",
     panNumber: "AACCN1234A",
     address:
@@ -2477,13 +2503,7 @@ const nextDocumentNumber = (
   prefix: string,
   existingNumbers: Array<string | undefined>,
 ) => {
-  const highest = existingNumbers.reduce((max, value) => {
-    if (!value) return max;
-    const match = value.match(new RegExp(`^${prefix}-(\\d+)$`));
-    if (!match) return max;
-    return Math.max(max, Number(match[1]));
-  }, 0);
-  return `${prefix}-${String(highest + 1).padStart(5, "0")}`;
+  return nextSequentialCode(prefix, existingNumbers, 5);
 };
 
 const resolveDocumentNumber = (
@@ -2491,10 +2511,7 @@ const resolveDocumentNumber = (
   requested: string | undefined,
   existingNumbers: Array<string | undefined>,
 ) => {
-  if (requested && !existingNumbers.includes(requested)) {
-    return requested;
-  }
-  return nextDocumentNumber(prefix, existingNumbers);
+  return resolveSequentialCode(prefix, requested, existingNumbers, 5);
 };
 
 const lineItemsFromSalesItems = (items: SalesLineItem[]) =>
@@ -2652,6 +2669,33 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     DEFAULT_SALES_ACTIVITIES,
   );
 
+  const primaryOrgId = organizations[0]?.id || "org-nido";
+  const activeSettings =
+    generalSettings[primaryOrgId] || buildDefaultGeneralSettings();
+
+  const configuredPrefix = useCallback(
+    (
+      key: keyof Pick<
+        GeneralSettings,
+        | "poPrefix"
+        | "quotationPrefix"
+        | "estimationPrefix"
+        | "invoicePrefix"
+        | "clientCodePrefix"
+        | "vendorCodePrefix"
+        | "productCodePrefix"
+        | "salesOrderPrefix"
+        | "deliveryChallanPrefix"
+        | "creditNotePrefix"
+      >,
+      fallback: string,
+    ) => {
+      const value = activeSettings[key];
+      return (value && value.trim()) || fallback;
+    },
+    [activeSettings],
+  );
+
   useEffect(() => {
     setSalesQuotes((prev) =>
       prev.map((quote) => {
@@ -2740,6 +2784,48 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const roleCrud = makeCrud(setRoles);
   const userRoleCrud = makeCrud(setUserRoles);
 
+  const addVendor = useCallback(
+    (vendor: Partial<Vendor>) => {
+      const vendorCode =
+        vendor.vendorCode ||
+        nextSequentialCode(
+          configuredPrefix("vendorCodePrefix", "VND"),
+          vendors.map((entry) => entry.vendorCode),
+          5,
+        );
+      setVendors((prev) => [
+        ...prev,
+        {
+          ...vendor,
+          id: vendor.id || `${Date.now()}`,
+          vendorCode,
+        } as Vendor,
+      ]);
+    },
+    [configuredPrefix, setVendors, vendors],
+  );
+
+  const addClient = useCallback(
+    (client: Partial<Client>) => {
+      const clientCode =
+        client.clientCode ||
+        nextSequentialCode(
+          configuredPrefix("clientCodePrefix", "CL"),
+          clients.map((entry) => entry.clientCode),
+          5,
+        );
+      setClients((prev) => [
+        ...prev,
+        {
+          ...client,
+          id: client.id || `${Date.now()}`,
+          clientCode,
+        } as Client,
+      ]);
+    },
+    [clients, configuredPrefix, setClients],
+  );
+
   const bulkUpdateOrders = useCallback(
     (ids: string[], data: Partial<Order>) => {
       setOrders((prev) =>
@@ -2779,7 +2865,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       setGeneralSettings((prev) => ({
         ...prev,
         [orgId]: {
-          ...(prev[orgId] || getDefaultGeneralSettings()),
+          ...(prev[orgId] || buildDefaultGeneralSettings()),
           ...settings,
         } as GeneralSettings,
       }));
@@ -2821,8 +2907,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         createdBy?: string;
       },
     ) => {
+      const quotePrefix =
+        configuredPrefix("estimationPrefix", "EST") ||
+        configuredPrefix("quotationPrefix", "Q");
       const quoteNumber = resolveDocumentNumber(
-        "EST",
+        quotePrefix,
         quote.quoteNumber,
         salesQuotes.map((entry) => entry.quoteNumber),
       );
@@ -2852,7 +2941,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       return nextQuote;
     },
-    [logSalesActivity, salesQuotes, setSalesQuotes],
+    [configuredPrefix, logSalesActivity, salesQuotes, setSalesQuotes],
   );
 
   const updateQuote = useCallback(
@@ -2904,8 +2993,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         createdBy?: string;
       },
     ) => {
+      const salesOrderPrefix = configuredPrefix("salesOrderPrefix", "SO");
       const salesOrderNumber = resolveDocumentNumber(
-        "SO",
+        salesOrderPrefix,
         order.salesOrderNumber,
         salesOrders.map((entry) => entry.salesOrderNumber),
       );
@@ -2935,7 +3025,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       return nextOrder;
     },
-    [logSalesActivity, salesOrders, setSalesOrders],
+    [configuredPrefix, logSalesActivity, salesOrders, setSalesOrders],
   );
 
   const createInvoice = useCallback(
@@ -2960,8 +3050,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         createdBy?: string;
       },
     ) => {
+      const invoicePrefix = configuredPrefix("invoicePrefix", "INV");
       const invoiceNumber = resolveDocumentNumber(
-        "INV",
+        invoicePrefix,
         invoice.invoiceNumber,
         invoices.map((entry) => entry.invoiceNumber),
       );
@@ -3011,7 +3102,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       return nextInvoice;
     },
-    [invoices, logSalesActivity, setInvoices],
+    [configuredPrefix, invoices, logSalesActivity, setInvoices],
   );
 
   const updateSalesOrder = useCallback(
@@ -3103,6 +3194,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     (quoteId: string, actor = "System") => {
       const quote = salesQuotes.find((entry) => entry.id === quoteId);
       if (!quote || quote.status !== "ACCEPTED") return null;
+      if (quote.referenceSalesOrderId) {
+        return (
+          salesOrders.find(
+            (entry) => entry.id === quote.referenceSalesOrderId,
+          ) || null
+        );
+      }
 
       const newOrder = createSalesOrder({
         salesOrderNumber: undefined,
@@ -3156,7 +3254,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       return newOrder;
     },
-    [createSalesOrder, logSalesActivity, salesQuotes],
+    [createSalesOrder, logSalesActivity, salesOrders, salesQuotes],
   );
 
   const convertQuoteToOrder = convertQuoteToSalesOrder;
@@ -3165,6 +3263,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     (quoteId: string, actor = "System") => {
       const quote = salesQuotes.find((entry) => entry.id === quoteId);
       if (!quote || quote.status !== "ACCEPTED") return null;
+      if (quote.referenceInvoiceId) {
+        return quote.referenceInvoiceId;
+      }
 
       const newInvoice = createInvoice({
         invoiceNumber: undefined,
@@ -3365,21 +3466,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     [invoices, salesActivities, salesOrders, salesQuotes],
   );
 
-  const getDefaultGeneralSettings = (): GeneralSettings => ({
-    companyName: "Nido Tech Pvt. Ltd.",
-    currency: "INR",
-    dateFormat: "DD/MM/YYYY",
-    timezone: "Asia/Kolkata",
-    language: "English",
-    fiscalYearStart: "April",
-    taxId: "",
-    gstNumber: "",
-    panNumber: "",
-    address: "",
-    phone: "",
-    email: "",
-  });
-
   const addUserRole = useCallback(
     (role: Omit<UserRole, "id">) => {
       const newId = `ur-${Date.now()}`;
@@ -3408,7 +3494,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     (item: Partial<MasterCatalogItem>) => {
       const productCode =
         item.productCode ||
-        `${(item.category || "CAT").replace(/\s+/g, "").slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+        nextSequentialCode(
+          configuredPrefix("productCodePrefix", "PRD"),
+          masterCatalogItems.map((entry) => entry.productCode),
+          5,
+        );
       const newItem: MasterCatalogItem = {
         id: `mc-${Date.now()}`,
         productCode,
@@ -3448,7 +3538,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       };
       setMasterCatalogItems((prev) => [...prev, newItem]);
     },
-    [setMasterCatalogItems],
+    [configuredPrefix, masterCatalogItems, setMasterCatalogItems],
   );
 
   const updateMasterCatalogItem = useCallback(
@@ -3487,6 +3577,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         id: `cli-${Date.now()}`,
         clientId,
         masterProductId: item.masterProductId || item.id || `mc-${Date.now()}`,
+        masterBasePrice: item.masterBasePrice ?? item.price ?? 0,
+        priceFixedByOwner: item.priceFixedByOwner ?? false,
         productCode: item.productCode || "",
         name: item.name || "Unnamed Item",
         category: item.category || "IT Hardware",
@@ -4384,10 +4476,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         updateOrder: orderCrud.update,
         bulkUpdateOrders,
         deleteOrder: orderCrud.delete,
-        addVendor: vendorCrud.add,
+        addVendor,
         updateVendor: vendorCrud.update,
         deleteVendor: vendorCrud.delete,
-        addClient: clientCrud.add,
+        addClient,
         updateClient: clientCrud.update,
         deleteClient: clientCrud.delete,
         addLocation: locationCrud.add,

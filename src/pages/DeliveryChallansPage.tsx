@@ -38,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
+import { nextSequentialCode } from "@/lib/documentNumbering";
 import {
   FileText,
   MessageSquare,
@@ -428,6 +429,8 @@ export default function DeliveryChallansPage() {
   const companyLogoUrl = Object.values(generalSettings).find(
     (setting) => setting.companyLogo,
   )?.companyLogo;
+  const challanPrefix =
+    Object.values(generalSettings)[0]?.deliveryChallanPrefix?.trim() || "DC";
 
   const reactToPrint = useReactToPrint({
     contentRef: printRef,
@@ -444,10 +447,24 @@ export default function DeliveryChallansPage() {
   useEffect(() => {
     if (createMode) {
       setEditingId(null);
-      setForm(normalize(defaultChallans[0]));
+      setForm(
+        normalize({
+          ...defaultChallans[0],
+          id: `dc-${Date.now()}`,
+          challanNumber: nextSequentialCode(
+            challanPrefix,
+            challans.map((entry) => entry.challanNumber),
+            5,
+          ),
+          challanDate: new Date().toISOString().slice(0, 10),
+          status: "draft",
+          invoiceStatus: "not_invoiced",
+          attachments: [],
+        }),
+      );
       setOpen(true);
     }
-  }, [createMode]);
+  }, [challanPrefix, challans, createMode]);
 
   useEffect(() => {
     if (params.id) setSelectedId(params.id);
@@ -493,7 +510,11 @@ export default function DeliveryChallansPage() {
     const next = normalize({
       ...defaultChallans[0],
       id: `dc-${Date.now()}`,
-      challanNumber: `DC-${String(challans.length + 31).padStart(5, "0")}`,
+      challanNumber: nextSequentialCode(
+        challanPrefix,
+        challans.map((entry) => entry.challanNumber),
+        5,
+      ),
       challanDate: new Date().toISOString().slice(0, 10),
       status: "draft",
       invoiceStatus: "not_invoiced",

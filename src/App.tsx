@@ -11,6 +11,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { EnhancedAuthProvider } from "@/contexts/EnhancedAuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -536,11 +537,13 @@ const App = () => (
         <ThemeProvider>
           <NotificationProvider>
             <AuthProvider>
-              <DataProvider>
-                <CartProvider>
-                  <AppRoutes />
-                </CartProvider>
-              </DataProvider>
+              <EnhancedAuthProvider>
+                <DataProvider>
+                  <CartProvider>
+                    <AppRoutes />
+                  </CartProvider>
+                </DataProvider>
+              </EnhancedAuthProvider>
             </AuthProvider>
           </NotificationProvider>
         </ThemeProvider>

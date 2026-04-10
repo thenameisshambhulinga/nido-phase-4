@@ -17,6 +17,16 @@ export interface GeneralSettings {
   address: string;
   phone: string;
   email: string;
+  poPrefix?: string;
+  quotationPrefix?: string;
+  estimationPrefix?: string;
+  invoicePrefix?: string;
+  clientCodePrefix?: string;
+  vendorCodePrefix?: string;
+  productCodePrefix?: string;
+  salesOrderPrefix?: string;
+  deliveryChallanPrefix?: string;
+  creditNotePrefix?: string;
 }
 
 // ── MODULE PERMISSIONS ─────────────────────────────────────────────

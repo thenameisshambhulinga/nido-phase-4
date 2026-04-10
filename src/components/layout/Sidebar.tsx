@@ -52,7 +52,6 @@ const NAV_ITEMS: NavItem[] = [
     module: "dashboard",
     children: [
       { label: "Main Dashboard", path: "/dashboard" },
-      { label: "Vendor Dashboard", path: "/dashboard/vendor" },
       { label: "SLA Overview", path: "/dashboard/sla" },
     ],
   },
@@ -79,6 +78,7 @@ const NAV_ITEMS: NavItem[] = [
     module: "vendors",
     children: [
       { label: "Vendor List", path: "/vendors" },
+      { label: "Vendor Dashboard", path: "/dashboard/vendor" },
       { label: "Vendor Categories", path: "/vendors/categories" },
       { label: "Vendor Onboarding", path: "/vendors/onboarding" },
     ],
@@ -147,6 +147,18 @@ const NAV_ITEMS: NavItem[] = [
           },
         ],
       },
+    ],
+  },
+  {
+    label: "User Management",
+    icon: UserCog,
+    module: "permissions",
+    children: [
+      { label: "Users", path: "/users/management" },
+      { label: "Roles", path: "/users/roles" },
+      { label: "Departments", path: "/users/departments" },
+      { label: "Invitations", path: "/users/invitations" },
+      { label: "Audit Trail", path: "/users/audit-trail" },
     ],
   },
   {

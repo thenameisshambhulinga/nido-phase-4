@@ -1,4 +1,5 @@
 # COMPREHENSIVE USER MANAGEMENT & RBAC SYSTEM
+
 ## Nido Platform - Production-Level Implementation
 
 ## Overview
@@ -10,6 +11,7 @@ This document describes the complete user management and Role-Based Access Contr
 ## Quick Start
 
 ### Access Points
+
 - **User Management**: `/users/management` - Create, edit, manage users with bulk import
 - **Role Templates**: `/users/roles` - View and understand permission matrix for each role
 - **Departments**: `/users/departments` - Organize teams and manage organizational structure
@@ -17,6 +19,7 @@ This document describes the complete user management and Role-Based Access Contr
 - **Audit Trail**: `/users/audit-trail` - Track all system activities
 
 ### Owner Credentials (Development)
+
 ```
 Email: owner@nidotech.com
 Password: password
@@ -29,11 +32,13 @@ Password: password
 ### 1. Permission System (`src/lib/permissions.ts`)
 
 **Core Concepts:**
+
 - **Modules**: 14 system modules (Dashboard, Orders, Shop, Vendors, Clients, etc.)
 - **Actions**: 7 permission actions (View, Create, Edit, Delete, Approve, Export, Configure)
 - **Role Templates**: 11 predefined role templates with permission matrices
 
 **Available Actions:**
+
 ```typescript
 "view"      - Can see data in the module
 "create"    - Can create new records
@@ -45,6 +50,7 @@ Password: password
 ```
 
 **Data Visibility Levels:**
+
 - **All** - Access to all company data
 - **Department Only** - Access to own department only
 - **Own Only** - Access only to personal records
@@ -56,6 +62,7 @@ Password: password
 ### Complete Role Hierarchy
 
 #### 1. **Owner** (System Owner)
+
 - **Access Level**: Complete platform access
 - **Data Visibility**: All data
 - **Approval Limit**: ₹999,999 (unlimited)
@@ -63,6 +70,7 @@ Password: password
 - **Use Case**: Platform administrator with full control
 
 #### 2. **Admin** (Administrator)
+
 - **Access Level**: Full internal operations access
 - **Data Visibility**: All data
 - **Approval Limit**: ₹500,000
@@ -70,6 +78,7 @@ Password: password
 - **Use Case**: Help with day-to-day operations
 
 #### 3. **Procurement Manager**
+
 - **Access Level**: Purchase orders and vendor management
 - **Data Visibility**: All data
 - **Approval Limit**: ₹250,000
@@ -77,6 +86,7 @@ Password: password
 - **Use Case**: Lead procurement team
 
 #### 4. **Procurement Specialist**
+
 - **Access Level**: Create and manage purchase orders
 - **Data Visibility**: All data
 - **Approval Limit**: ₹50,000
@@ -84,6 +94,7 @@ Password: password
 - **Use Case**: Day-to-day purchasing
 
 #### 5. **Accounts Payable Officer**
+
 - **Access Level**: Bill and payment management
 - **Data Visibility**: All data
 - **Approval Limit**: ₹100,000
@@ -91,6 +102,7 @@ Password: password
 - **Use Case**: Process vendor payments
 
 #### 6. **Finance Manager**
+
 - **Access Level**: Full financial operations
 - **Data Visibility**: All data
 - **Approval Limit**: ₹300,000
@@ -98,6 +110,7 @@ Password: password
 - **Use Case**: Financial oversight
 
 #### 7. **Employee** (Internal)
+
 - **Access Level**: Basic dashboard and shop access
 - **Data Visibility**: Department only
 - **Approval Limit**: ₹0
@@ -105,6 +118,7 @@ Password: password
 - **Use Case**: Standard employee
 
 #### 8. **Client Admin**
+
 - **Access Level**: Full client account management
 - **Data Visibility**: All client data
 - **Approval Limit**: ₹1,000,000
@@ -112,6 +126,7 @@ Password: password
 - **Use Case**: Corporate client admin
 
 #### 9. **Client User** (Standard)
+
 - **Access Level**: Limited client functionality
 - **Data Visibility**: Own records only
 - **Approval Limit**: ₹0
@@ -119,6 +134,7 @@ Password: password
 - **Use Case**: Corporate client staff
 
 #### 10. **Vendor Admin**
+
 - **Access Level**: Vendor account management
 - **Data Visibility**: Own records only
 - **Approval Limit**: ₹0
@@ -126,6 +142,7 @@ Password: password
 - **Use Case**: Vendor representative
 
 #### 11. **Vendor User**
+
 - **Access Level**: Basic vendor access
 - **Data Visibility**: Own records only
 - **Approval Limit**: ₹0
@@ -139,6 +156,7 @@ Password: password
 ### 1. Enhanced Users Page (`/users/management`)
 
 **Features:**
+
 - User directory with advanced search/filter
 - Create new users with role assignment
 - Bulk import from CSV
@@ -148,11 +166,13 @@ Password: password
 - Statistics dashboard
 
 **User Types:**
+
 - **Internal User**: Company employees
 - **Client User**: Corporate collaborators
 - **Vendor User**: Business partners
 
 **Actions:**
+
 ```
 ✓ Create users individually or in bulk
 ✓ Assign roles and departments
@@ -165,12 +185,14 @@ Password: password
 ### 2. Role Templates Page (`/users/roles`)
 
 **Features:**
+
 - Interactive role exploration
 - Complete permission matrix per role
 - Side-by-side role comparison
 - RBAC best practices guide
 
 **Matrix Shows:**
+
 - Module name and description
 - Granted actions (View, Create, Edit, Delete, Approve, Export)
 - Clear visual indicators (✓/✗)
@@ -179,6 +201,7 @@ Password: password
 ### 3. Departments Page (`/users/departments`)
 
 **Features:**
+
 - Organizational structure management
 - Department CRUD operations
 - Manager assignment
@@ -186,6 +209,7 @@ Password: password
 - Statistics tracking
 
 **Usages:**
+
 - Organize employees by function
 - Set data visibility scope
 - Manage hierarchical structures
@@ -194,6 +218,7 @@ Password: password
 ### 4. User Invitation Page (`/users/invitations`)
 
 **Onboarding Workflow:**
+
 1. Owner/Admin sends invitation to new user's email
 2. Temporary credentials generated automatically
 3. Invitation link valid for 7 days
@@ -202,11 +227,13 @@ Password: password
 6. Access permissions applied immediately
 
 **Invitation States:**
+
 - **Pending**: Awaiting user acceptance
 - **Accepted**: User activated account
 - **Expired**: Link expired (resend required)
 
 **Actions:**
+
 ```
 ✓ Send invitations to multiple users
 ✓ Auto-assign roles and departments
@@ -219,6 +246,7 @@ Password: password
 ### 5. Audit Trail Page (`/users/audit-trail`)
 
 **Tracked Activities:**
+
 - User login/logout
 - Record creation, updates, deletions
 - Approval actions
@@ -226,18 +254,21 @@ Password: password
 - Role/permission changes
 
 **Advanced Filtering:**
+
 - By user
 - By action type
 - By entity type
 - Date range filtering
 
 **Data Captured:**
+
 - Exact timestamp
 - User who performed action
 - What changed (before/after values)
 - Reason/context if available
 
 **Export Options:**
+
 - CSV export with filters
 - Historical analysis
 - Compliance reporting
@@ -249,6 +280,7 @@ Password: password
 ### Key Functionality
 
 #### Authentication
+
 ```typescript
 login(email: string, password: string): Promise<boolean>
 logout(): void
@@ -257,6 +289,7 @@ resetPassword(userId: string): Promise<Result>
 ```
 
 #### User Management
+
 ```typescript
 createUser(userData: UserData): Promise<Result>
 createBulkUsers(rows: UserData[]): Promise<Statistics>
@@ -265,6 +298,7 @@ deleteUser(userId: string): Promise<boolean>
 ```
 
 #### Permissions
+
 ```typescript
 hasModulePermission(module: string, action: PermissionAction): boolean
 canApprove(amount: number): boolean
@@ -272,6 +306,7 @@ getUserPermissions(userId: string): Record<string, string[]>
 ```
 
 #### Invitations
+
 ```typescript
 inviteUser(email, role, userType, dept): Promise<Result>
 getInvitations(): UserInvitation[]
@@ -280,6 +315,7 @@ resendInvitation(invitationId): Promise<boolean>
 ```
 
 #### Departments
+
 ```typescript
 createDepartment(dept: DepartmentData): void
 updateDepartment(id: string, data: Partial<DepartmentData>): void
@@ -287,6 +323,7 @@ deleteDepartment(id: string): void
 ```
 
 #### Audit Logging
+
 ```typescript
 logAction(action, entityType, entityId, entityName, details): void
 getAuditLogs(filters?): AuditLog[]
@@ -297,24 +334,28 @@ getAuditLogs(filters?): AuditLog[]
 ## Security Features
 
 ### 1. Password Management
+
 - **Hashing**: Passwords are hashed before storage
 - **Temporary Passwords**: Generated for new users (8 chars alphanumeric)
 - **Reset Workflow**: Force password change on first login
 - **Account Lockout**: 5 failed attempts = 30 min lockout
 
 ### 2. Session Management
+
 - Session tracking with timestamps
 - Last login recording
 - Device/IP information capture
 - Automatic session timeout
 
 ### 3. Audit Trail
+
 - Immutable action logs
 - User identification
 - Complete activity history
 - Compliance-ready reporting
 
 ### 4. Role-Based Access Control
+
 - Granular permission assignment
 - Approval workflows with limits
 - Data visibility scoping
@@ -325,6 +366,7 @@ getAuditLogs(filters?): AuditLog[]
 ## User Data Model
 
 ### EnhancedAppUser Structure
+
 ```typescript
 {
   id: string;                    // Unique user ID
@@ -354,6 +396,7 @@ getAuditLogs(filters?): AuditLog[]
 ```
 
 ### UserInvitation Structure
+
 ```typescript
 {
   id: string;                    // Invitation ID
@@ -371,6 +414,7 @@ getAuditLogs(filters?): AuditLog[]
 ```
 
 ### AuditLog Structure
+
 ```typescript
 {
   id: string;                    // Log entry ID
@@ -413,6 +457,7 @@ getAuditLogs(filters?): AuditLog[]
 ### Assigning Permissions
 
 Permissions are **automatically assigned based on user's role**:
+
 - Role templates have predefined permissions
 - Cannot override individual module permissions (use role templates)
 - To grant user special permissions, create new role or promote to higher role
@@ -473,6 +518,7 @@ Result:
 ## Migration from Old System
 
 If you have existing UsersPage setup, the new system:
+
 - ✓ Maintains backward compatibility
 - ✓ Keeps existing data intact
 - ✓ Adds new capabilities without breaking changes
@@ -480,6 +526,7 @@ If you have existing UsersPage setup, the new system:
 - ✓ New routes available alongside
 
 **Access Both:**
+
 - Old: `/users` (basic user page)
 - New: `/users/management` (enhanced management)
 
@@ -488,18 +535,21 @@ If you have existing UsersPage setup, the new system:
 ## Best Practices
 
 ### 1. Least Privilege Principle
+
 - Assign minimum required permissions
 - Regular permission audits
 - Remove access when role changes
 - Quarterly permission reviews
 
 ### 2. Separation of Duties
+
 - Procurement ≠ Approval
 - Finance ≠ Operations
 - Vendor ≠ Client data visibility
 - Critical actions need multi-level approval
 
 ### 3. Onboarding Process
+
 1. Create user account
 2. Send invitation email
 3. User sets password
@@ -509,6 +559,7 @@ If you have existing UsersPage setup, the new system:
 7. Log initial login (audit trail)
 
 ### 4. Offboarding Process
+
 1. Remove active sessions
 2. Disable account (status → Suspended)
 3. Audit their recent actions
@@ -516,6 +567,7 @@ If you have existing UsersPage setup, the new system:
 5. Log deprovisioning (audit trail)
 
 ### 5. Account Management
+
 - Monthly inactive user report
 - Quarterly permission review
 - Annual role assessment
@@ -526,18 +578,21 @@ If you have existing UsersPage setup, the new system:
 ## Compliance & Auditing
 
 ### GDPR Compliance
+
 - Audit trail retention policies
 - User data export capability
 - Right to be forgotten (soft delete)
 - Data minimization applied
 
 ### Financial Controls
+
 - Approval limits enforced
 - Dual approval for high amounts
 - Approval chain visibility
 - Unauthorized action detection
 
 ### Security Auditing
+
 - Failed login tracking
 - Permission escalation detection
 - High-risk action alerts
@@ -548,6 +603,7 @@ If you have existing UsersPage setup, the new system:
 ## Technical Implementation Details
 
 ### Storage
+
 - **Type**: localStorage (can be swapped with backend API)
 - **Keys**:
   - `nido_auth_user` - Current user session
@@ -557,12 +613,14 @@ If you have existing UsersPage setup, the new system:
   - `nido_auth_audit_logs` - Activity audit trail
 
 ### Type Safety
+
 - Full TypeScript support
 - Discriminated unions for type safety
 - Runtime validation for localStorage
 - IDE autocomplete for all operations
 
 ### Performance
+
 - Memoized permission checks
 - Fast filter operations
 - Indexed audit log searches
@@ -573,18 +631,21 @@ If you have existing UsersPage setup, the new system:
 ## Future Enhancements
 
 ### Phase 2
+
 - Two-factor authentication (2FA)
 - Single sign-on (SSO) integration
 - OAuth2 provider support
 - Advanced audit analytics
 
 ### Phase 3
+
 - Machine learning for anomaly detection
 - Predictive permission suggestions
 - Role auto-assignment based on job title
 - Integration with HR systems
 
 ### Phase 4
+
 - API-based user provisioning
 - Just-in-time access (JIT)
 - Cloud identity provider integration
@@ -613,6 +674,7 @@ A: Refresh page, check filters, verify date range
 ## Contact & Support
 
 For implementation questions or feature requests:
+
 - Documentation: `/users/roles` (built-in guide)
 - Demo Access: owner@nidotech.com / password
 - Audit Trail: `/users/audit-trail` (activity history)

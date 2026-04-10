@@ -220,7 +220,7 @@ export default function ClientDetailPage() {
     applyDiscountRules,
     applyTax,
   } = useData();
-  const { users, createUser, updateUser, deleteUser } = useAuth();
+  const { users, createUser, updateUser, deleteUser, isOwner } = useAuth();
 
   const [activeTab, setActiveTab] = useState("overview");
   const [showMail, setShowMail] = useState(false);
@@ -1120,18 +1120,20 @@ export default function ClientDetailPage() {
   };
 
   const saveCatalogItem = () => {
+    if (!isOwner) {
+      toast({ title: "Only owner can fix client-specific product pricing" });
+      return;
+    }
+
     if (!selectedMasterProduct) {
       toast({ title: "Select a master catalog item first" });
       return;
     }
 
-    if (!catalogForm.vendorSku.trim()) {
-      toast({ title: "Vendor SKU is required" });
-      return;
-    }
-
     const payload = {
       masterProductId: selectedMasterProduct.id,
+      masterBasePrice: selectedMasterProduct.price,
+      priceFixedByOwner: true,
       productCode: selectedMasterProduct.productCode,
       name: selectedMasterProduct.name,
       category: selectedMasterProduct.category,
@@ -1139,7 +1141,9 @@ export default function ClientDetailPage() {
       brand: selectedMasterProduct.brand,
       productType: selectedMasterProduct.productType,
       physicalType: selectedMasterProduct.physicalType,
-      price: catalogForm.price || selectedMasterProduct.price,
+      price: Number.isFinite(catalogForm.price)
+        ? catalogForm.price
+        : selectedMasterProduct.price,
       discountPrice: catalogForm.discountPrice
         ? Number(catalogForm.discountPrice)
         : selectedMasterProduct.discountPrice,
@@ -1154,21 +1158,17 @@ export default function ClientDetailPage() {
       specification:
         selectedMasterProduct.specification || catalogForm.specification,
       warranty: selectedMasterProduct.warranty || catalogForm.warranty,
-      hsnCode: selectedMasterProduct.hsnCode || catalogForm.hsnCode,
-      customsDeclaration:
-        selectedMasterProduct.customsDeclaration ||
-        catalogForm.customsDeclaration,
-      primaryVendor:
-        catalogForm.primaryVendor || selectedMasterProduct.primaryVendor || "",
-      vendorSku: catalogForm.vendorSku || selectedMasterProduct.vendorSku || "",
-      leadTime:
-        catalogForm.leadTime || selectedMasterProduct.leadTime || "10 Days",
-      vendorContact: catalogForm.vendorContact,
-      vendorEmail: catalogForm.vendorEmail,
-      vendorPhone: catalogForm.vendorPhone,
-      vendorPhone2: catalogForm.vendorPhone2,
-      trackPerformance: catalogForm.trackPerformance,
-      performanceRating: catalogForm.performanceRating,
+      hsnCode: selectedMasterProduct.hsnCode,
+      customsDeclaration: selectedMasterProduct.customsDeclaration,
+      primaryVendor: selectedMasterProduct.primaryVendor || "",
+      vendorSku: selectedMasterProduct.vendorSku || "",
+      leadTime: selectedMasterProduct.leadTime || "10 Days",
+      vendorContact: selectedMasterProduct.vendorContact || "",
+      vendorEmail: selectedMasterProduct.vendorEmail || "",
+      vendorPhone: selectedMasterProduct.vendorPhone || "",
+      vendorPhone2: selectedMasterProduct.vendorPhone2 || "",
+      trackPerformance: selectedMasterProduct.trackPerformance || false,
+      performanceRating: selectedMasterProduct.performanceRating || 4,
     };
 
     if (editingCatalogItemId) {
@@ -1185,9 +1185,17 @@ export default function ClientDetailPage() {
   };
 
   const downloadCatalogExport = () => {
+    if (selectedCatalogIds.length === 0) {
+      toast({ title: "Select at least one catalog item to export" });
+      return;
+    }
+
+    const selectedItems = clientCatalog.filter((item) =>
+      selectedCatalogIds.includes(item.id),
+    );
     const rows = [
       ["ProductCode", "ItemName", "Category", "Brand", "Price", "Status"],
-      ...clientCatalog.map((item) => [
+      ...selectedItems.map((item) => [
         item.productCode,
         item.name,
         item.category,
@@ -1210,15 +1218,7 @@ export default function ClientDetailPage() {
 
   const downloadCatalogTemplate = () => {
     const templateRows = [
-      [
-        "ProductCode",
-        "ItemName",
-        "Category",
-        "Brand",
-        "Price",
-        "Status",
-        "VendorSKU",
-      ],
+      ["ProductCode", "ItemName", "Category", "Brand", "Price", "Status"],
       [
         "PRD-1001",
         "Laptop Stand",
@@ -1226,7 +1226,6 @@ export default function ClientDetailPage() {
         "Logitech",
         "1500",
         "In Stock",
-        "VND-001",
       ],
     ];
     const csv = templateRows.map((row) => row.join(",")).join("\n");
@@ -1265,7 +1264,6 @@ export default function ClientDetailPage() {
       const brandIdx = headers.indexOf("brand");
       const priceIdx = headers.indexOf("price");
       const statusIdx = headers.indexOf("status");
-      const vendorSkuIdx = headers.indexOf("vendorsku");
 
       let imported = 0;
       lines.slice(1).forEach((line) => {
@@ -1275,8 +1273,6 @@ export default function ClientDetailPage() {
         const productCode = cols[productCodeIdx] || "";
         const name = cols[itemNameIdx] || "";
         if (!productCode || !name) return;
-        const vendorSku = cols[vendorSkuIdx] || "";
-        if (!vendorSku) return;
 
         addClientCatalogItem(client.id, {
           masterProductId: selectedMasterProductId || `mc-${Date.now()}`,
@@ -1295,7 +1291,6 @@ export default function ClientDetailPage() {
           minStockThreshold: 0,
           stock: 0,
           minStock: 0,
-          vendorSku,
         });
         imported += 1;
       });
@@ -1705,11 +1700,11 @@ export default function ClientDetailPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <Card className="lg:col-span-1 overflow-hidden">
-            <div className="h-20 bg-gradient-to-br from-primary to-primary/70" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <Card className="lg:col-span-4 rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-white">
+            <div className="h-24 bg-gradient-to-br from-blue-600 to-blue-400" />
             <CardContent className="pt-0 -mt-10 text-center space-y-4">
-              <div className="mx-auto h-20 w-20 rounded-full bg-card border-4 border-card flex items-center justify-center text-2xl font-bold text-primary shadow-lg">
+              <div className="mx-auto h-20 w-20 rounded-full border-4 border-white bg-blue-100 text-blue-700 shadow-sm flex items-center justify-center text-2xl font-semibold">
                 {initials}
               </div>
               <div>
@@ -1745,20 +1740,15 @@ export default function ClientDetailPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 pt-2">
-                <Button
-                  size="sm"
-                  className="gap-1 w-full"
-                  onClick={() => setShowMail(true)}
-                >
-                  <Mail className="h-3.5 w-3.5" /> Email
+                <Button className="gap-2" onClick={() => setShowMail(true)}>
+                  <Mail className="h-4 w-4" /> Email
                 </Button>
                 <Button
-                  size="sm"
                   variant="outline"
-                  className="gap-1 w-full"
+                  className="gap-2"
                   onClick={() => window.open(`tel:${client.phone}`)}
                 >
-                  <Phone className="h-3.5 w-3.5" /> Call
+                  <Phone className="h-4 w-4" /> Call
                 </Button>
               </div>
               <div className="pt-2 border-t space-y-2">
@@ -1787,7 +1777,7 @@ export default function ClientDetailPage() {
             </CardContent>
           </Card>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-8">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="flex flex-wrap h-auto">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -2457,6 +2447,7 @@ export default function ClientDetailPage() {
                       size="sm"
                       className="gap-1.5"
                       onClick={() => openCatalogDialog()}
+                      disabled={!isOwner}
                     >
                       <Plus size={12} /> Add New Item
                     </Button>
@@ -2478,7 +2469,9 @@ export default function ClientDetailPage() {
                           <TableHead>SKU</TableHead>
                           <TableHead>Category</TableHead>
                           <TableHead>Brand</TableHead>
+                          <TableHead>Master Price</TableHead>
                           <TableHead>Price</TableHead>
+                          <TableHead>Owner Fix</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
@@ -2498,6 +2491,12 @@ export default function ClientDetailPage() {
                             productCode: item.productCode,
                           });
                           const finalPrice = applyTax(discountedPrice);
+                          const masterPrice =
+                            item.masterBasePrice ??
+                            masterCatalogItems.find(
+                              (entry) => entry.id === item.masterProductId,
+                            )?.price ??
+                            item.price;
 
                           return (
                             <TableRow key={item.id}>
@@ -2540,7 +2539,15 @@ export default function ClientDetailPage() {
                                 {item.brand}
                               </TableCell>
                               <TableCell>
+                                ₹{masterPrice.toLocaleString()}
+                              </TableCell>
+                              <TableCell>
                                 ₹{finalPrice.toLocaleString()}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {item.priceFixedByOwner ? "Fixed" : "Auto"}
+                                </Badge>
                               </TableCell>
                               <TableCell>
                                 <Badge
@@ -2637,7 +2644,7 @@ export default function ClientDetailPage() {
                             </p>
                             <p className="text-xs text-muted-foreground">
                               Includes ProductCode, ItemName, Category, Brand,
-                              Price, Status, VendorSKU.
+                              Price and Status.
                             </p>
                             <Button
                               className="mt-2"
@@ -3631,6 +3638,20 @@ export default function ClientDetailPage() {
                           ₹{selectedMasterProduct.price.toLocaleString()}
                         </span>
                       </div>
+                      <div>
+                        <span className="block text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                          Owner Price Delta
+                        </span>
+                        <span className="font-medium text-slate-700">
+                          {catalogForm.price >= selectedMasterProduct.price
+                            ? "+"
+                            : "-"}
+                          ₹
+                          {Math.abs(
+                            catalogForm.price - selectedMasterProduct.price,
+                          ).toLocaleString()}
+                        </span>
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -3641,89 +3662,7 @@ export default function ClientDetailPage() {
                   </h3>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>
-                        Vendor SKU <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        value={catalogForm.vendorSku}
-                        onChange={(e) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            vendorSku: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Primary Vendor</Label>
-                      <Select
-                        value={catalogForm.primaryVendor}
-                        onValueChange={(value) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            primaryVendor: value,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Vendor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATALOG_DEFAULT_VENDORS.map((vendor) => (
-                            <SelectItem key={vendor} value={vendor}>
-                              {vendor}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Lead Time</Label>
-                      <Select
-                        value={catalogForm.leadTime}
-                        onValueChange={(value) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            leadTime: value,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATALOG_LEAD_TIME_OPTIONS.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Inventory Status</Label>
-                      <Select
-                        value={catalogForm.status}
-                        onValueChange={(
-                          value: "In Stock" | "Low Stock" | "Out of Stock",
-                        ) =>
-                          setCatalogForm((prev) => ({ ...prev, status: value }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="In Stock">In Stock</SelectItem>
-                          <SelectItem value="Low Stock">Low Stock</SelectItem>
-                          <SelectItem value="Out of Stock">
-                            Out of Stock
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Price Override</Label>
+                      <Label>Selling Price</Label>
                       <Input
                         type="number"
                         value={catalogForm.price}
@@ -3733,6 +3672,7 @@ export default function ClientDetailPage() {
                             price: Number(e.target.value) || 0,
                           }))
                         }
+                        disabled={!isOwner}
                       />
                     </div>
                     <div className="space-y-2">
@@ -3746,150 +3686,8 @@ export default function ClientDetailPage() {
                             discountPrice: e.target.value,
                           }))
                         }
+                        disabled={!isOwner}
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Initial Stock</Label>
-                      <Input
-                        type="number"
-                        value={catalogForm.initialStock}
-                        onChange={(e) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            initialStock: Number(e.target.value) || 0,
-                            stock: Number(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Minimum Stock Threshold</Label>
-                      <Input
-                        type="number"
-                        value={catalogForm.minStockThreshold}
-                        onChange={(e) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            minStockThreshold: Number(e.target.value) || 0,
-                            minStock: Number(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2 col-span-2">
-                      <Label>Vendor Contact</Label>
-                      <Input
-                        value={catalogForm.vendorContact}
-                        onChange={(e) =>
-                          setCatalogForm((prev) => ({
-                            ...prev,
-                            vendorContact: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2 space-y-2">
-                      <Label>Image</Label>
-                      <div
-                        className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => catalogImageInputRef.current?.click()}
-                      >
-                        <ImageIcon
-                          size={20}
-                          className="mx-auto text-muted-foreground mb-2"
-                        />
-                        <p className="text-xs">
-                          Click to upload an override image
-                        </p>
-                      </div>
-                      <input
-                        ref={catalogImageInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          const files = e.target.files;
-                          if (!files) return;
-                          Array.from(files).forEach((file) => {
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              if (event.target?.result) {
-                                setCatalogImages((prev) => [
-                                  ...prev,
-                                  event.target?.result as string,
-                                ]);
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          });
-                        }}
-                      />
-                      {catalogImages.length > 0 && (
-                        <div className="flex gap-2 mt-2 flex-wrap">
-                          {catalogImages.map((img, index) => (
-                            <div
-                              key={`${img}-${index}`}
-                              className="relative w-14 h-14 rounded overflow-hidden border"
-                            >
-                              <img
-                                src={img}
-                                alt=""
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                type="button"
-                                className="absolute top-0 right-0 bg-destructive text-destructive-foreground rounded-bl p-0.5"
-                                onClick={() =>
-                                  setCatalogImages((prev) =>
-                                    prev.filter((_, idx) => idx !== index),
-                                  )
-                                }
-                              >
-                                <X size={10} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="col-span-2 space-y-2">
-                      <Label>Track Vendor Performance</Label>
-                      <div className="flex items-center gap-3 rounded-lg border bg-white px-3 py-2">
-                        <Switch
-                          checked={catalogForm.trackPerformance}
-                          onCheckedChange={(value) =>
-                            setCatalogForm((prev) => ({
-                              ...prev,
-                              trackPerformance: value,
-                            }))
-                          }
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {catalogForm.trackPerformance
-                            ? "Enabled"
-                            : "Disabled"}
-                        </span>
-                        <div className="ml-auto flex items-center gap-2">
-                          <Label className="text-xs">Rating</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={5}
-                            className="w-20"
-                            value={catalogForm.performanceRating}
-                            onChange={(e) =>
-                              setCatalogForm((prev) => ({
-                                ...prev,
-                                performanceRating: Math.max(
-                                  1,
-                                  Math.min(5, Number(e.target.value) || 1),
-                                ),
-                              }))
-                            }
-                          />
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -3904,7 +3702,9 @@ export default function ClientDetailPage() {
             >
               Cancel
             </Button>
-            <Button onClick={saveCatalogItem}>Save Item</Button>
+            <Button onClick={saveCatalogItem} disabled={!isOwner}>
+              Save Item
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

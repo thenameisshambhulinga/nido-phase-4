@@ -15,6 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
+import { nextSequentialCode } from "@/lib/documentNumbering";
 import {
   ArrowLeft,
   ArrowRight,
@@ -64,13 +65,19 @@ const INDIAN_STATES = [
 ];
 
 export default function AddClient() {
-  const { addClient } = useData();
+  const { addClient, clients, generalSettings } = useData();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
+  const clientCodePrefix =
+    Object.values(generalSettings)[0]?.clientCodePrefix?.trim() || "CL";
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     companyName: "",
-    clientCode: "",
+    clientCode: nextSequentialCode(
+      clientCodePrefix,
+      clients.map((entry) => entry.clientCode),
+      5,
+    ),
     companyLogoName: "",
     primaryContactName: "",
     employeeId: "",
@@ -94,7 +101,7 @@ export default function AddClient() {
     paymentTerms: "",
     contractDocNames: [] as string[],
     notes: "",
-  });
+  }));
 
   const isRegistered = form.businessType === "Registered";
   const notesWordCount = useMemo(
@@ -140,12 +147,8 @@ export default function AddClient() {
   };
 
   const save = () => {
-    if (
-      !form.companyName?.trim() ||
-      !form.clientCode?.trim() ||
-      !form.email?.trim()
-    ) {
-      toast({ title: "Company name, client code and email are required" });
+    if (!form.companyName?.trim() || !form.email?.trim()) {
+      toast({ title: "Company name and email are required" });
       return;
     }
     if (!form.primaryContactName?.trim() || !form.contactNumber?.trim()) {
@@ -172,7 +175,13 @@ export default function AddClient() {
     addClient({
       name: form.companyName,
       companyName: form.companyName,
-      clientCode: form.clientCode,
+      clientCode:
+        form.clientCode ||
+        nextSequentialCode(
+          clientCodePrefix,
+          clients.map((entry) => entry.clientCode),
+          5,
+        ),
       contactPerson: form.primaryContactName,
       contactEmployeeId: form.employeeId,
       contactNumber: form.contactNumber,
