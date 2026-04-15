@@ -133,6 +133,110 @@ const defaultTags = [
   "Eco-Friendly",
 ];
 
+const normalizeCategoryValue = (value?: string) =>
+  (value || "").trim().toLowerCase();
+
+const isElectronicsCategory = (item: CatalogItem) => {
+  const category = normalizeCategoryValue(item.category);
+  const subCategory = normalizeCategoryValue(item.subCategory);
+  const electronicsKeywords = [
+    "it",
+    "elect",
+    "laptop",
+    "desktop",
+    "tablet",
+    "mobile",
+    "monitor",
+    "network",
+    "storage",
+    "peripheral",
+  ];
+
+  return electronicsKeywords.some(
+    (keyword) => category.includes(keyword) || subCategory.includes(keyword),
+  );
+};
+
+const formatDimensionText = (item: CatalogItem) => {
+  if (!item.dimensionL || !item.dimensionW || !item.dimensionH) {
+    return "Not specified";
+  }
+  const unit = item.dimUnit ? ` ${item.dimUnit}` : "";
+  return `${item.dimensionL} x ${item.dimensionW} x ${item.dimensionH}${unit}`;
+};
+
+const formatWeightText = (item: CatalogItem) => {
+  if (!item.weight) return "Not specified";
+  return `${item.weight}${item.weightUnit ? ` ${item.weightUnit}` : ""}`;
+};
+
+const buildCategoryOverviewDescription = (item: CatalogItem) => {
+  const category = item.category || "General";
+  const subCategory = item.subCategory || "catalogue";
+  const brand = item.brand || "trusted";
+  const vendor = item.primaryVendor || "verified supply partner";
+
+  if (isElectronicsCategory(item)) {
+    return `${item.name} is a ${category.toLowerCase()} product built for everyday performance and reliability. The ${brand} build, ${subCategory.toLowerCase()} form factor, and procurement-ready configuration make it suitable for business and retail demand. Sourced via ${vendor}, it is positioned for consistent availability, predictable delivery, and smooth after-sales support similar to top e-commerce product listings.`;
+  }
+
+  if (normalizeCategoryValue(category).includes("stationery")) {
+    return `${item.name} is a ${subCategory.toLowerCase()} essential designed for repeat daily usage. It balances durability, practical utility, and cost efficiency for office and institutional buying. With sourcing from ${vendor}, this item supports steady replenishment cycles and dependable order fulfillment.`;
+  }
+
+  if (normalizeCategoryValue(category).includes("office")) {
+    return `${item.name} is an office-use ${subCategory.toLowerCase()} item focused on functionality and long-term value. The ${brand} positioning and vendor-backed supply model make it suitable for structured procurement and ongoing inventory planning.`;
+  }
+
+  return `${item.name} belongs to the ${category} category and is configured for catalogue-led procurement. It is sourced through ${vendor} with pricing, compliance, and stock controls aligned to business purchasing workflows.`;
+};
+
+const buildCategorySpecifications = (item: CatalogItem): [string, string][] => {
+  const common = [
+    ["HSN/SAC", item.hsnCode || "Not specified"],
+    ["Dimensions", formatDimensionText(item)],
+    ["Shipping Weight", formatWeightText(item)],
+    ["Primary Vendor", item.primaryVendor || "Not specified"],
+    ["Vendor SKU", item.vendorSku || "Not specified"],
+    ["Lead Time", item.leadTime || "Not specified"],
+  ] as [string, string][];
+
+  if (isElectronicsCategory(item)) {
+    return [
+      ["Model", item.productCode || "Not specified"],
+      ["Brand", item.brand || "Not specified"],
+      ["Product Type", item.productType || "Not specified"],
+      ["Connectivity/Tech Spec", item.specification || "Not specified"],
+      ["Warranty", item.warranty || "Not specified"],
+      ["Stock Visibility", `${item.initialStock.toLocaleString()} Units`],
+      ...common,
+    ];
+  }
+
+  if (normalizeCategoryValue(item.category).includes("stationery")) {
+    return [
+      ["Sub-category", item.subCategory || "Not specified"],
+      ["Brand", item.brand || "Not specified"],
+      ["Material/Specification", item.specification || "Not specified"],
+      ["Pack/Stock", `${item.initialStock.toLocaleString()} Units`],
+      ["Product Type", item.productType || "Not specified"],
+      ["Usage Type", item.physicalType || "Not specified"],
+      ...common,
+    ];
+  }
+
+  return [
+    ["Category", item.category || "Not specified"],
+    ["Sub-category", item.subCategory || "Not specified"],
+    ["Brand", item.brand || "Not specified"],
+    ["Product Type", item.productType || "Not specified"],
+    ["Physical Type", item.physicalType || "Not specified"],
+    ["Specification", item.specification || "Not specified"],
+    ["Warranty", item.warranty || "Not specified"],
+    ...common,
+  ];
+};
+
 const initialItems: CatalogItem[] = [
   {
     id: "1",
@@ -1162,6 +1266,12 @@ export default function MasterCataloguePage() {
                       </div>
                       <div className="grid grid-cols-2 border-b text-sm">
                         <div className="border-r p-3 font-medium text-muted-foreground">
+                          HSN/SAC Code
+                        </div>
+                        <div className="p-3">{viewItem.hsnCode || "-"}</div>
+                      </div>
+                      <div className="grid grid-cols-2 border-b text-sm">
+                        <div className="border-r p-3 font-medium text-muted-foreground">
                           Price
                         </div>
                         <div className="p-3">
@@ -1193,12 +1303,17 @@ export default function MasterCataloguePage() {
                           {viewItem.initialStock.toLocaleString()} Units
                         </div>
                       </div>
+                      <div className="grid grid-cols-2 border-t text-sm">
+                        <div className="border-r p-3 font-medium text-muted-foreground">
+                          Shipping Weight
+                        </div>
+                        <div className="p-3">{formatWeightText(viewItem)}</div>
+                      </div>
                     </div>
 
                     <div>
                       <p className="text-sm leading-7 text-foreground">
-                        {viewItem.description ||
-                          `${viewItem.name} is configured in the master catalogue and can be mapped with independent client and vendor pricing based on business strategy.`}
+                        {buildCategoryOverviewDescription(viewItem)}
                       </p>
                     </div>
 
@@ -1207,42 +1322,21 @@ export default function MasterCataloguePage() {
                         Key Specifications
                       </h5>
                       <div className="grid gap-3 sm:grid-cols-2">
-                        {[
-                          [
-                            "Display",
-                            viewItem.specification || "Not specified",
-                          ],
-                          [
-                            "Storage",
-                            viewItem.tags?.join(", ") || "Not specified",
-                          ],
-                          ["Connectivity", viewItem.hsnCode || "Not specified"],
-                          [
-                            "Battery Life",
-                            viewItem.warranty || "Not specified",
-                          ],
-                          ["Processor", viewItem.productType],
-                          ["Color", viewItem.brand || "Not specified"],
-                          [
-                            "Weight",
-                            viewItem.weight
-                              ? `${viewItem.weight}${viewItem.weightUnit ? ` ${viewItem.weightUnit}` : ""}`
-                              : "Not specified",
-                          ],
-                          ["OS", viewItem.physicalType],
-                        ].map(([label, value]) => (
-                          <div
-                            key={label}
-                            className="rounded-xl border bg-background p-3 text-sm"
-                          >
-                            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                              {label}
-                            </p>
-                            <p className="mt-1 font-medium text-foreground">
-                              {value}
-                            </p>
-                          </div>
-                        ))}
+                        {buildCategorySpecifications(viewItem).map(
+                          ([label, value]) => (
+                            <div
+                              key={label}
+                              className="rounded-xl border bg-background p-3 text-sm"
+                            >
+                              <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                                {label}
+                              </p>
+                              <p className="mt-1 font-medium text-foreground">
+                                {value}
+                              </p>
+                            </div>
+                          ),
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1345,66 +1439,53 @@ export default function MasterCataloguePage() {
                         onChange={(e) => updateForm({ sku: e.target.value })}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>Short Description</Label>
-                        <Textarea
-                          placeholder="Brief product description"
-                          value={form.description || ""}
-                          onChange={(e) =>
-                            updateForm({ description: e.target.value })
-                          }
-                          className="min-h-[60px]"
-                        />
-                      </div>
-                      <div>
-                        <Label>Product Type</Label>
-                        {addingProductType ? (
-                          <div className="flex gap-1">
-                            <Input
-                              value={newProductTypeInput}
-                              onChange={(e) =>
-                                setNewProductTypeInput(e.target.value)
-                              }
-                              placeholder="New product type"
-                              className="h-9"
-                            />
-                            <Button size="sm" onClick={addNewProductType}>
-                              Add
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setAddingProductType(false)}
-                            >
-                              X
-                            </Button>
-                          </div>
-                        ) : (
-                          <Select
-                            value={form.productType}
-                            onValueChange={(v) =>
-                              v === "__add__"
-                                ? setAddingProductType(true)
-                                : updateForm({ productType: v })
+                    <div>
+                      <Label>Product Type</Label>
+                      {addingProductType ? (
+                        <div className="flex gap-1">
+                          <Input
+                            value={newProductTypeInput}
+                            onChange={(e) =>
+                              setNewProductTypeInput(e.target.value)
                             }
+                            placeholder="New product type"
+                            className="h-9"
+                          />
+                          <Button size="sm" onClick={addNewProductType}>
+                            Add
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setAddingProductType(false)}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select Product Type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {productTypes.map((p) => (
-                                <SelectItem key={p} value={p}>
-                                  {p}
-                                </SelectItem>
-                              ))}
-                              <SelectItem value="__add__">
-                                + Add Product Type
+                            X
+                          </Button>
+                        </div>
+                      ) : (
+                        <Select
+                          value={form.productType}
+                          onValueChange={(v) =>
+                            v === "__add__"
+                              ? setAddingProductType(true)
+                              : updateForm({ productType: v })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Product Type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {productTypes.map((p) => (
+                              <SelectItem key={p} value={p}>
+                                {p}
                               </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
+                            ))}
+                            <SelectItem value="__add__">
+                              + Add Product Type
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
                     </div>
                   </div>
 
@@ -1601,6 +1682,163 @@ export default function MasterCataloguePage() {
                             </Badge>
                           ))}
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
+                    Logistics & Customs
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <Label>HSN/SAC Code</Label>
+                      <Input
+                        placeholder="e.g., 84713010"
+                        value={form.hsnCode || ""}
+                        onChange={(e) =>
+                          updateForm({ hsnCode: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Dimensions</Label>
+                      <div className="grid grid-cols-[1fr_1fr_1fr_96px] gap-2">
+                        <Input
+                          placeholder="L"
+                          value={form.dimensionL || ""}
+                          onChange={(e) =>
+                            updateForm({ dimensionL: e.target.value })
+                          }
+                        />
+                        <Input
+                          placeholder="W"
+                          value={form.dimensionW || ""}
+                          onChange={(e) =>
+                            updateForm({ dimensionW: e.target.value })
+                          }
+                        />
+                        <Input
+                          placeholder="H"
+                          value={form.dimensionH || ""}
+                          onChange={(e) =>
+                            updateForm({ dimensionH: e.target.value })
+                          }
+                        />
+                        <Select
+                          value={form.dimUnit || "cm"}
+                          onValueChange={(v) => updateForm({ dimUnit: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cm">cm</SelectItem>
+                            <SelectItem value="mm">mm</SelectItem>
+                            <SelectItem value="m">m</SelectItem>
+                            <SelectItem value="in">in</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Shipping Weight</Label>
+                      <div className="grid grid-cols-[1fr_90px] gap-2">
+                        <Input
+                          placeholder="e.g., 1.34"
+                          value={form.weight || ""}
+                          onChange={(e) =>
+                            updateForm({ weight: e.target.value })
+                          }
+                        />
+                        <Select
+                          value={form.weightUnit || "kg"}
+                          onValueChange={(v) => updateForm({ weightUnit: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="kg">kg</SelectItem>
+                            <SelectItem value="g">g</SelectItem>
+                            <SelectItem value="lb">lb</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 max-w-[280px]">
+                    <Label>Customs Declaration</Label>
+                    <Select
+                      value={form.customsDeclaration || "Exempt"}
+                      onValueChange={(v) =>
+                        updateForm({ customsDeclaration: v })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Customs Declaration" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {customsOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
+                    Vendor & Sourcing
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <Label>Primary Vendor</Label>
+                      <Select
+                        value={form.primaryVendor || ""}
+                        onValueChange={(v) => updateForm({ primaryVendor: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Vendor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {defaultVendors.map((vendor) => (
+                            <SelectItem key={vendor} value={vendor}>
+                              {vendor}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Vendor SKU (optional)</Label>
+                      <Input
+                        placeholder="e.g., V-HP-MB-M3"
+                        value={form.vendorSku || ""}
+                        onChange={(e) =>
+                          updateForm({ vendorSku: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Estimated Lead Time</Label>
+                      <Select
+                        value={form.leadTime || "10 Days"}
+                        onValueChange={(v) => updateForm({ leadTime: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Days/Weeks" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {leadTimeOptions.map((leadTime) => (
+                            <SelectItem key={leadTime} value={leadTime}>
+                              {leadTime}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>

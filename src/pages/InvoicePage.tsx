@@ -119,9 +119,16 @@ export default function InvoicePage() {
     createInvoice,
     sendEmail,
     generalSettings,
+    resolveClientProductPricing,
   } = useData();
   const activeSettings = Object.values(generalSettings)[0];
   const invoicePrefix = activeSettings?.invoicePrefix?.trim() || "INV";
+  const pricingSourceLabel: Record<string, string> = {
+    "client-fixed": "Client Fixed",
+    "client-catalog": "Client Catalog",
+    "service-tier": "Service Tier",
+    master: "Master Price",
+  };
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const deferredSearch = useDeferredValue(search);
@@ -339,13 +346,20 @@ export default function InvoicePage() {
     const item = masterCatalogItems.find((entry) => entry.id === catalogItemId);
     if (!item) return;
     const quantity = draft.items[index]?.quantity || 1;
-    const rate = Number(item.discountPrice ?? item.price ?? 0);
+    const pricing = resolveClientProductPricing({
+      clientId: draft.customerId || undefined,
+      productId: item.id,
+      productCode: item.productCode,
+      fallbackPrice: Number(item.discountPrice ?? item.price ?? 0),
+    });
+    const rate = pricing.unitPrice;
     updateItem(index, {
       catalogItemId,
       itemName: item.name,
       description: item.description || "",
       hsnSac: item.hsnCode || "",
       rate,
+      pricingSource: pricing.source,
       taxRate: 18,
       quantity,
       discount: 0,
@@ -421,6 +435,7 @@ export default function InvoicePage() {
         discount: Number(item.discount) || 0,
         taxRate: Number(item.taxRate) || 0,
         amount: Math.round((Number(item.amount) || 0) * 100) / 100,
+        pricingSource: item.pricingSource,
       })),
       subtotal: totals.subtotal,
       cgst: Math.round((totals.tax / 2) * 100) / 100,
@@ -878,6 +893,15 @@ export default function InvoicePage() {
                               }
                               placeholder="Description"
                             />
+                            {item.pricingSource ? (
+                              <Badge
+                                variant="secondary"
+                                className="mt-2 rounded-full bg-slate-100 text-[10px] uppercase tracking-[0.18em] text-slate-600"
+                              >
+                                {pricingSourceLabel[item.pricingSource] ||
+                                  item.pricingSource}
+                              </Badge>
+                            ) : null}
                           </TableCell>
                           <TableCell>
                             <Input

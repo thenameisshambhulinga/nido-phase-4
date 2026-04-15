@@ -103,6 +103,7 @@ export interface Client {
     timeZone: string;
   };
   contractType?: string;
+  pricingTier?: ClientServiceLevel;
   paymentTerms?: string;
   companyLogo?: string;
   contractDocuments?: string[];
@@ -326,6 +327,34 @@ export interface PricingComputation {
   total: number;
 }
 
+export type ClientServiceLevel = "high" | "mid" | "low" | "custom";
+export type ClientPricingSource =
+  | "client-fixed"
+  | "client-catalog"
+  | "service-tier"
+  | "master";
+
+export interface ClientPricingResolution {
+  unitPrice: number;
+  basePrice: number;
+  serviceLevel: ClientServiceLevel;
+  source: ClientPricingSource;
+}
+
+export interface ServiceTierPolicy {
+  id: string;
+  name: string;
+  scopeType: "global" | "category" | "product";
+  scopeValue: string;
+  highMultiplier: number;
+  midMultiplier: number;
+  lowMultiplier: number;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  active: boolean;
+  priority: number;
+}
+
 export interface GlobalSearchResult {
   group: "Users" | "Orders" | "Vendors" | "Clients" | "Invoices";
   title: string;
@@ -346,6 +375,7 @@ export interface SalesLineItem {
   discount: number;
   taxRate: number;
   amount: number;
+  pricingSource?: ClientPricingSource;
 }
 
 export interface SalesQuote {
@@ -486,6 +516,7 @@ interface DataContextType {
   appUsers: AppUser[];
   masterCatalogItems: MasterCatalogItem[];
   clientCatalogItems: Record<string, ClientCatalogItem[]>;
+  serviceTierPolicies: ServiceTierPolicy[];
   pricingRules: PricingRule[];
   discountRules: DiscountRule[];
   taxSettings: TaxSetting[];
@@ -581,6 +612,18 @@ interface DataContextType {
     errors: string[];
   };
   detectRuleConflicts: () => RuleConflict[];
+  addServiceTierPolicy: (policy: Omit<ServiceTierPolicy, "id">) => void;
+  updateServiceTierPolicy: (
+    id: string,
+    data: Partial<ServiceTierPolicy>,
+  ) => void;
+  deleteServiceTierPolicy: (id: string) => void;
+  resolveClientProductPricing: (args: {
+    clientId?: string;
+    productId?: string;
+    productCode?: string;
+    fallbackPrice?: number;
+  }) => ClientPricingResolution;
   computeOrderPricing: (args: {
     amount: number;
     quantity?: number;
@@ -681,6 +724,27 @@ interface DataContextType {
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
+
+const SERVICE_LEVEL_PRICE_MULTIPLIER: Record<
+  Exclude<ClientServiceLevel, "custom">,
+  number
+> = {
+  high: 1.22,
+  mid: 1,
+  low: 0.9,
+};
+
+const money = (value: number) => Math.round(value * 100) / 100;
+
+const resolveServiceLevel = (contractType?: string): ClientServiceLevel => {
+  const normalized = (contractType || "").trim().toLowerCase();
+  if (normalized.includes("high")) return "high";
+  if (normalized.includes("mid")) return "mid";
+  if (normalized.includes("low")) return "low";
+  return "custom";
+};
+
+const normalizeScopeValue = (value: string) => value.trim().toLowerCase();
 
 function usePersistedState<T>(
   key: string,
@@ -998,6 +1062,22 @@ const DEFAULT_DISCOUNT_RULES: DiscountRule[] = [
     discountPercent: 3,
     maxUsagePerUser: 5,
     stackable: false,
+  },
+];
+
+const DEFAULT_SERVICE_TIER_POLICIES: ServiceTierPolicy[] = [
+  {
+    id: "stp-default",
+    name: "Default Global Tier Policy",
+    scopeType: "global",
+    scopeValue: "*",
+    highMultiplier: 1.22,
+    midMultiplier: 1,
+    lowMultiplier: 0.9,
+    effectiveFrom: "2024-01-01",
+    effectiveTo: "2099-12-31",
+    active: true,
+    priority: 1,
   },
 ];
 
@@ -2632,6 +2712,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     "nido_client_catalog",
     DEFAULT_CLIENT_CATALOG,
   );
+  const [serviceTierPolicies, setServiceTierPolicies] = usePersistedState(
+    "nido_service_tier_policies",
+    DEFAULT_SERVICE_TIER_POLICIES,
+  );
   const [pricingRules, setPricingRules] = usePersistedState(
     "nido_pricing_rules",
     DEFAULT_PRICING_RULES,
@@ -4073,6 +4157,67 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     return conflicts;
   }, [discountRules, pricingRules]);
 
+  const addServiceTierPolicy = useCallback(
+    (policy: Omit<ServiceTierPolicy, "id">) => {
+      const nextPolicy: ServiceTierPolicy = {
+        ...policy,
+        id: `stp-${Date.now()}`,
+      };
+      setServiceTierPolicies((prev) => [...prev, nextPolicy]);
+      addAuditEntry({
+        user: "System",
+        action: "Service Tier Policy Created",
+        module: "Pricing",
+        details: `Created policy '${nextPolicy.name}' (${nextPolicy.scopeType}:${nextPolicy.scopeValue})`,
+        ipAddress: "192.168.1.1",
+        status: "success",
+      });
+    },
+    [addAuditEntry, setServiceTierPolicies],
+  );
+
+  const updateServiceTierPolicy = useCallback(
+    (id: string, data: Partial<ServiceTierPolicy>) => {
+      setServiceTierPolicies((prev) => {
+        const current = prev.find((policy) => policy.id === id);
+        if (current) {
+          addAuditEntry({
+            user: "System",
+            action: "Service Tier Policy Updated",
+            module: "Pricing",
+            details: `Updated policy '${current.name}' (${current.scopeType}:${current.scopeValue})`,
+            ipAddress: "192.168.1.1",
+            status: "success",
+          });
+        }
+        return prev.map((policy) =>
+          policy.id === id ? { ...policy, ...data } : policy,
+        );
+      });
+    },
+    [addAuditEntry, setServiceTierPolicies],
+  );
+
+  const deleteServiceTierPolicy = useCallback(
+    (id: string) => {
+      setServiceTierPolicies((prev) => {
+        const current = prev.find((policy) => policy.id === id);
+        if (current) {
+          addAuditEntry({
+            user: "System",
+            action: "Service Tier Policy Deleted",
+            module: "Pricing",
+            details: `Deleted policy '${current.name}' (${current.scopeType}:${current.scopeValue})`,
+            ipAddress: "192.168.1.1",
+            status: "success",
+          });
+        }
+        return prev.filter((policy) => policy.id !== id);
+      });
+    },
+    [addAuditEntry, setServiceTierPolicies],
+  );
+
   const applyPricingRules = useCallback(
     ({
       price,
@@ -4442,6 +4587,150 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     [applyDiscountRules, applyTax, pricingRules],
   );
 
+  const resolveClientProductPricing = useCallback(
+    ({
+      clientId,
+      productId,
+      productCode,
+      fallbackPrice = 0,
+    }: {
+      clientId?: string;
+      productId?: string;
+      productCode?: string;
+      fallbackPrice?: number;
+    }): ClientPricingResolution => {
+      const client = clientId
+        ? clients.find((entry) => entry.id === clientId)
+        : undefined;
+      const serviceLevel =
+        client?.pricingTier || resolveServiceLevel(client?.contractType);
+      const normalizedCode = productCode?.trim().toLowerCase();
+
+      const masterItem = masterCatalogItems.find((entry) => {
+        if (productId && entry.id === productId) return true;
+        if (
+          normalizedCode &&
+          entry.productCode?.trim().toLowerCase() === normalizedCode
+        )
+          return true;
+        return false;
+      });
+
+      const basePrice = money(
+        Number(masterItem?.discountPrice ?? masterItem?.price ?? fallbackPrice),
+      );
+      const productCategory = masterItem?.category;
+
+      const clientCatalog = clientId
+        ? (clientCatalogItems[clientId] ?? [])
+        : [];
+      const matchedClientItem = clientCatalog.find((entry) => {
+        if (
+          productId &&
+          (entry.masterProductId === productId || entry.id === productId)
+        ) {
+          return true;
+        }
+        if (
+          normalizedCode &&
+          entry.productCode?.trim().toLowerCase() === normalizedCode
+        ) {
+          return true;
+        }
+        return false;
+      });
+
+      if (matchedClientItem?.priceFixedByOwner) {
+        return {
+          unitPrice: money(Number(matchedClientItem.price ?? basePrice)),
+          basePrice,
+          serviceLevel,
+          source: "client-fixed",
+        };
+      }
+
+      if (
+        matchedClientItem &&
+        Number.isFinite(Number(matchedClientItem.price))
+      ) {
+        return {
+          unitPrice: money(Number(matchedClientItem.price)),
+          basePrice,
+          serviceLevel,
+          source: "client-catalog",
+        };
+      }
+
+      if (serviceLevel !== "custom") {
+        const today = new Date().toISOString().slice(0, 10);
+        const normalizedCategory = normalizeScopeValue(productCategory || "");
+        const normalizedProductId = normalizeScopeValue(productId || "");
+        const normalizedProductCode = normalizeScopeValue(
+          masterItem?.productCode || productCode || "",
+        );
+
+        const matchedPolicy = serviceTierPolicies
+          .filter((policy) => {
+            if (!policy.active) return false;
+            if (today < policy.effectiveFrom) return false;
+            if (policy.effectiveTo && today > policy.effectiveTo) return false;
+
+            const normalizedScope = normalizeScopeValue(
+              policy.scopeValue || "",
+            );
+            if (policy.scopeType === "global") return true;
+            if (policy.scopeType === "category") {
+              return normalizedScope === normalizedCategory;
+            }
+            if (policy.scopeType === "product") {
+              return (
+                normalizedScope === normalizedProductId ||
+                normalizedScope === normalizedProductCode
+              );
+            }
+            return false;
+          })
+          .sort((a, b) => {
+            const rank = (scopeType: ServiceTierPolicy["scopeType"]) => {
+              if (scopeType === "product") return 3;
+              if (scopeType === "category") return 2;
+              return 1;
+            };
+            return (
+              rank(b.scopeType) - rank(a.scopeType) || b.priority - a.priority
+            );
+          })[0];
+
+        const highMultiplier =
+          matchedPolicy?.highMultiplier ?? SERVICE_LEVEL_PRICE_MULTIPLIER.high;
+        const midMultiplier =
+          matchedPolicy?.midMultiplier ?? SERVICE_LEVEL_PRICE_MULTIPLIER.mid;
+        const lowMultiplier =
+          matchedPolicy?.lowMultiplier ?? SERVICE_LEVEL_PRICE_MULTIPLIER.low;
+        const serviceLevelMultiplier: Record<"high" | "mid" | "low", number> = {
+          high: highMultiplier,
+          mid: midMultiplier,
+          low: lowMultiplier,
+        };
+
+        return {
+          unitPrice: money(basePrice * serviceLevelMultiplier[serviceLevel]),
+          basePrice,
+          serviceLevel,
+          source: "service-tier",
+        };
+      }
+
+      return {
+        unitPrice: basePrice,
+        basePrice,
+        serviceLevel,
+        source: "master",
+      };
+    },
+    [clientCatalogItems, clients, masterCatalogItems, serviceTierPolicies],
+  );
+
   return (
     <DataContext.Provider
       value={{
@@ -4461,6 +4750,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         appUsers,
         masterCatalogItems,
         clientCatalogItems,
+        serviceTierPolicies,
         pricingRules,
         discountRules,
         taxSettings,
@@ -4540,6 +4830,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         exportRuleTemplate,
         importRuleTemplate,
         detectRuleConflicts,
+        addServiceTierPolicy,
+        updateServiceTierPolicy,
+        deleteServiceTierPolicy,
+        resolveClientProductPricing,
         computeOrderPricing,
         applyPricingRules,
         applyDiscountRules,

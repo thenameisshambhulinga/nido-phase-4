@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "@/components/layout/Header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,7 @@ interface QuoteFormData {
     discount: number;
     taxRate: number;
     amount: number;
+    pricingSource?: string;
   }>;
   subtotal: number;
   cgst: number;
@@ -71,6 +73,7 @@ export default function SalesQuoteFormPage() {
     clients,
     masterCatalogItems,
     generalSettings,
+    resolveClientProductPricing,
   } = useData();
 
   const activeSettings = Object.values(generalSettings)[0];
@@ -142,6 +145,13 @@ export default function SalesQuoteFormPage() {
 
   const [form, setForm] = useState<QuoteFormData>(initialForm);
 
+  const pricingSourceLabel: Record<string, string> = {
+    "client-fixed": "Client Fixed",
+    "client-catalog": "Client Catalog",
+    "service-tier": "Service Tier",
+    master: "Master Price",
+  };
+
   const [emailInput, setEmailInput] = useState("");
 
   const recalculate = (items: typeof form.items, adjustment: number) => {
@@ -156,6 +166,35 @@ export default function SalesQuoteFormPage() {
     const nextItems = form.items.map((item, i) => {
       if (i !== idx) return item;
       const updated = { ...item, ...fields };
+
+      const typedName = updated.itemName?.trim().toLowerCase();
+      if (typedName) {
+        const matchedCatalogItem = masterCatalogItems.find(
+          (entry) =>
+            entry.name.trim().toLowerCase() === typedName ||
+            entry.productCode?.trim().toLowerCase() === typedName,
+        );
+
+        if (
+          matchedCatalogItem &&
+          (fields.rate === undefined || fields.rate === 0)
+        ) {
+          const pricing = resolveClientProductPricing({
+            clientId: form.customerId || undefined,
+            productId: matchedCatalogItem.id,
+            productCode: matchedCatalogItem.productCode,
+            fallbackPrice: Number(
+              matchedCatalogItem.discountPrice ?? matchedCatalogItem.price ?? 0,
+            ),
+          });
+          updated.rate = pricing.unitPrice;
+          updated.pricingSource = pricing.source;
+          updated.description =
+            updated.description || matchedCatalogItem.description || "";
+          updated.hsnSac = updated.hsnSac || matchedCatalogItem.hsnCode || "";
+        }
+      }
+
       updated.amount = updated.quantity * updated.rate - updated.discount;
       return updated;
     });
@@ -182,6 +221,7 @@ export default function SalesQuoteFormPage() {
         discount: 0,
         taxRate: 18,
         amount: 0,
+        pricingSource: undefined,
       },
     ];
     setForm((prev) => ({ ...prev, items: nextItems }));
@@ -493,6 +533,15 @@ export default function SalesQuoteFormPage() {
                           placeholder="Item name"
                           className="w-32"
                         />
+                        {item.pricingSource ? (
+                          <Badge
+                            variant="secondary"
+                            className="mt-2 rounded-full bg-slate-100 text-[10px] uppercase tracking-[0.18em] text-slate-600"
+                          >
+                            {pricingSourceLabel[item.pricingSource] ||
+                              item.pricingSource}
+                          </Badge>
+                        ) : null}
                       </TableCell>
                       <TableCell>
                         <Input

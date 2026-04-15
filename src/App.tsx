@@ -78,6 +78,9 @@ import DepartmentsPage from "@/pages/DepartmentsPage";
 import UserInvitationPage from "@/pages/UserInvitationPage";
 import AuditLogPage from "@/pages/AuditLogPage";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
+import ShopPage from "@/pages/ShopPage";
+import CheckoutPage from "@/pages/CheckoutPage";
+import OrderConfirmationPage from "@/pages/OrderConfirmationPage";
 
 const queryClient = new QueryClient();
 
@@ -288,14 +291,46 @@ function AppRoutes() {
           path="shop"
           element={
             <PageErrorBoundary
-              title="Orders failed to load"
+              title="Shop failed to load"
               resetKey={location.pathname}
             >
-              <OrdersPage />
+              <ShopPage />
             </PageErrorBoundary>
           }
         />
-        <Route path="shop/cart" element={<CartPage />} />
+        <Route
+          path="shop/cart"
+          element={
+            <PageErrorBoundary
+              title="Cart failed to load"
+              resetKey={location.pathname}
+            >
+              <CartPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="shop/checkout"
+          element={
+            <PageErrorBoundary
+              title="Checkout failed to load"
+              resetKey={location.pathname}
+            >
+              <CheckoutPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="shop/order-confirmation/:orderId"
+          element={
+            <PageErrorBoundary
+              title="Order confirmation failed to load"
+              resetKey={location.pathname}
+            >
+              <OrderConfirmationPage />
+            </PageErrorBoundary>
+          }
+        />
         <Route path="services" element={<MainDashboard />} />
         <Route path="support" element={<SupportPage />} />
         <Route

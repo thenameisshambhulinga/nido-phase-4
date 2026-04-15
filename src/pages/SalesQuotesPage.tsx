@@ -27,7 +27,13 @@ const badgeVariantByStatus: Record<
 
 export default function SalesQuotesPage() {
   const navigate = useNavigate();
-  const { salesQuotes, clients, masterCatalogItems, createQuote } = useData();
+  const {
+    salesQuotes,
+    clients,
+    masterCatalogItems,
+    createQuote,
+    resolveClientProductPricing,
+  } = useData();
 
   const createQuickQuote = () => {
     const firstClient = clients[0];
@@ -39,7 +45,14 @@ export default function SalesQuotesPage() {
     const firstItem = masterCatalogItems[0];
     const itemName = firstItem?.name || "Consulting Services";
     const quantity = 1;
-    const rate = Number(firstItem?.price || 5000);
+    const rate = firstItem
+      ? resolveClientProductPricing({
+          clientId: firstClient.id,
+          productId: firstItem.id,
+          productCode: firstItem.productCode,
+          fallbackPrice: Number(firstItem.price || 5000),
+        }).unitPrice
+      : 5000;
     const amount = quantity * rate;
     const subtotal = amount;
     const cgst = Math.round(subtotal * 0.09);
@@ -100,12 +113,12 @@ export default function SalesQuotesPage() {
       <Header title="Sales Quotes" />
       <div className="p-6 space-y-4">
         <Card>
-          <CardContent className="pt-6 flex items-center justify-between">
+          <CardContent className="pt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50 shadow-sm md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-slate-500">
                 Create and manage client quotations
               </p>
-              <p className="text-xl font-semibold">
+              <p className="text-2xl font-semibold tracking-tight text-slate-900">
                 {salesQuotes.length} Quotes
               </p>
             </div>

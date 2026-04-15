@@ -36,6 +36,7 @@ interface Product {
   rating: number;
   stock: number;
   emoji: string;
+  description: string;
 }
 
 const PRODUCTS: Product[] = [
@@ -47,6 +48,8 @@ const PRODUCTS: Product[] = [
     rating: 4.8,
     stock: 45,
     emoji: "🪑",
+    description:
+      "Ergonomic build with lumbar support for long work sessions and executive comfort.",
   },
   {
     id: 2,
@@ -56,6 +59,8 @@ const PRODUCTS: Product[] = [
     rating: 4.6,
     stock: 120,
     emoji: "🖱️",
+    description:
+      "Precision wireless tracking with smooth productivity response and durable battery life.",
   },
   {
     id: 3,
@@ -65,6 +70,8 @@ const PRODUCTS: Product[] = [
     rating: 4.7,
     stock: 32,
     emoji: "🗄️",
+    description:
+      "Secure multi-drawer storage for organized office documentation and daily access.",
   },
   {
     id: 4,
@@ -74,6 +81,8 @@ const PRODUCTS: Product[] = [
     rating: 4.9,
     stock: 67,
     emoji: "🖥️",
+    description:
+      "High-clarity display suited for dashboards, analytics and extended professional use.",
   },
   {
     id: 5,
@@ -83,6 +92,8 @@ const PRODUCTS: Product[] = [
     rating: 4.5,
     stock: 200,
     emoji: "📄",
+    description:
+      "A4 office-grade sheets optimized for high-volume printing and smooth feed quality.",
   },
   {
     id: 6,
@@ -92,6 +103,8 @@ const PRODUCTS: Product[] = [
     rating: 4.8,
     stock: 28,
     emoji: "💺",
+    description:
+      "Executive seating with balanced cushioning and premium posture support for teams.",
   },
   {
     id: 7,
@@ -101,6 +114,8 @@ const PRODUCTS: Product[] = [
     rating: 4.4,
     stock: 150,
     emoji: "🔌",
+    description:
+      "Compact multi-port expansion hub for laptops and modern workstation connectivity.",
   },
   {
     id: 8,
@@ -110,6 +125,8 @@ const PRODUCTS: Product[] = [
     rating: 4.3,
     stock: 300,
     emoji: "📎",
+    description:
+      "Reliable stapling set with easy handling for recurring documentation workflows.",
   },
   {
     id: 9,
@@ -119,6 +136,8 @@ const PRODUCTS: Product[] = [
     rating: 4.9,
     stock: 18,
     emoji: "🪵",
+    description:
+      "Spacious standing desk designed for healthy posture, cable order and sturdy daily use.",
   },
   {
     id: 10,
@@ -128,6 +147,8 @@ const PRODUCTS: Product[] = [
     rating: 4.7,
     stock: 85,
     emoji: "⌨️",
+    description:
+      "Responsive mechanical typing experience for coding, admin operations and fast input.",
   },
   {
     id: 11,
@@ -137,6 +158,8 @@ const PRODUCTS: Product[] = [
     rating: 4.5,
     stock: 500,
     emoji: "📦",
+    description:
+      "Durable corrugated carton bundle for secure packing, dispatch and storage operations.",
   },
   {
     id: 12,
@@ -146,6 +169,8 @@ const PRODUCTS: Product[] = [
     rating: 4.6,
     stock: 12,
     emoji: "🏗️",
+    description:
+      "Heavy-duty handling tool for warehouse movement and consistent logistics throughput.",
   },
 ];
 
@@ -207,6 +232,25 @@ export default function CategoriesPage() {
               Browse our complete catalog of business essentials
             </p>
           </div>
+          <Button
+            onClick={() => setCartOpen((prev) => !prev)}
+            className={cn(
+              "group relative h-11 rounded-full px-5 text-white shadow-lg transition-all duration-300",
+              "bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500",
+              cartOpen && "ring-2 ring-blue-300/70 ring-offset-2",
+            )}
+          >
+            <span className="absolute -inset-0.5 -z-10 rounded-full bg-gradient-to-r from-cyan-400/40 to-blue-500/30 blur opacity-80 transition-opacity group-hover:opacity-100" />
+            {cartOpen ? (
+              <X className="mr-2 h-4 w-4" />
+            ) : (
+              <ShoppingCart className="mr-2 h-4 w-4" />
+            )}
+            Cart
+            <span className="ml-2 inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-700">
+              {totalItems}
+            </span>
+          </Button>
         </div>
 
         {/* Filters */}
@@ -274,6 +318,9 @@ export default function CategoriesPage() {
                     <p className="font-semibold text-foreground mb-1 truncate">
                       {p.name}
                     </p>
+                    <p className="mb-2 line-clamp-2 text-xs text-muted-foreground min-h-8">
+                      {p.description}
+                    </p>
                     <div className="flex items-center gap-2 mb-1">
                       <Star className="h-3.5 w-3.5 fill-warning text-warning" />
                       <span className="text-sm font-medium text-foreground">
@@ -318,6 +365,9 @@ export default function CategoriesPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-foreground">{p.name}</p>
+                    <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                      {p.description}
+                    </p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <Badge variant="secondary" className="text-xs">
                         {p.category}
@@ -360,30 +410,10 @@ export default function CategoriesPage() {
         )}
       </div>
 
-      {/* Floating Cart Button */}
-      <button
-        onClick={() => setCartOpen(!cartOpen)}
-        className={cn(
-          "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95",
-          cartOpen && "rotate-90",
-        )}
-      >
-        {cartOpen ? (
-          <X className="h-5 w-5" />
-        ) : (
-          <ShoppingCart className="h-5 w-5" />
-        )}
-        {!cartOpen && totalItems > 0 && (
-          <span className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
-            {totalItems}
-          </span>
-        )}
-      </button>
-
       {/* Mini Cart Panel */}
       <div
         className={cn(
-          "fixed bottom-24 right-6 z-50 w-80 bg-card border border-border rounded-xl shadow-2xl transition-all origin-bottom-right",
+          "fixed right-8 top-24 z-50 w-80 bg-card border border-border rounded-xl shadow-2xl transition-all origin-top-right",
           cartOpen
             ? "scale-100 opacity-100 pointer-events-auto"
             : "scale-90 opacity-0 pointer-events-none",

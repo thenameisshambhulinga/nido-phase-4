@@ -1079,7 +1079,11 @@ export default function DeliveryChallansPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="fixed left-[-10000px] top-0 w-[794px] bg-white">
+      <div
+        aria-hidden="true"
+        className="fixed top-0 w-[794px] bg-white"
+        style={{ left: "-10000px" }}
+      >
         <div ref={printRef} id="dc-print-area">
           {selected ? (
             <DeliveryChallanDocument

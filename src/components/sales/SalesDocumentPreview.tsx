@@ -1,4 +1,5 @@
 import React from "react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface SalesLineItemPreview {
@@ -10,6 +11,7 @@ interface SalesLineItemPreview {
   discount: number;
   taxRate: number;
   amount: number;
+  pricingSource?: string;
 }
 
 interface SalesDocumentPreviewProps {
@@ -44,6 +46,13 @@ const currency = new Intl.NumberFormat("en-IN", {
 const safeNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const pricingSourceLabel: Record<string, string> = {
+  "client-fixed": "Client Fixed",
+  "client-catalog": "Client Catalog",
+  "service-tier": "Service Tier",
+  master: "Master Price",
 };
 
 export default function SalesDocumentPreview(props: SalesDocumentPreviewProps) {
@@ -175,6 +184,15 @@ export default function SalesDocumentPreview(props: SalesDocumentPreviewProps) {
                           <p className="font-medium text-slate-900">
                             {item.itemName}
                           </p>
+                          {item.pricingSource ? (
+                            <Badge
+                              variant="secondary"
+                              className="mt-1 rounded-full bg-slate-100 text-[10px] uppercase tracking-[0.18em] text-slate-600"
+                            >
+                              {pricingSourceLabel[item.pricingSource] ||
+                                item.pricingSource}
+                            </Badge>
+                          ) : null}
                           <p className="mt-1 text-slate-600">
                             {item.description}
                           </p>

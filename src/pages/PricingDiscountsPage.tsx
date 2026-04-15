@@ -47,6 +47,7 @@ import {
   Edit,
   Trash2,
   X,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -85,17 +86,24 @@ interface CouponCode {
 export default function PricingDiscountsPage() {
   const { isOwner } = useAuth();
   const {
+    clients,
     pricingRules,
     discountRules,
     couponCodes,
     couponCodeRules,
     masterCatalogItems,
+    serviceTierPolicies,
     addPricingRule,
     updatePricingRule,
     addDiscountRule,
     updateDiscountRule,
     addCouponCode,
     addCouponCodeRule,
+    addServiceTierPolicy,
+    updateServiceTierPolicy,
+    deleteServiceTierPolicy,
+    resolveClientProductPricing,
+    computeOrderPricing,
     autoConfigurePricingAndDiscountRules,
     autoGenerateCouponCampaign,
   } = useData();
@@ -103,6 +111,7 @@ export default function PricingDiscountsPage() {
   const [showAddDiscount, setShowAddDiscount] = useState(false);
   const [showCreateCoupon, setShowCreateCoupon] = useState(false);
   const [showCouponCodeRule, setShowCouponCodeRule] = useState(false);
+  const [showAddTierPolicy, setShowAddTierPolicy] = useState(false);
 
   const [discountComputation, setDiscountComputation] = useState("before_tax");
   const [gstRate, setGstRate] = useState("18");
@@ -118,6 +127,75 @@ export default function PricingDiscountsPage() {
       ),
     [masterCatalogItems],
   );
+
+  const catalogProducts = useMemo(
+    () =>
+      masterCatalogItems.map((item) => ({
+        id: item.id,
+        label: `${item.name} (${item.productCode})`,
+        value: item.id,
+      })),
+    [masterCatalogItems],
+  );
+
+  const [simulationClientId, setSimulationClientId] = useState("");
+  const [simulationProductId, setSimulationProductId] = useState("");
+  const [simulationQuantity, setSimulationQuantity] = useState("1");
+
+  const simulationPreview = useMemo(() => {
+    const quantity = Math.max(1, Number(simulationQuantity) || 1);
+    const product = masterCatalogItems.find(
+      (item) => item.id === simulationProductId,
+    );
+    if (!product) return null;
+
+    const resolved = resolveClientProductPricing({
+      clientId: simulationClientId || undefined,
+      productId: product.id,
+      productCode: product.productCode,
+      fallbackPrice: Number(product.discountPrice ?? product.price ?? 0),
+    });
+
+    const subtotal = resolved.unitPrice * quantity;
+    const priced = computeOrderPricing({
+      amount: subtotal,
+      quantity,
+      category: product.category,
+      productCode: product.productCode,
+    });
+    const perUnitMargin = resolved.unitPrice - resolved.basePrice;
+    const marginPercent =
+      resolved.basePrice > 0 ? (perUnitMargin / resolved.basePrice) * 100 : 0;
+
+    return {
+      product,
+      resolved,
+      quantity,
+      subtotal,
+      priced,
+      perUnitMargin,
+      marginPercent,
+    };
+  }, [
+    computeOrderPricing,
+    masterCatalogItems,
+    resolveClientProductPricing,
+    simulationClientId,
+    simulationProductId,
+    simulationQuantity,
+  ]);
+
+  const [newTierPolicy, setNewTierPolicy] = useState({
+    name: "",
+    scopeType: "global" as "global" | "category" | "product",
+    scopeValue: "*",
+    highMultiplier: "1.22",
+    midMultiplier: "1.00",
+    lowMultiplier: "0.90",
+    effectiveFrom: new Date().toISOString().slice(0, 10),
+    effectiveTo: "2099-12-31",
+    priority: "1",
+  });
 
   // Form states
   const [newPricing, setNewPricing] = useState({
@@ -404,6 +482,55 @@ export default function PricingDiscountsPage() {
     });
   };
 
+  const handleAddTierPolicy = () => {
+    if (!newTierPolicy.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Policy name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const scopeValue =
+      newTierPolicy.scopeType === "global" ? "*" : newTierPolicy.scopeValue;
+    if (!scopeValue.trim()) {
+      toast({
+        title: "Error",
+        description: "Scope value is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addServiceTierPolicy({
+      name: newTierPolicy.name,
+      scopeType: newTierPolicy.scopeType,
+      scopeValue,
+      highMultiplier: Number(newTierPolicy.highMultiplier) || 1,
+      midMultiplier: Number(newTierPolicy.midMultiplier) || 1,
+      lowMultiplier: Number(newTierPolicy.lowMultiplier) || 1,
+      effectiveFrom: newTierPolicy.effectiveFrom,
+      effectiveTo: newTierPolicy.effectiveTo,
+      active: true,
+      priority: Number(newTierPolicy.priority) || 1,
+    });
+
+    setNewTierPolicy({
+      name: "",
+      scopeType: "global",
+      scopeValue: "*",
+      highMultiplier: "1.22",
+      midMultiplier: "1.00",
+      lowMultiplier: "0.90",
+      effectiveFrom: new Date().toISOString().slice(0, 10),
+      effectiveTo: "2099-12-31",
+      priority: "1",
+    });
+    setShowAddTierPolicy(false);
+    toast({ title: "Service-tier policy added" });
+  };
+
   return (
     <div>
       <Header title="Pricing & Discounts" />
@@ -516,6 +643,85 @@ export default function PricingDiscountsPage() {
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" /> Owner Pricing
+                  Console
+                </CardTitle>
+                <Button
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setShowAddTierPolicy(true)}
+                  disabled={!isOwner}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Tier Policy
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {!isOwner && (
+                  <p className="text-xs text-muted-foreground">
+                    Owner access is required to create or modify pricing
+                    policies.
+                  </p>
+                )}
+                {serviceTierPolicies
+                  .slice()
+                  .sort((a, b) => b.priority - a.priority)
+                  .map((policy) => (
+                    <div
+                      key={policy.id}
+                      className="rounded-lg border border-border bg-card p-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{policy.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Scope: {policy.scopeType} {policy.scopeValue} ·
+                            Priority {policy.priority}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {policy.effectiveFrom} to{" "}
+                            {policy.effectiveTo || "No end date"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={policy.active}
+                            onCheckedChange={(checked) =>
+                              updateServiceTierPolicy(policy.id, {
+                                active: checked,
+                              })
+                            }
+                            disabled={!isOwner}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => deleteServiceTierPolicy(policy.id)}
+                            disabled={!isOwner}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                        <Badge variant="outline" className="justify-center">
+                          High x{policy.highMultiplier.toFixed(2)}
+                        </Badge>
+                        <Badge variant="outline" className="justify-center">
+                          Mid x{policy.midMultiplier.toFixed(2)}
+                        </Badge>
+                        <Badge variant="outline" className="justify-center">
+                          Low x{policy.lowMultiplier.toFixed(2)}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+              </CardContent>
+            </Card>
+
             {/* Discount Rules */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -578,6 +784,149 @@ export default function PricingDiscountsPage() {
 
           {/* Column 2: Discount Computation + Coupons */}
           <div className="space-y-6">
+            <Card className="overflow-hidden border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-blue-600" /> Pricing
+                  Simulation Lab
+                </CardTitle>
+                <p className="text-xs text-slate-600">
+                  Safe sandbox preview. No live data is modified.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="text-xs">Client</Label>
+                  <Select
+                    value={simulationClientId}
+                    onValueChange={setSimulationClientId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.companyName || client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Product</Label>
+                  <Select
+                    value={simulationProductId}
+                    onValueChange={setSimulationProductId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {catalogProducts.map((product) => (
+                        <SelectItem key={product.id} value={product.value}>
+                          {product.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Quantity</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={simulationQuantity}
+                    onChange={(e) => setSimulationQuantity(e.target.value)}
+                  />
+                </div>
+
+                {simulationPreview ? (
+                  <div className="space-y-2 rounded-lg border border-slate-200 bg-white/80 p-3">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-md border p-2">
+                        <p className="text-slate-500">Price Source</p>
+                        <p className="font-semibold capitalize">
+                          {simulationPreview.resolved.source.replaceAll(
+                            "-",
+                            " ",
+                          )}
+                        </p>
+                      </div>
+                      <div className="rounded-md border p-2">
+                        <p className="text-slate-500">Service Level</p>
+                        <p className="font-semibold uppercase">
+                          {simulationPreview.resolved.serviceLevel}
+                        </p>
+                      </div>
+                      <div className="rounded-md border p-2">
+                        <p className="text-slate-500">Base Unit Price</p>
+                        <p className="font-semibold">
+                          ₹
+                          {simulationPreview.resolved.basePrice.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="rounded-md border p-2">
+                        <p className="text-slate-500">Resolved Unit Price</p>
+                        <p className="font-semibold text-blue-700">
+                          ₹
+                          {simulationPreview.resolved.unitPrice.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="rounded-md border p-2">
+                        <p className="text-slate-500">Unit Margin</p>
+                        <p className="font-semibold">
+                          {simulationPreview.perUnitMargin >= 0 ? "+" : "-"}₹
+                          {Math.abs(
+                            simulationPreview.perUnitMargin,
+                          ).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="rounded-md border p-2">
+                        <p className="text-slate-500">Margin %</p>
+                        <p className="font-semibold">
+                          {simulationPreview.marginPercent.toFixed(2)}%
+                        </p>
+                      </div>
+                    </div>
+                    <Separator />
+                    <div className="space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Subtotal</span>
+                        <span className="font-medium">
+                          ₹{simulationPreview.subtotal.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">
+                          After pricing/discount rules
+                        </span>
+                        <span className="font-medium">
+                          ₹
+                          {simulationPreview.priced.discountedAmount.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between border-t pt-1">
+                        <span className="font-semibold text-slate-700">
+                          Final (with tax)
+                        </span>
+                        <span className="font-semibold text-emerald-700">
+                          ₹{simulationPreview.priced.total.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Select client and product to preview pricing path and
+                    margin.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Discount Computation Control */}
             <Card>
               <CardHeader className="pb-3">
@@ -761,6 +1110,198 @@ export default function PricingDiscountsPage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={showAddTierPolicy} onOpenChange={setShowAddTierPolicy}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Add Service Tier Policy</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Policy Name *</Label>
+              <Input
+                value={newTierPolicy.name}
+                onChange={(e) =>
+                  setNewTierPolicy((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
+                }
+                placeholder="e.g. IT Hardware Premium Policy"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Scope Type</Label>
+                <Select
+                  value={newTierPolicy.scopeType}
+                  onValueChange={(value: "global" | "category" | "product") =>
+                    setNewTierPolicy((prev) => ({
+                      ...prev,
+                      scopeType: value,
+                      scopeValue: value === "global" ? "*" : "",
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="global">Global</SelectItem>
+                    <SelectItem value="category">Category</SelectItem>
+                    <SelectItem value="product">Product</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Scope Value</Label>
+                {newTierPolicy.scopeType === "category" ? (
+                  <Select
+                    value={newTierPolicy.scopeValue}
+                    onValueChange={(value) =>
+                      setNewTierPolicy((prev) => ({
+                        ...prev,
+                        scopeValue: value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {catalogCategories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : newTierPolicy.scopeType === "product" ? (
+                  <Select
+                    value={newTierPolicy.scopeValue}
+                    onValueChange={(value) =>
+                      setNewTierPolicy((prev) => ({
+                        ...prev,
+                        scopeValue: value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {catalogProducts.map((product) => (
+                        <SelectItem key={product.id} value={product.value}>
+                          {product.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value="*" disabled />
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>High Multiplier</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={newTierPolicy.highMultiplier}
+                  onChange={(e) =>
+                    setNewTierPolicy((prev) => ({
+                      ...prev,
+                      highMultiplier: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Mid Multiplier</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={newTierPolicy.midMultiplier}
+                  onChange={(e) =>
+                    setNewTierPolicy((prev) => ({
+                      ...prev,
+                      midMultiplier: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Low Multiplier</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={newTierPolicy.lowMultiplier}
+                  onChange={(e) =>
+                    setNewTierPolicy((prev) => ({
+                      ...prev,
+                      lowMultiplier: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Effective From</Label>
+                <Input
+                  type="date"
+                  value={newTierPolicy.effectiveFrom}
+                  onChange={(e) =>
+                    setNewTierPolicy((prev) => ({
+                      ...prev,
+                      effectiveFrom: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Effective To</Label>
+                <Input
+                  type="date"
+                  value={newTierPolicy.effectiveTo}
+                  onChange={(e) =>
+                    setNewTierPolicy((prev) => ({
+                      ...prev,
+                      effectiveTo: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={newTierPolicy.priority}
+                  onChange={(e) =>
+                    setNewTierPolicy((prev) => ({
+                      ...prev,
+                      priority: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowAddTierPolicy(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleAddTierPolicy} disabled={!isOwner}>
+              Save Policy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Coupon Dialog - Multi-tab */}
       <Dialog open={showCreateCoupon} onOpenChange={setShowCreateCoupon}>

@@ -98,6 +98,7 @@ export default function AddClient() {
     contractStart: "",
     contractEnd: "",
     contractType: "",
+    pricingTier: "mid" as "high" | "mid" | "low" | "custom",
     paymentTerms: "",
     contractDocNames: [] as string[],
     notes: "",
@@ -138,6 +139,7 @@ export default function AddClient() {
     if (step === 1) {
       return (
         form.contractType &&
+        form.pricingTier &&
         form.paymentTerms &&
         form.contractStart &&
         form.contractEnd
@@ -202,6 +204,7 @@ export default function AddClient() {
         timeZone: form.timeZone,
       },
       contractType: form.contractType,
+      pricingTier: form.pricingTier,
       paymentTerms: form.paymentTerms,
       contractDocuments: form.contractDocNames,
       notes: form.notes,
@@ -589,7 +592,7 @@ export default function AddClient() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label>Contract Type *</Label>
                       <Select
@@ -606,6 +609,27 @@ export default function AddClient() {
                           <SelectItem value="Subscription">
                             Subscription
                           </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Client Service Tier *</Label>
+                      <Select
+                        value={form.pricingTier}
+                        onValueChange={(v) =>
+                          updateForm({
+                            pricingTier: v as "high" | "mid" | "low" | "custom",
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select tier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="high">High Level</SelectItem>
+                          <SelectItem value="mid">Mid Level</SelectItem>
+                          <SelectItem value="low">Low Level</SelectItem>
+                          <SelectItem value="custom">Custom</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

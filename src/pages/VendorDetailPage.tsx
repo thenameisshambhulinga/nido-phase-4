@@ -531,7 +531,6 @@ export default function VendorDetailPage() {
                   color: "text-info",
                   onClick: () => setActiveTab("orders"),
                 },
-
                 {
                   title: "Overdue Orders",
                   value: overdueOrders,

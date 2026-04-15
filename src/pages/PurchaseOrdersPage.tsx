@@ -70,6 +70,7 @@ interface PurchaseOrderItem {
 interface PurchaseOrderEntry {
   id: string;
   poNumber: string;
+  sourceOrderNumber?: string;
   referenceNumber: string;
   vendorName: string;
   vendorAddress: string;
@@ -1255,6 +1256,7 @@ export default function PurchaseOrdersPage() {
                   </TableHead>
                   <TableHead>DATE</TableHead>
                   <TableHead>PURCHASE ORDER#</TableHead>
+                  <TableHead>SOURCE ORDER#</TableHead>
                   <TableHead>REFERENCE#</TableHead>
                   <TableHead>VENDOR NAME</TableHead>
                   <TableHead>STATUS</TableHead>
@@ -1286,6 +1288,7 @@ export default function PurchaseOrdersPage() {
                           {entry.poNumber}
                         </button>
                       </TableCell>
+                      <TableCell>{entry.sourceOrderNumber || "-"}</TableCell>
                       <TableCell>{entry.referenceNumber || "-"}</TableCell>
                       <TableCell>{entry.vendorName}</TableCell>
                       <TableCell>

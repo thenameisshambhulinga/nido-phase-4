@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { safeReadJson } from "@/lib/storage";
 import {
   ArrowLeft,
   Clock,
@@ -44,6 +46,8 @@ import {
   Package,
   Timer,
   X,
+  CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
@@ -63,10 +67,86 @@ interface SubOrder {
   status: string;
 }
 
+interface PurchaseOrderItem {
+  id: string;
+  itemName: string;
+  description: string;
+  account: string;
+  hsnSac: string;
+  quantity: number;
+  rate: number;
+  taxPercent: number;
+}
+
+interface PurchaseOrderEntry {
+  id: string;
+  poNumber: string;
+  sourceOrderNumber?: string;
+  referenceNumber: string;
+  vendorName: string;
+  vendorAddress: string;
+  deliveryAddressType: "Organization" | "Customer";
+  deliveryAddress: string;
+  date: string;
+  deliveryDate: string;
+  paymentTerms: string;
+  shipmentPreference: string;
+  includeInterStateGst: boolean;
+  status: "DRAFT" | "ISSUED";
+  billedStatus: "YET TO BE BILLED" | "BILLED";
+  receiveStatus: "YET TO BE RECEIVED" | "RECEIVED";
+  discountPercent: number;
+  adjustment: number;
+  notes: string;
+  termsAndConditions: string;
+  attachmentType: string;
+  items: PurchaseOrderItem[];
+}
+
+const PURCHASE_ORDER_STORAGE_KEY = "nido_purchase_orders_v1";
+
+const nextPoNumber = (entries: PurchaseOrderEntry[]) => {
+  const max = entries.reduce((current, entry) => {
+    const parsed = Number(entry.poNumber.replace(/\D/g, ""));
+    return Number.isFinite(parsed) ? Math.max(current, parsed) : current;
+  }, 0);
+  return `PO-${String(max + 1).padStart(5, "0")}`;
+};
+
+const orderItemCategory = (name: string) => {
+  const normalized = name.toLowerCase();
+  if (
+    normalized.includes("iphone") ||
+    normalized.includes("dell") ||
+    normalized.includes("samsung") ||
+    normalized.includes("galaxy") ||
+    normalized.includes("laptop")
+  )
+    return "electronics";
+  if (
+    normalized.includes("printer") ||
+    normalized.includes("paper") ||
+    normalized.includes("stationery")
+  )
+    return "office supplies";
+  if (normalized.includes("camera") || normalized.includes("cctv"))
+    return "security";
+  if (normalized.includes("router") || normalized.includes("switch"))
+    return "networking";
+  return "general";
+};
+
+const vendorMatchesItem = (vendorCategory: string, itemName: string) => {
+  const vendor = vendorCategory.toLowerCase();
+  const itemCategory = orderItemCategory(itemName);
+  if (itemCategory === "general") return true;
+  return vendor.includes(itemCategory) || itemCategory.includes(vendor);
+};
+
 export default function OrderDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { orders, updateOrder, addAuditEntry } = useData();
+  const { orders, vendors, updateOrder, addAuditEntry } = useData();
   const { user } = useAuth();
   const order = orders.find((o) => o.id === id);
   const [newComment, setNewComment] = useState("");
@@ -78,8 +158,14 @@ export default function OrderDetailsPage() {
   const [commentFilter, setCommentFilter] = useState<
     "all" | "internal" | "external"
   >("all");
+  const [visibleCommentCount, setVisibleCommentCount] = useState(30);
+  const [visibleAttachmentCount, setVisibleAttachmentCount] = useState(24);
   const [selectedSubOrder, setSelectedSubOrder] = useState<SubOrder | null>(
     null,
+  );
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [vendorByItemId, setVendorByItemId] = useState<Record<string, string>>(
+    {},
   );
 
   const isDelivered = order?.status === "Delivered";
@@ -152,6 +238,11 @@ export default function OrderDetailsPage() {
     return () => clearInterval(interval);
   }, [order, isDelivered]);
 
+  useEffect(() => {
+    setVisibleCommentCount(30);
+    setVisibleAttachmentCount(24);
+  }, [id, commentFilter]);
+
   if (!order)
     return (
       <div className="p-6">
@@ -222,6 +313,10 @@ export default function OrderDetailsPage() {
   const filteredComments = orderCommentHistory.filter(
     (c) => commentFilter === "all" || c.type === commentFilter,
   );
+  const visibleComments = filteredComments.slice(
+    Math.max(0, filteredComments.length - visibleCommentCount),
+  );
+  const visibleAttachments = orderAttachments.slice(0, visibleAttachmentCount);
   const STATUS_COLORS: Record<string, string> = {
     Pending: "#F59E0B",
     Processing: "#F97316",
@@ -241,6 +336,195 @@ export default function OrderDetailsPage() {
 
   const isBulkOrder = orderItems.length > 1;
   const masterOrderId = order.orderNumber;
+
+  const selectedItems = orderItems.filter((item) =>
+    selectedItemIds.includes(item.id),
+  );
+
+  const itemWiseTracking = useMemo(() => {
+    const statusToStage: Record<string, number> = {
+      Pending: 0,
+      New: 0,
+      Approved: 1,
+      Processing: 2,
+      Shipped: 3,
+      Completed: 4,
+      Delivered: 4,
+    };
+
+    const currentStage = isDelivered
+      ? 4
+      : (statusToStage[order.status] ?? (order.trackingNumber ? 3 : 1));
+
+    const stageLabels = [
+      "Order Created",
+      "PO Issued",
+      "Vendor Acknowledged",
+      "Shipped",
+      "Delivered",
+    ];
+
+    return orderItems.map((item, index) => ({
+      item,
+      stages: stageLabels.map((label, stageIndex) => {
+        let state: "done" | "current" | "pending" = "pending";
+        if (stageIndex < currentStage) state = "done";
+        if (stageIndex === currentStage) state = "current";
+        return {
+          label,
+          state,
+          etaHint:
+            stageIndex <= currentStage
+              ? "Completed"
+              : `${Math.max(1, stageIndex - currentStage)} step(s) remaining`,
+        };
+      }),
+      progress: Math.round(((currentStage + 1) / stageLabels.length) * 100),
+      rowCode: `${order.orderNumber}-${index + 1}`,
+    }));
+  }, [
+    isDelivered,
+    order.status,
+    order.trackingNumber,
+    orderItems,
+    order.orderNumber,
+  ]);
+
+  const matchingVendors = useMemo(() => {
+    if (selectedItems.length === 0) return [];
+    return vendors.filter((vendor) =>
+      selectedItems.some((item) =>
+        vendorMatchesItem(vendor.category, item.name),
+      ),
+    );
+  }, [selectedItems, vendors]);
+
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItemIds((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((idEntry) => idEntry !== itemId)
+        : [...prev, itemId],
+    );
+  };
+
+  const toggleSelectAllItems = (checked: boolean) => {
+    if (checked) {
+      setSelectedItemIds(orderItems.map((item) => item.id));
+      return;
+    }
+    setSelectedItemIds([]);
+  };
+
+  const handleCreatePurchaseOrders = () => {
+    if (selectedItems.length === 0) {
+      toast({ title: "Select at least one item to create purchase orders" });
+      return;
+    }
+
+    const pendingVendorItems = selectedItems.filter(
+      (item) => !vendorByItemId[item.id],
+    );
+    if (pendingVendorItems.length > 0) {
+      toast({ title: "Assign a vendor for each selected item" });
+      return;
+    }
+
+    const existingOrders = safeReadJson<PurchaseOrderEntry[]>(
+      PURCHASE_ORDER_STORAGE_KEY,
+      [],
+    );
+    let runningEntries = [...existingOrders];
+
+    const today = new Date().toISOString().slice(0, 10);
+    const day = new Date();
+    const delivery = new Date(day.getTime() + 5 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const newPurchaseOrders = selectedItems.map((item) => {
+      const vendorId = vendorByItemId[item.id];
+      const vendor = vendors.find((entry) => entry.id === vendorId);
+      const poNumber = nextPoNumber(runningEntries);
+
+      const poEntry: PurchaseOrderEntry = {
+        id: `po-${Date.now()}-${item.id}`,
+        poNumber,
+        sourceOrderNumber: order.orderNumber,
+        referenceNumber: order.orderNumber,
+        vendorName: vendor?.name || "Assigned Vendor",
+        vendorAddress: vendor?.address || "Vendor address pending",
+        deliveryAddressType: "Organization",
+        deliveryAddress: order.shippingAddress,
+        date: today.split("-").reverse().join("/"),
+        deliveryDate: delivery.split("-").reverse().join("/"),
+        paymentTerms: "Due on Receipt",
+        shipmentPreference: "Any",
+        includeInterStateGst: false,
+        status: "ISSUED",
+        billedStatus: "YET TO BE BILLED",
+        receiveStatus: "YET TO BE RECEIVED",
+        discountPercent: 0,
+        adjustment: 0,
+        notes: `Auto-created from procure order ${order.orderNumber}`,
+        termsAndConditions: "PO should be accepted within 3 business days.",
+        attachmentType: "Upload File",
+        items: [
+          {
+            id: `poi-${item.id}`,
+            itemName: item.name,
+            description: item.description,
+            account: "Materials",
+            hsnSac: "8517",
+            quantity: item.quantity,
+            rate: item.pricePerItem,
+            taxPercent: 18,
+          },
+        ],
+      };
+
+      runningEntries = [poEntry, ...runningEntries];
+      return poEntry;
+    });
+
+    localStorage.setItem(
+      PURCHASE_ORDER_STORAGE_KEY,
+      JSON.stringify([...newPurchaseOrders, ...existingOrders]),
+    );
+
+    updateOrder(order.id, {
+      status: "Processing",
+      comments: `Purchase orders created: ${newPurchaseOrders.map((entry) => entry.poNumber).join(", ")}`,
+      commentHistory: [
+        ...orderCommentHistory,
+        {
+          id: `c-${Date.now()}-po`,
+          user: user?.name || "System Owner",
+          text: `Created ${newPurchaseOrders.length} purchase order(s): ${newPurchaseOrders
+            .map((entry) => entry.poNumber)
+            .join(", ")}`,
+          timestamp: new Date().toISOString(),
+          type: "internal",
+        },
+      ],
+    });
+
+    addAuditEntry({
+      user: user?.name || "System Owner",
+      action: "Purchase Orders Created",
+      module: "Procure",
+      details: `Order ${order.orderNumber}: ${newPurchaseOrders
+        .map((entry) => entry.poNumber)
+        .join(", ")}`,
+      ipAddress: "192.168.1.1",
+      status: "success",
+    });
+
+    toast({
+      title: "Purchase Orders Created",
+      description: `${newPurchaseOrders.length} PO(s) created and moved to Purchase Orders list.`,
+    });
+    navigate("/transactions/purchase/purchase-orders");
+  };
 
   const getSlaColor = (status: string) => {
     if (isDelivered)
@@ -408,6 +692,17 @@ export default function OrderDetailsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={
+                        orderItems.length > 0 &&
+                        selectedItemIds.length === orderItems.length
+                      }
+                      onCheckedChange={(checked) =>
+                        toggleSelectAllItems(Boolean(checked))
+                      }
+                    />
+                  </TableHead>
                   <TableHead>
                     {isBulkOrder ? "Sub Order ID" : "Order/Service No."}
                   </TableHead>
@@ -423,6 +718,12 @@ export default function OrderDetailsPage() {
               <TableBody>
                 {orderItems.map((item, i) => (
                   <TableRow key={item.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedItemIds.includes(item.id)}
+                        onCheckedChange={() => toggleItemSelection(item.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       {isBulkOrder ? (
                         <button
@@ -498,6 +799,161 @@ export default function OrderDetailsPage() {
                   </span>
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-primary/20 bg-gradient-to-br from-blue-50 to-cyan-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">
+              Item-wise Procurement Tracking Timeline
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {itemWiseTracking.map(({ item, stages, progress, rowCode }) => (
+              <div
+                key={item.id}
+                className="rounded-xl border bg-background/80 p-4 shadow-sm"
+              >
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium text-foreground">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Ref {rowCode} • SKU/{item.sku} • Qty {item.quantity}
+                    </p>
+                  </div>
+                  <Badge variant="secondary">{progress}% Tracked</Badge>
+                </div>
+
+                <div className="grid gap-2 md:grid-cols-5">
+                  {stages.map((step) => (
+                    <div
+                      key={`${item.id}-${step.label}`}
+                      className={`rounded-lg border px-3 py-2 text-xs ${
+                        step.state === "done"
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                          : step.state === "current"
+                            ? "border-blue-300 bg-blue-50 text-blue-700"
+                            : "border-border bg-muted/30 text-muted-foreground"
+                      }`}
+                    >
+                      <p className="font-semibold">{step.label}</p>
+                      <p className="mt-1">{step.etaHint}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center justify-between">
+              <span>Vendor Selection & Purchase Order Creation</span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => {
+                  setSelectedItemIds([]);
+                  setVendorByItemId({});
+                }}
+              >
+                <RefreshCw className="h-4 w-4" /> Reset
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <p className="font-medium flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" /> Best practice flow
+              </p>
+              <p className="mt-1">
+                Select order items from the table above, assign an eligible
+                vendor for each item, then create purchase orders with
+                sequential PO IDs.
+              </p>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+              <div className="space-y-3">
+                {selectedItems.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No items selected yet. Tick item checkboxes above to enable
+                    vendor assignment.
+                  </p>
+                )}
+
+                {selectedItems.map((item) => {
+                  const itemVendors = vendors.filter((vendor) =>
+                    vendorMatchesItem(vendor.category, item.name),
+                  );
+
+                  return (
+                    <div key={item.id} className="rounded-lg border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-medium">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            SKU/{item.sku} • Qty {item.quantity} • $
+                            {item.totalCost.toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="w-[240px]">
+                          <Select
+                            value={vendorByItemId[item.id] || ""}
+                            onValueChange={(value) =>
+                              setVendorByItemId((prev) => ({
+                                ...prev,
+                                [item.id]: value,
+                              }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select Vendor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {itemVendors.map((vendor) => (
+                                <SelectItem key={vendor.id} value={vendor.id}>
+                                  {vendor.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="pt-4 space-y-2 text-sm">
+                  <p className="font-medium">Selection Summary</p>
+                  <p className="text-muted-foreground">
+                    Items Selected: {selectedItems.length}
+                  </p>
+                  <p className="text-muted-foreground">
+                    Matching Vendors: {matchingVendors.length}
+                  </p>
+                  <p className="text-muted-foreground">
+                    Ready for PO:{" "}
+                    {
+                      selectedItems.filter((item) => vendorByItemId[item.id])
+                        .length
+                    }
+                  </p>
+
+                  <Button
+                    className="mt-3 w-full"
+                    onClick={handleCreatePurchaseOrders}
+                    disabled={selectedItems.length === 0}
+                  >
+                    Create Purchase Orders
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </CardContent>
         </Card>
@@ -624,7 +1080,7 @@ export default function OrderDetailsPage() {
 
             <ScrollArea className="h-64 pr-4">
               <div className="space-y-4">
-                {filteredComments.map((c) => (
+                {visibleComments.map((c) => (
                   <div key={c.id} className="flex items-start gap-3">
                     <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-sm text-primary-foreground font-bold shrink-0">
                       {c.user.charAt(0)}
@@ -651,6 +1107,19 @@ export default function OrderDetailsPage() {
                   <div className="text-center py-8 text-muted-foreground">
                     <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
                     <p className="text-sm">No messages yet</p>
+                  </div>
+                )}
+                {filteredComments.length > visibleComments.length && (
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setVisibleCommentCount((prev) => prev + 30)
+                      }
+                    >
+                      Load Older Messages
+                    </Button>
                   </div>
                 )}
               </div>
@@ -686,7 +1155,7 @@ export default function OrderDetailsPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {orderAttachments.map((a, i) => (
+              {visibleAttachments.map((a, i) => (
                 <div
                   key={i}
                   className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition-colors"
@@ -716,6 +1185,17 @@ export default function OrderDetailsPage() {
                 </div>
               ))}
             </div>
+            {orderAttachments.length > visibleAttachments.length && (
+              <div className="mt-4 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisibleAttachmentCount((prev) => prev + 24)}
+                >
+                  Load More Documents
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

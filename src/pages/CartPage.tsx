@@ -41,47 +41,8 @@ export default function CartPage() {
   const total = subtotal + tax + shipping;
 
   const handleCheckout = () => {
-    // Auto-generate invoice in localStorage
-    const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
-    const savedInvoices = safeReadJson("nido_invoices", []);
-    const newInvoice = {
-      id: `inv-${Date.now()}`,
-      invoiceNumber,
-      vendorOrClient: user?.name || "Self",
-      type: "client",
-      issueDate: new Date().toISOString().split("T")[0],
-      dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-      amount: subtotal,
-      tax,
-      totalAmount: total,
-      status: "pending",
-      items: items.map((i) => ({
-        description: `${i.emoji} ${i.name} x${i.quantity}`,
-        quantity: i.quantity,
-        unitPrice: i.price,
-        total: i.price * i.quantity,
-      })),
-      notes: "Auto-generated from cart checkout",
-      autoReminder: true,
-    };
-    localStorage.setItem(
-      "nido_invoices",
-      JSON.stringify([newInvoice, ...savedInvoices]),
-    );
-
-    addAuditEntry({
-      user: user?.name || "System",
-      action: "Order Placed",
-      module: "Shop",
-      details: `Checkout completed - ${items.length} items, total $${total.toLocaleString()}. Invoice ${invoiceNumber} generated.`,
-      ipAddress: "192.168.1.1",
-      status: "success",
-    });
-
-    clearCart();
     setShowCheckout(false);
-    setOrderPlaced(true);
-    toast.success("Order placed & invoice generated!");
+    navigate("/shop/checkout");
   };
 
   if (orderPlaced) {
@@ -255,7 +216,7 @@ export default function CartPage() {
               <Button
                 className="w-full mt-2"
                 size="lg"
-                onClick={() => setShowCheckout(true)}
+                onClick={handleCheckout}
               >
                 <CreditCard className="h-4 w-4 mr-2" /> Proceed to Checkout
               </Button>
