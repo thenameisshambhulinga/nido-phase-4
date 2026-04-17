@@ -32,9 +32,11 @@ import {
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { safeReadJson } from "@/lib/storage";
+import { normalizeOrderCode } from "@/lib/documentNumbering";
 import {
   ArrowLeft,
-  Clock,
+  BellRing,
+  Circle,
   Download,
   Eye,
   Send,
@@ -69,6 +71,7 @@ interface SubOrder {
 
 interface PurchaseOrderItem {
   id: string;
+  sourceOrderItemId?: string;
   itemName: string;
   description: string;
   account: string;
@@ -104,6 +107,7 @@ interface PurchaseOrderEntry {
 }
 
 const PURCHASE_ORDER_STORAGE_KEY = "nido_purchase_orders_v1";
+const VENDOR_ASSIGNMENT_STORAGE_KEY = "nido_order_vendor_assignments_v1";
 
 const nextPoNumber = (entries: PurchaseOrderEntry[]) => {
   const max = entries.reduce((current, entry) => {
@@ -143,14 +147,83 @@ const vendorMatchesItem = (vendorCategory: string, itemName: string) => {
   return vendor.includes(itemCategory) || itemCategory.includes(vendor);
 };
 
+const stableSeedFromText = (text: string) => {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash * 31 + text.charCodeAt(i)) % 100000;
+  }
+  return hash;
+};
+
+type VendorMatchMetric = {
+  vendorId: string;
+  availableQty: number;
+  pricePerUnit: number;
+  estDeliveryDays: number;
+  availabilityScore: number;
+  weightedScore: number;
+};
+
+const deriveVendorMetrics = (
+  vendorId: string,
+  itemId: string,
+  unitPrice: number,
+  quantity: number,
+  refreshTick: number,
+): VendorMatchMetric => {
+  const seed = stableSeedFromText(`${vendorId}-${itemId}-${refreshTick}`);
+  const capacityBoost = (seed % 5) * 10;
+  const availableQty = Math.max(quantity, quantity + 10 + capacityBoost);
+  const priceVariance = ((seed % 9) - 4) * 0.012;
+  const pricePerUnit = Math.max(1, Math.round(unitPrice * (1 + priceVariance)));
+  const estDeliveryDays = 1 + (seed % 4);
+
+  const quantityFit = Math.min(100, Math.round((availableQty / quantity) * 80));
+  const costScore = Math.max(
+    0,
+    Math.round(
+      100 - ((pricePerUnit - unitPrice) / Math.max(unitPrice, 1)) * 100,
+    ),
+  );
+  const deliveryScore = Math.max(0, 100 - estDeliveryDays * 15);
+  const availabilityScore = Math.max(
+    55,
+    Math.min(
+      99,
+      Math.round(quantityFit * 0.35 + costScore * 0.35 + deliveryScore * 0.3),
+    ),
+  );
+
+  return {
+    vendorId,
+    availableQty,
+    pricePerUnit,
+    estDeliveryDays,
+    availabilityScore,
+    weightedScore: availabilityScore,
+  };
+};
+
+const poItemMatchesOrderItem = (
+  poItem: PurchaseOrderItem,
+  orderItemId: string,
+) => {
+  if (poItem.sourceOrderItemId === orderItemId) return true;
+  if (poItem.id === orderItemId) return true;
+  if (poItem.id.endsWith(`-${orderItemId}`)) return true;
+  return false;
+};
+
 export default function OrderDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { orders, vendors, updateOrder, addAuditEntry } = useData();
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
   const order = orders.find((o) => o.id === id);
   const [newComment, setNewComment] = useState("");
   const [slaTime, setSlaTime] = useState("00:00:00");
+  const [slaSetHours, setSlaSetHours] = useState("0");
+  const [slaSetMinutes, setSlaSetMinutes] = useState("30");
   const [showMailComposer, setShowMailComposer] = useState(false);
   const [mailRecipientType, setMailRecipientType] = useState<
     "vendor" | "client" | "all"
@@ -167,8 +240,13 @@ export default function OrderDetailsPage() {
   const [vendorByItemId, setVendorByItemId] = useState<Record<string, string>>(
     {},
   );
+  const [vendorRefreshTick, setVendorRefreshTick] = useState(0);
+  const [poRefreshTick, setPoRefreshTick] = useState(0);
 
   const isDelivered = order?.status === "Delivered";
+  const canSetSlaTimer =
+    isOwner || ["admin", "procurement_manager"].includes(user?.role || "");
+  const canSetSlaAnytime = isOwner;
 
   const subOrders: SubOrder[] = useMemo(() => {
     if (!order) return [];
@@ -201,7 +279,7 @@ export default function OrderDetailsPage() {
           ? slaStatuses[i % 2]
           : order.slaStatus;
       return {
-        subOrderId: `${order.orderNumber}-${i + 1}`,
+        subOrderId: `${normalizeOrderCode(order.orderNumber)}-${i + 1}`,
         category,
         item: {
           name: item.name,
@@ -243,6 +321,28 @@ export default function OrderDetailsPage() {
     setVisibleAttachmentCount(24);
   }, [id, commentFilter]);
 
+  useEffect(() => {
+    if (!order) return;
+    const allAssignments = safeReadJson<Record<string, Record<string, string>>>(
+      VENDOR_ASSIGNMENT_STORAGE_KEY,
+      {},
+    );
+    setVendorByItemId(allAssignments[order.id] || {});
+  }, [order]);
+
+  useEffect(() => {
+    if (!order) return;
+    const allAssignments = safeReadJson<Record<string, Record<string, string>>>(
+      VENDOR_ASSIGNMENT_STORAGE_KEY,
+      {},
+    );
+    allAssignments[order.id] = vendorByItemId;
+    localStorage.setItem(
+      VENDOR_ASSIGNMENT_STORAGE_KEY,
+      JSON.stringify(allAssignments),
+    );
+  }, [order, vendorByItemId]);
+
   if (!order)
     return (
       <div className="p-6">
@@ -265,7 +365,7 @@ export default function OrderDetailsPage() {
       user: user?.name || "System",
       action: "Order Status Updated",
       module: "Procure",
-      details: `Order #${order.orderNumber} status changed to ${status}`,
+      details: `Order ${formattedOrderNumber} status changed to ${status}`,
       ipAddress: "192.168.1.1",
       status: "success",
     });
@@ -293,7 +393,7 @@ export default function OrderDetailsPage() {
   };
 
   const handleDownload = (filename: string) => {
-    const content = `This is a sample document: ${filename}\nOrder: ${order.orderNumber}\nDate: ${order.orderDate}`;
+    const content = `This is a sample document: ${filename}\nOrder: ${formattedOrderNumber}\nDate: ${order.orderDate}`;
     const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -335,19 +435,76 @@ export default function OrderDetailsPage() {
   };
 
   const isBulkOrder = orderItems.length > 1;
-  const masterOrderId = order.orderNumber;
+  const formattedOrderNumber = normalizeOrderCode(order.orderNumber);
+  const masterOrderId = formattedOrderNumber;
 
   const selectedItems = orderItems.filter((item) =>
     selectedItemIds.includes(item.id),
   );
+
+  const existingPurchaseOrders = useMemo(
+    () =>
+      safeReadJson<PurchaseOrderEntry[]>(PURCHASE_ORDER_STORAGE_KEY, []).filter(
+        (entry) => entry.sourceOrderNumber === order.orderNumber,
+      ),
+    [order.orderNumber, poRefreshTick],
+  );
+
+  const activePoItemIds = useMemo(() => {
+    const ids = new Set<string>();
+    existingPurchaseOrders.forEach((entry) => {
+      const statusValue = String((entry as { status?: string }).status || "")
+        .trim()
+        .toLowerCase();
+      const isCancelled =
+        statusValue === "cancelled" || statusValue === "canceled";
+      if (isCancelled) return;
+      entry.items.forEach((poItem) => {
+        orderItems.forEach((item) => {
+          if (poItemMatchesOrderItem(poItem, item.id)) {
+            ids.add(item.id);
+          }
+        });
+      });
+    });
+    return ids;
+  }, [existingPurchaseOrders, orderItems]);
+
+  const isItemProcurementLocked = (itemId: string) =>
+    activePoItemIds.has(itemId);
+
+  const buildVendorRowsForItem = (item: (typeof orderItems)[number]) => {
+    const basePool = vendors.filter((vendor) =>
+      vendorMatchesItem(vendor.category, item.name),
+    );
+    const pool = basePool.length > 0 ? basePool : vendors;
+
+    return pool
+      .map((vendor) => {
+        const metric = deriveVendorMetrics(
+          vendor.id,
+          item.id,
+          item.pricePerItem,
+          item.quantity,
+          vendorRefreshTick,
+        );
+        return { vendor, metric };
+      })
+      .sort((a, b) => b.metric.weightedScore - a.metric.weightedScore);
+  };
+
+  const resolveVendorIdForItem = (item: (typeof orderItems)[number]) =>
+    vendorByItemId[item.id] || buildVendorRowsForItem(item)[0]?.vendor.id || "";
 
   const itemWiseTracking = useMemo(() => {
     const statusToStage: Record<string, number> = {
       Pending: 0,
       New: 0,
       Approved: 1,
-      Processing: 2,
-      Shipped: 3,
+      Processing: 1,
+      Shipped: order.trackingNumber ? 3 : 2,
+      "Out for Delivery": 3,
+      "Out For Delivery": 3,
       Completed: 4,
       Delivered: 4,
     };
@@ -358,13 +515,17 @@ export default function OrderDetailsPage() {
 
     const stageLabels = [
       "Order Created",
-      "PO Issued",
-      "Vendor Acknowledged",
+      "Confirmed",
       "Shipped",
+      "Out for Delivery",
       "Delivered",
     ];
 
-    return orderItems.map((item, index) => ({
+    const eligibleItems = orderItems.filter(
+      (item) => vendorByItemId[item.id] || activePoItemIds.has(item.id),
+    );
+
+    return eligibleItems.map((item, index) => ({
       item,
       stages: stageLabels.map((label, stageIndex) => {
         let state: "done" | "current" | "pending" = "pending";
@@ -380,7 +541,7 @@ export default function OrderDetailsPage() {
         };
       }),
       progress: Math.round(((currentStage + 1) / stageLabels.length) * 100),
-      rowCode: `${order.orderNumber}-${index + 1}`,
+      rowCode: `${formattedOrderNumber}-${index + 1}`,
     }));
   }, [
     isDelivered,
@@ -388,6 +549,8 @@ export default function OrderDetailsPage() {
     order.trackingNumber,
     orderItems,
     order.orderNumber,
+    vendorByItemId,
+    activePoItemIds,
   ]);
 
   const matchingVendors = useMemo(() => {
@@ -421,8 +584,19 @@ export default function OrderDetailsPage() {
       return;
     }
 
+    const lockedItems = selectedItems.filter((item) =>
+      isItemProcurementLocked(item.id),
+    );
+    if (lockedItems.length > 0) {
+      toast({
+        title: "Purchase order already exists",
+        description: `${lockedItems.length} selected item(s) already have an active PO. Cancel that PO first to regenerate.`,
+      });
+      return;
+    }
+
     const pendingVendorItems = selectedItems.filter(
-      (item) => !vendorByItemId[item.id],
+      (item) => !resolveVendorIdForItem(item),
     );
     if (pendingVendorItems.length > 0) {
       toast({ title: "Assign a vendor for each selected item" });
@@ -442,15 +616,15 @@ export default function OrderDetailsPage() {
       .slice(0, 10);
 
     const newPurchaseOrders = selectedItems.map((item) => {
-      const vendorId = vendorByItemId[item.id];
+      const vendorId = resolveVendorIdForItem(item);
       const vendor = vendors.find((entry) => entry.id === vendorId);
       const poNumber = nextPoNumber(runningEntries);
 
       const poEntry: PurchaseOrderEntry = {
         id: `po-${Date.now()}-${item.id}`,
         poNumber,
-        sourceOrderNumber: order.orderNumber,
-        referenceNumber: order.orderNumber,
+        sourceOrderNumber: formattedOrderNumber,
+        referenceNumber: formattedOrderNumber,
         vendorName: vendor?.name || "Assigned Vendor",
         vendorAddress: vendor?.address || "Vendor address pending",
         deliveryAddressType: "Organization",
@@ -465,12 +639,13 @@ export default function OrderDetailsPage() {
         receiveStatus: "YET TO BE RECEIVED",
         discountPercent: 0,
         adjustment: 0,
-        notes: `Auto-created from procure order ${order.orderNumber}`,
+        notes: `Auto-created from procure order ${formattedOrderNumber}`,
         termsAndConditions: "PO should be accepted within 3 business days.",
         attachmentType: "Upload File",
         items: [
           {
-            id: `poi-${item.id}`,
+            id: item.id,
+            sourceOrderItemId: item.id,
             itemName: item.name,
             description: item.description,
             account: "Materials",
@@ -512,7 +687,7 @@ export default function OrderDetailsPage() {
       user: user?.name || "System Owner",
       action: "Purchase Orders Created",
       module: "Procure",
-      details: `Order ${order.orderNumber}: ${newPurchaseOrders
+      details: `Order ${formattedOrderNumber}: ${newPurchaseOrders
         .map((entry) => entry.poNumber)
         .join(", ")}`,
       ipAddress: "192.168.1.1",
@@ -523,7 +698,108 @@ export default function OrderDetailsPage() {
       title: "Purchase Orders Created",
       description: `${newPurchaseOrders.length} PO(s) created and moved to Purchase Orders list.`,
     });
+    setPoRefreshTick((prev) => prev + 1);
     navigate("/transactions/purchase/purchase-orders");
+  };
+
+  const handleRefreshSla = () => {
+    if (isDelivered) {
+      toast({ title: "SLA already completed for delivered order" });
+      return;
+    }
+    const start = new Date(order.slaStartTime).getTime();
+    const diff = Date.now() - start;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    setSlaTime(
+      `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`,
+    );
+    toast({ title: "SLA timer refreshed" });
+  };
+
+  const handleResetSla = () => {
+    if (isDelivered) {
+      toast({ title: "Delivered order SLA cannot be reset" });
+      return;
+    }
+    const nowIso = new Date().toISOString();
+    updateOrder(order.id, { slaStartTime: nowIso, slaStatus: "within_sla" });
+    setSlaTime("00:00:00");
+    toast({ title: "SLA reset", description: "SLA timer restarted from now." });
+  };
+
+  const handleSetSlaReminder = () => {
+    const reminderTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    const reminderText = `Reminder set for SLA follow-up at ${new Date(reminderTime).toLocaleString()}`;
+    updateOrder(order.id, {
+      commentHistory: [
+        ...orderCommentHistory,
+        {
+          id: `c-${Date.now()}-sla-reminder`,
+          user: user?.name || "System",
+          text: reminderText,
+          timestamp: new Date().toISOString(),
+          type: "internal",
+        },
+      ],
+    });
+    toast({ title: "Reminder set", description: reminderText });
+  };
+
+  const handleSetSlaTimer = () => {
+    if (!canSetSlaTimer) {
+      toast({
+        title: "Not authorized",
+        description:
+          "Only owner and authorized internal users can set SLA timer.",
+      });
+      return;
+    }
+
+    if (isDelivered && !canSetSlaAnytime) {
+      toast({
+        title: "SLA locked",
+        description: "Only owner can set SLA timer after delivery.",
+      });
+      return;
+    }
+
+    const hours = Math.max(0, Number.parseInt(slaSetHours || "0", 10) || 0);
+    const minutes = Math.max(
+      0,
+      Math.min(59, Number.parseInt(slaSetMinutes || "0", 10) || 0),
+    );
+    const elapsedMs = (hours * 60 + minutes) * 60 * 1000;
+
+    if (elapsedMs <= 0) {
+      toast({
+        title: "Invalid SLA timer",
+        description: "Set at least 1 minute to apply the SLA timer.",
+      });
+      return;
+    }
+
+    const adjustedStartIso = new Date(Date.now() - elapsedMs).toISOString();
+    updateOrder(order.id, {
+      slaStartTime: adjustedStartIso,
+      slaStatus: "within_sla",
+    });
+    toast({
+      title: "SLA timer set",
+      description: `Timer updated to ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00 elapsed.`,
+    });
+  };
+
+  const handleRefreshVendorRecommendations = () => {
+    if (selectedItems.length === 0) {
+      toast({
+        title: "Select at least one item to refresh vendor recommendations",
+      });
+      return;
+    }
+    setVendorRefreshTick((prev) => prev + 1);
+    toast({ title: "Vendor recommendations refreshed" });
   };
 
   const getSlaColor = (status: string) => {
@@ -559,7 +835,7 @@ export default function OrderDetailsPage() {
                   Master Order
                 </p>
                 <p className="text-lg font-bold font-mono text-primary">
-                  ORD-{masterOrderId}
+                  {masterOrderId}
                 </p>
               </div>
               <Badge className="ml-auto">{orderItems.length} Sub-Orders</Badge>
@@ -575,7 +851,7 @@ export default function OrderDetailsPage() {
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Order Number</span>
-                <span className="font-medium">{order.orderNumber}</span>
+                <span className="font-medium">{formattedOrderNumber}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Order Date</span>
@@ -613,44 +889,110 @@ export default function OrderDetailsPage() {
                 SLA Information (Overall)
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-center space-y-3">
-              <div
-                className={`text-4xl font-mono font-bold tracking-wider border-2 rounded-lg py-3 px-4 inline-block ${isDelivered ? "border-emerald-500 text-emerald-600 bg-emerald-50" : "border-border"}`}
-              >
-                {slaTime}
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={handleRefreshSla}>
+                  <RefreshCw className="mr-1 h-4 w-4" /> Refresh SLA
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleResetSla}>
+                  Reset SLA
+                </Button>
+                <Select onValueChange={handleStatusUpdate}>
+                  <SelectTrigger className="h-8 w-[150px] text-xs">
+                    <SelectValue placeholder="Update Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Processing">Processing</SelectItem>
+                    <SelectItem value="Shipped">Shipped</SelectItem>
+                    <SelectItem value="Delivered">Delivered</SelectItem>
+                    <SelectItem value="Cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSetSlaReminder}
+                >
+                  <BellRing className="mr-1 h-4 w-4" /> Set Reminder
+                </Button>
               </div>
-              {isDelivered && (
-                <p className="text-xs text-emerald-600 font-medium">
-                  SLA timer stopped — Order Delivered
-                </p>
-              )}
-              <div className="text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">SLA start time:</span>
-                  <span>{new Date(order.slaStartTime).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">SLA Status:</span>
-                  <span
-                    className={
-                      order.slaStatus === "within_sla"
-                        ? "text-success font-medium"
-                        : order.slaStatus === "at_risk"
-                          ? "text-warning font-medium"
-                          : "text-destructive font-medium"
-                    }
-                  >
-                    {order.slaStatus
-                      .replace("_", " ")
-                      .replace(/\b\w/g, (c) => c.toUpperCase())}
-                  </span>
+              <div className="flex flex-wrap items-end justify-end gap-2">
+                <div>
+                  <p className="text-[11px] text-muted-foreground mb-1">
+                    Set SLA Timer (Elapsed)
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={slaSetHours}
+                      onChange={(e) => setSlaSetHours(e.target.value)}
+                      className="h-8 w-20"
+                      disabled={!canSetSlaTimer}
+                    />
+                    <span className="text-xs text-muted-foreground">h</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={59}
+                      value={slaSetMinutes}
+                      onChange={(e) => setSlaSetMinutes(e.target.value)}
+                      className="h-8 w-20"
+                      disabled={!canSetSlaTimer}
+                    />
+                    <span className="text-xs text-muted-foreground">m</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSetSlaTimer}
+                      disabled={!canSetSlaTimer}
+                    >
+                      Set SLA Timer
+                    </Button>
+                  </div>
                 </div>
               </div>
-              {isBulkOrder && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Click any Sub-Order ID below to view individual SLA details
-                </p>
-              )}
+              <div className="text-center space-y-3">
+                <div
+                  className={`text-4xl font-mono font-bold tracking-wider border-2 rounded-lg py-3 px-4 inline-block ${isDelivered ? "border-emerald-500 text-emerald-600 bg-emerald-50" : "border-border"}`}
+                >
+                  {slaTime}
+                </div>
+                {isDelivered && (
+                  <p className="text-xs text-emerald-600 font-medium">
+                    SLA timer stopped — Order Delivered
+                  </p>
+                )}
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      SLA start time:
+                    </span>
+                    <span>{new Date(order.slaStartTime).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">SLA Status:</span>
+                    <span
+                      className={
+                        order.slaStatus === "within_sla"
+                          ? "text-success font-medium"
+                          : order.slaStatus === "at_risk"
+                            ? "text-warning font-medium"
+                            : "text-destructive font-medium"
+                      }
+                    >
+                      {order.slaStatus
+                        .replace("_", " ")
+                        .replace(/\b\w/g, (c) => c.toUpperCase())}
+                    </span>
+                  </div>
+                </div>
+                {isBulkOrder && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Click any Sub-Order ID below to view individual SLA details
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -735,7 +1077,7 @@ export default function OrderDetailsPage() {
                         </button>
                       ) : (
                         <span className="text-primary font-medium font-mono text-xs">
-                          {order.orderNumber}
+                          {formattedOrderNumber}
                         </span>
                       )}
                     </TableCell>
@@ -810,6 +1152,13 @@ export default function OrderDetailsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {itemWiseTracking.length === 0 && (
+              <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                Timeline appears only for items that have a vendor assigned or
+                an active purchase order.
+              </p>
+            )}
+
             {itemWiseTracking.map(({ item, stages, progress, rowCode }) => (
               <div
                 key={item.id}
@@ -825,20 +1174,36 @@ export default function OrderDetailsPage() {
                   <Badge variant="secondary">{progress}% Tracked</Badge>
                 </div>
 
-                <div className="grid gap-2 md:grid-cols-5">
-                  {stages.map((step) => (
+                <div className="space-y-3">
+                  {stages.map((step, index) => (
                     <div
                       key={`${item.id}-${step.label}`}
-                      className={`rounded-lg border px-3 py-2 text-xs ${
-                        step.state === "done"
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                          : step.state === "current"
-                            ? "border-blue-300 bg-blue-50 text-blue-700"
-                            : "border-border bg-muted/30 text-muted-foreground"
-                      }`}
+                      className="flex gap-3"
                     >
-                      <p className="font-semibold">{step.label}</p>
-                      <p className="mt-1">{step.etaHint}</p>
+                      <div className="flex w-4 flex-col items-center">
+                        {step.state === "done" ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : step.state === "current" ? (
+                          <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <Circle className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        {index < stages.length - 1 && (
+                          <span className="mt-1 h-6 w-px bg-border" />
+                        )}
+                      </div>
+                      <div
+                        className={`rounded-lg border px-3 py-2 text-xs w-full ${
+                          step.state === "done"
+                            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                            : step.state === "current"
+                              ? "border-blue-300 bg-blue-50 text-blue-700"
+                              : "border-border bg-muted/30 text-muted-foreground"
+                        }`}
+                      >
+                        <p className="font-semibold">{step.label}</p>
+                        <p className="mt-1">{step.etaHint}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -850,31 +1215,22 @@ export default function OrderDetailsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center justify-between">
-              <span>Vendor Selection & Purchase Order Creation</span>
+              <span>Vendor Selection</span>
               <Button
                 variant="outline"
                 size="sm"
                 className="gap-2"
-                onClick={() => {
-                  setSelectedItemIds([]);
-                  setVendorByItemId({});
-                }}
+                onClick={handleRefreshVendorRecommendations}
               >
-                <RefreshCw className="h-4 w-4" /> Reset
+                <RefreshCw className="h-4 w-4" /> Refresh vendors
               </Button>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              <p className="font-medium flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" /> Best practice flow
-              </p>
-              <p className="mt-1">
-                Select order items from the table above, assign an eligible
-                vendor for each item, then create purchase orders with
-                sequential PO IDs.
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Select a vendor to fulfill each selected item using quantity, unit
+              price, delivery estimate, and availability score.
+            </p>
 
             <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
               <div className="space-y-3">
@@ -886,12 +1242,15 @@ export default function OrderDetailsPage() {
                 )}
 
                 {selectedItems.map((item) => {
-                  const itemVendors = vendors.filter((vendor) =>
-                    vendorMatchesItem(vendor.category, item.name),
-                  );
+                  const vendorRows = buildVendorRowsForItem(item);
+                  const bestVendor = vendorRows[0]?.vendor;
+                  const selectedVendorId = resolveVendorIdForItem(item);
 
                   return (
-                    <div key={item.id} className="rounded-lg border p-3">
+                    <div
+                      key={item.id}
+                      className="rounded-lg border p-3 space-y-3"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-medium">{item.name}</p>
@@ -899,30 +1258,115 @@ export default function OrderDetailsPage() {
                             SKU/{item.sku} • Qty {item.quantity} • $
                             {item.totalCost.toLocaleString()}
                           </p>
+                          {!!item.description && (
+                            <p className="text-xs text-muted-foreground">
+                              Specs: {item.description}
+                            </p>
+                          )}
                         </div>
-                        <div className="w-[240px]">
-                          <Select
-                            value={vendorByItemId[item.id] || ""}
-                            onValueChange={(value) =>
-                              setVendorByItemId((prev) => ({
-                                ...prev,
-                                [item.id]: value,
-                              }))
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select Vendor" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {itemVendors.map((vendor) => (
-                                <SelectItem key={vendor.id} value={vendor.id}>
-                                  {vendor.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        {isItemProcurementLocked(item.id) && (
+                          <Badge className="bg-amber-100 text-amber-800">
+                            PO already generated
+                          </Badge>
+                        )}
                       </div>
+
+                      {!!bestVendor && (
+                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                          <span className="font-semibold">
+                            Best Vendor: {bestVendor.name}
+                          </span>{" "}
+                          has been selected based on price, delivery time, and
+                          availability score.
+                        </div>
+                      )}
+
+                      <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Vendor Matching Panel</TableHead>
+                              <TableHead className="text-right">
+                                Available Qty
+                              </TableHead>
+                              <TableHead className="text-right">
+                                Price per Unit
+                              </TableHead>
+                              <TableHead className="text-right">
+                                Est. Delivery Time
+                              </TableHead>
+                              <TableHead className="text-right">
+                                Availability Score
+                              </TableHead>
+                              <TableHead className="text-center">
+                                Select
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {vendorRows.map(({ vendor, metric }) => (
+                              <TableRow key={`${item.id}-${vendor.id}`}>
+                                <TableCell className="font-medium">
+                                  {vendor.name}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {metric.availableQty}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  ${metric.pricePerUnit.toLocaleString()}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {metric.estDeliveryDays}d
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="h-2 w-16 rounded bg-muted">
+                                      <span
+                                        className="block h-2 rounded bg-emerald-500"
+                                        style={{
+                                          width: `${Math.min(100, metric.availabilityScore)}%`,
+                                        }}
+                                      />
+                                    </span>
+                                    {metric.availabilityScore}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <button
+                                    className="inline-flex items-center justify-center"
+                                    onClick={() => {
+                                      if (isItemProcurementLocked(item.id)) {
+                                        toast({
+                                          title: "Cannot change vendor",
+                                          description:
+                                            "PO already exists for this item. Cancel it first to reassign vendor.",
+                                        });
+                                        return;
+                                      }
+                                      setVendorByItemId((prev) => ({
+                                        ...prev,
+                                        [item.id]: vendor.id,
+                                      }));
+                                    }}
+                                  >
+                                    {selectedVendorId === vendor.id ? (
+                                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                    ) : (
+                                      <Circle className="h-5 w-5 text-muted-foreground" />
+                                    )}
+                                  </button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        The best vendor is recommended using price, estimated
+                        delivery time, and availability score. You can manually
+                        override before PO generation.
+                      </p>
                     </div>
                   );
                 })}
@@ -940,8 +1384,11 @@ export default function OrderDetailsPage() {
                   <p className="text-muted-foreground">
                     Ready for PO:{" "}
                     {
-                      selectedItems.filter((item) => vendorByItemId[item.id])
-                        .length
+                      selectedItems.filter(
+                        (item) =>
+                          resolveVendorIdForItem(item) &&
+                          !isItemProcurementLocked(item.id),
+                      ).length
                     }
                   </p>
 
@@ -951,6 +1398,16 @@ export default function OrderDetailsPage() {
                     disabled={selectedItems.length === 0}
                   >
                     Create Purchase Orders
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setSelectedItemIds([]);
+                      setVendorByItemId({});
+                    }}
+                  >
+                    Cancel
                   </Button>
                 </CardContent>
               </Card>
@@ -1303,7 +1760,7 @@ function SubOrderSLADialog({
             <Package className="h-4 w-4" />
             <span>Part of Master Order:</span>
             <span className="font-mono font-bold text-primary">
-              ORD-{masterOrderId}
+              {masterOrderId}
             </span>
           </div>
 

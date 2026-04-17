@@ -45,7 +45,7 @@ export const emailTemplates = {
           <div class="container">
             <div class="header">
               <h1>✓ Order Confirmed!</h1>
-              <div class="order-number">Order # ${order.id}</div>
+              <div class="order-number">Order ${order.id}</div>
             </div>
 
             <p>Dear ${order.shippingInfo.fullName},</p>

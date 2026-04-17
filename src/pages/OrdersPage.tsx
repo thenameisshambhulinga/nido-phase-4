@@ -25,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { emailTemplates, sendEmail } from "@/lib/emailService";
+import { normalizeOrderCode } from "@/lib/documentNumbering";
 import {
   Upload,
   Download,
@@ -65,7 +66,7 @@ export default function OrdersPage() {
         const normalizedStatus = (order.status || "New").toLowerCase();
         return {
           ...order,
-          orderNumber: order.orderNumber || order.id,
+          orderNumber: normalizeOrderCode(order.orderNumber || order.id),
           organization: order.organization || "Direct Customer",
           requestingUser: order.requestingUser || "Client User",
           assignedAnalyst:
@@ -537,7 +538,7 @@ export default function OrdersPage() {
                       </TableCell>
                       <TableCell>
                         <p className="font-medium text-primary">
-                          #{order.orderNumber}
+                          {order.orderNumber}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {new Date(order.orderDate).toLocaleDateString()}

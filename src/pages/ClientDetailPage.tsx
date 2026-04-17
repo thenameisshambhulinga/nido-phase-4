@@ -2220,7 +2220,7 @@ export default function ClientDetailPage() {
                               onCheckedChange={toggleAllOrders}
                             />
                           </TableHead>
-                          <TableHead>Order #</TableHead>
+                          <TableHead>Order ID</TableHead>
                           <TableHead>Date</TableHead>
                           <TableHead>Organization</TableHead>
                           <TableHead>Requesting User</TableHead>

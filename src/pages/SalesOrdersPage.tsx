@@ -108,7 +108,7 @@ export default function SalesOrdersPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
-                    <TableHead>Sales Order #</TableHead>
+                    <TableHead>Sales Order ID</TableHead>
                     <TableHead>Reference</TableHead>
                     <TableHead>Customer Name</TableHead>
                     <TableHead>Status</TableHead>

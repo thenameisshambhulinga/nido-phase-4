@@ -30,6 +30,10 @@ import {
   Shield,
 } from "lucide-react";
 import { safeReadJson } from "@/lib/storage";
+import {
+  nextSequentialCode,
+  normalizeOrderCode,
+} from "@/lib/documentNumbering";
 
 interface ShippingInfo {
   fullName: string;
@@ -55,7 +59,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const { items, subtotal, clearCart, totalItems } = useCart();
   const { user } = useAuth();
-  const { addAuditEntry, setOrders } = useData();
+  const { orders, addAuditEntry, setOrders } = useData();
 
   const [shippingMethod, setShippingMethod] = useState<"standard" | "express">(
     "standard",
@@ -170,8 +174,19 @@ export default function CheckoutPage() {
       // Simulate payment processing
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // Generate order ID and create order
-      const orderID = `ORD-${Date.now().toString().slice(-8)}`;
+      // Generate a continuous sequential order ID across shop + procure datasets.
+      const previousOrders = safeReadJson<Array<{ id?: string }>>(
+        "nido_orders",
+        [],
+      );
+      const orderID = nextSequentialCode(
+        "ORD",
+        [
+          ...previousOrders.map((entry) => normalizeOrderCode(entry.id)),
+          ...orders.map((entry) => normalizeOrderCode(entry.orderNumber)),
+        ],
+        8,
+      );
       const todayIso = new Date().toISOString();
       const expectedDeliveryDate = new Date(
         Date.now() +
@@ -202,7 +217,6 @@ export default function CheckoutPage() {
         shippingMethod,
       };
 
-      const previousOrders = safeReadJson("nido_orders", []);
       localStorage.setItem(
         "nido_orders",
         JSON.stringify([confirmationOrder, ...previousOrders]),

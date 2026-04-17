@@ -130,7 +130,7 @@ function PaymentVoucher({ entry }: { entry: PaymentEntry }) {
         <div>
           <h3 className="text-2xl font-semibold">PAYMENTS MADE</h3>
           <p className="text-sm text-muted-foreground">
-            Payment #{entry.paymentNumber}
+            Payment {entry.paymentNumber}
           </p>
         </div>
         <div className="rounded-md bg-emerald-600 px-4 py-3 text-right text-white">

@@ -61,6 +61,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
 import VendorScorecard from "@/components/shared/VendorScorecard";
+import { normalizeOrderCode } from "@/lib/documentNumbering";
 
 const CHART_COLORS = [
   "hsl(213, 94%, 56%)",
@@ -215,7 +216,15 @@ export default function VendorDetailPage() {
     selectedVendorCatalogIds.length === filteredVendorCatalog.length;
 
   const vendorOrders = useMemo(
-    () => (vendor ? orders.filter((o) => o.organization === vendor.name) : []),
+    () =>
+      vendor
+        ? orders
+            .filter((o) => o.organization === vendor.name)
+            .map((o) => ({
+              ...o,
+              orderNumber: normalizeOrderCode(o.orderNumber || o.id),
+            }))
+        : [],
     [vendor, orders],
   );
   const totalSpend = useMemo(
@@ -814,7 +823,7 @@ export default function VendorDetailPage() {
                           onClick={() => navigate(`/orders/${o.id}`)}
                         >
                           <TableCell className="font-medium text-primary">
-                            #{o.orderNumber}
+                            {o.orderNumber}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {o.orderDate}
@@ -870,7 +879,7 @@ export default function VendorDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Order #</TableHead>
+                      <TableHead>Order ID</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Requesting User</TableHead>
                       <TableHead>Status</TableHead>
@@ -886,7 +895,7 @@ export default function VendorDetailPage() {
                         onClick={() => navigate(`/orders/${o.id}`)}
                       >
                         <TableCell className="font-medium text-primary">
-                          #{o.orderNumber}
+                          {o.orderNumber}
                         </TableCell>
                         <TableCell>{o.orderDate}</TableCell>
                         <TableCell>{o.requestingUser}</TableCell>
@@ -1317,7 +1326,7 @@ export default function VendorDetailPage() {
                       className="gap-2"
                       onClick={() => {
                         const headers = [
-                          "Order #",
+                          "Order ID",
                           "Date",
                           "Items",
                           "Status",
@@ -1354,7 +1363,7 @@ export default function VendorDetailPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Order #</TableHead>
+                        <TableHead>Order ID</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
@@ -1364,7 +1373,7 @@ export default function VendorDetailPage() {
                       {vendorOrders.slice(0, 10).map((o) => (
                         <TableRow key={o.id}>
                           <TableCell className="font-medium">
-                            #{o.orderNumber}
+                            {o.orderNumber}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {o.orderDate}

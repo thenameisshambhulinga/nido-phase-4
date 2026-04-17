@@ -66,3 +66,28 @@ export const resolveSequentialCode = (
   }
   return nextSequentialCode(prefix, existingValues, padding);
 };
+
+export const normalizePrefixedCode = (
+  value: string | undefined | null,
+  prefix: string,
+) => {
+  const normalizedPrefix = normalizePrefix(prefix).replace(/-+$/, "");
+  const rawValue = String(value ?? "")
+    .trim()
+    .replace(/^#+/, "");
+
+  if (!rawValue) return "";
+
+  const escapedPrefix = escapeRegExp(normalizedPrefix);
+  const withoutRepeatedPrefix = rawValue.replace(
+    new RegExp(`^(?:${escapedPrefix}-?)+`, "i"),
+    "",
+  );
+  const normalizedSuffix = withoutRepeatedPrefix.replace(/^-+/, "").trim();
+
+  if (!normalizedSuffix) return normalizedPrefix;
+  return `${normalizedPrefix}-${normalizedSuffix}`;
+};
+
+export const normalizeOrderCode = (value: string | undefined | null) =>
+  normalizePrefixedCode(value, "ORD");

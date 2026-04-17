@@ -306,7 +306,7 @@ function BillPdfSheet({
         </div>
         <div className="text-right">
           <h2 className="text-4xl font-serif">BILL</h2>
-          <p className="text-sm">Bill #{bill.billNumber}</p>
+          <p className="text-sm">Bill {bill.billNumber}</p>
           <p className="mt-2 text-sm">Balance Due</p>
           <p className="text-xl font-semibold">{money(balanceDue)}</p>
         </div>

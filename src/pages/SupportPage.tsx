@@ -113,7 +113,7 @@ const INITIAL_TICKETS: Ticket[] = [
     id: "TKT-001",
     organization: "Acme Corp",
     subject: "Delay in laptop delivery",
-    description: "Order #ORD-1042 laptops delayed by 2 weeks.",
+    description: "Order ORD-1042 laptops delayed by 2 weeks.",
     priority: "High",
     status: "In Progress",
     lastUpdated: "2026-03-03",
@@ -157,7 +157,7 @@ const INITIAL_TICKETS: Ticket[] = [
       {
         id: "m3",
         sender: "Beta Inc",
-        text: "Invoice #INV-298 shows ₹45,000 but PO was ₹42,500.",
+        text: "Invoice INV-298 shows ₹45,000 but PO was ₹42,500.",
         timestamp: "2026-02-27 09:15",
       },
     ],

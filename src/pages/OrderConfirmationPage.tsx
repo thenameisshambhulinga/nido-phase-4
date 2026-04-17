@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,9 @@ import {
   FilePlus2,
 } from "lucide-react";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { normalizeOrderCode } from "@/lib/documentNumbering";
 
 type TrackingStage = "confirmed" | "processing" | "shipped" | "delivered";
 
@@ -64,6 +68,7 @@ export default function OrderConfirmationPage() {
   const { orderId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
   const [copied, setCopied] = useState(false);
   const [trackingStage, setTrackingStage] =
@@ -133,35 +138,172 @@ export default function OrderConfirmationPage() {
   );
 
   const stageIndex = timeline.findIndex((step) => step.key === trackingStage);
+  const displayOrderCode = normalizeOrderCode(orderId || order?.id || "");
+
+  const canConvertToInvoice = useMemo(() => {
+    if (!order || !user) return false;
+    const isOwnerPlatformUser =
+      (user.organization || "").trim().toLowerCase() === "nido tech";
+
+    if (user.role === "owner") return true;
+    if (!isOwnerPlatformUser) return false;
+
+    return ["procurement_manager", "accounts_payable"].includes(user.role);
+  }, [order, user]);
+
+  const canDownloadInvoice = useMemo(() => {
+    if (!order || !user) return false;
+    if (canConvertToInvoice) return true;
+    return user.id === order.clientId;
+  }, [order, user]);
 
   const downloadInvoice = () => {
     if (!order) return;
-    const lines = [
-      `Invoice for Order ${order.id}`,
-      `Date: ${new Date(order.orderDate).toLocaleString()}`,
-      "",
-      ...order.items.map(
-        (item) => `${item.name} x${item.quantity} - $${item.total}`,
-      ),
-      "",
-      `Subtotal: $${order.subtotal}`,
-      `Tax: $${order.tax}`,
-      `Shipping: $${order.shippingCost}`,
-      `Total: $${order.total}`,
-      `Payment: ${order.paymentMethod}`,
+    if (!canDownloadInvoice) {
+      toast.error("You are not authorized to download this invoice.");
+      return;
+    }
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, pageWidth, 110, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.text("Nido Tech", 44, 48);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text("Corporate Essentials Invoice", 44, 68);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("INVOICE", pageWidth - 140, 48);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Invoice #: ${order.id}`, pageWidth - 190, 66);
+    doc.text(
+      `Date: ${new Date(order.orderDate).toLocaleDateString()}`,
+      pageWidth - 190,
+      82,
+    );
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Bill To", 44, 144);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const addressLines = [
+      order.shippingInfo.fullName,
+      order.shippingInfo.companyName || "N/A",
+      order.shippingInfo.address,
+      `${order.shippingInfo.city}, ${order.shippingInfo.state} ${order.shippingInfo.zipCode}`,
+      order.shippingInfo.phone,
+      order.shippingInfo.email,
     ];
-    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `invoice-${order.id}.txt`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    let y = 162;
+    addressLines.forEach((line) => {
+      doc.text(line, 44, y);
+      y += 14;
+    });
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Payment", pageWidth - 190, 144);
+    doc.setFont("helvetica", "normal");
+    doc.text(order.paymentMethod.toUpperCase(), pageWidth - 190, 162);
+    doc.text(
+      `Delivery: ${
+        order.shippingMethod === "express" ? "Express" : "Standard"
+      }`,
+      pageWidth - 190,
+      178,
+    );
+
+    autoTable(doc, {
+      startY: 242,
+      margin: { left: 44, right: 44 },
+      head: [["Item", "Category", "Qty", "Unit Price", "Amount"]],
+      body: order.items.map((item) => [
+        item.name,
+        item.category,
+        String(item.quantity),
+        `₹${item.price.toLocaleString()}`,
+        `₹${item.total.toLocaleString()}`,
+      ]),
+      headStyles: {
+        fillColor: [30, 41, 59],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 7,
+        lineColor: [226, 232, 240],
+        lineWidth: 0.5,
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+    });
+
+    const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } })
+      .lastAutoTable?.finalY;
+    const totalsY = (finalY || 360) + 28;
+
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(pageWidth - 232, totalsY - 16, 188, 104, 8, 8, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Subtotal", pageWidth - 216, totalsY + 8);
+    doc.text(
+      `₹${order.subtotal.toLocaleString()}`,
+      pageWidth - 56,
+      totalsY + 8,
+      {
+        align: "right",
+      },
+    );
+    doc.text("Tax", pageWidth - 216, totalsY + 26);
+    doc.text(`₹${order.tax.toLocaleString()}`, pageWidth - 56, totalsY + 26, {
+      align: "right",
+    });
+    doc.text("Shipping", pageWidth - 216, totalsY + 44);
+    doc.text(
+      `₹${order.shippingCost.toLocaleString()}`,
+      pageWidth - 56,
+      totalsY + 44,
+      {
+        align: "right",
+      },
+    );
+    doc.setFont("helvetica", "bold");
+    doc.text("Grand Total", pageWidth - 216, totalsY + 70);
+    doc.text(`₹${order.total.toLocaleString()}`, pageWidth - 56, totalsY + 70, {
+      align: "right",
+    });
+
+    doc.setDrawColor(226, 232, 240);
+    doc.line(44, 792, pageWidth - 44, 792);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text(
+      "Thank you for shopping with Nido Tech. This is a computer-generated invoice.",
+      44,
+      810,
+    );
+
+    doc.save(`invoice-${order.id}.pdf`);
     toast.success("Invoice downloaded");
   };
 
   const convertToInvoice = () => {
     if (!order) return;
+    if (!canConvertToInvoice) {
+      toast.error("You are not authorized to convert this order to invoice.");
+      return;
+    }
     const existing = JSON.parse(
       localStorage.getItem("nido_shop_invoices") || "[]",
     );
@@ -191,7 +333,7 @@ export default function OrderConfirmationPage() {
 
   const handleCopyOrderId = () => {
     if (orderId) {
-      navigator.clipboard.writeText(orderId);
+      navigator.clipboard.writeText(displayOrderCode || orderId);
       setCopied(true);
       toast.success("Order ID copied!");
       setTimeout(() => setCopied(false), 2000);
@@ -242,7 +384,9 @@ export default function OrderConfirmationPage() {
                 Order Number
               </p>
               <div className="flex items-center gap-2 mt-2">
-                <p className="text-xl font-bold text-foreground">{orderId}</p>
+                <p className="text-xl font-bold text-foreground">
+                  {displayOrderCode || orderId}
+                </p>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -558,6 +702,7 @@ export default function OrderConfirmationPage() {
                 variant="outline"
                 className="w-full gap-2"
                 onClick={downloadInvoice}
+                disabled={!canDownloadInvoice}
               >
                 <Download className="h-4 w-4" /> Download Invoice
               </Button>
@@ -574,13 +719,15 @@ export default function OrderConfirmationPage() {
                   : "Advance Tracking"}
               </Button>
 
-              <Button
-                variant="outline"
-                className="w-full gap-2"
-                onClick={convertToInvoice}
-              >
-                <FilePlus2 className="h-4 w-4" /> Convert To Invoice
-              </Button>
+              {canConvertToInvoice && (
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={convertToInvoice}
+                >
+                  <FilePlus2 className="h-4 w-4" /> Convert To Invoice
+                </Button>
+              )}
             </CardContent>
           </Card>
 
@@ -610,8 +757,8 @@ export default function OrderConfirmationPage() {
             <strong>Order Confirmation:</strong> A confirmation email has been
             sent to <strong>{order?.shippingInfo.email}</strong> with all order
             details. Please save this for your records. Your order number is{" "}
-            <strong>{orderId}</strong>. Use this to track your order or contact
-            support.
+            <strong>{displayOrderCode || orderId}</strong>. Use this to track
+            your order or contact support.
           </p>
         </CardContent>
       </Card>
