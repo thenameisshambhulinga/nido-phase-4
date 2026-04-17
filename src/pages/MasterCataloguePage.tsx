@@ -240,6 +240,13 @@ const buildCategorySpecifications = (item: CatalogItem): [string, string][] => {
   const dimensions = formatDimensionText(item);
   const weight = formatWeightText(item);
   const stockVisibility = `${item.initialStock.toLocaleString()} Units`;
+  const semanticSpecSummary = buildSemanticSpecificationSummary(
+    item.specAttributes,
+  );
+  const specificationForDisplay =
+    item.specification?.trim() === semanticSpecSummary
+      ? undefined
+      : item.specification;
   const semanticSpecPairs = (item.specAttributes || [])
     .filter(
       (spec) =>
@@ -249,7 +256,7 @@ const buildCategorySpecifications = (item: CatalogItem): [string, string][] => {
     )
     .map(
       (spec) =>
-        [`${spec.category} / ${spec.attribute}`, spec.value] as [
+        [`${spec.category} - ${spec.attribute}`, spec.value] as [
           string,
           string,
         ],
@@ -290,7 +297,7 @@ const buildCategorySpecifications = (item: CatalogItem): [string, string][] => {
   if (hasAnyKeyword(context, furnitureKeywords)) {
     return [
       ...createSpecList(
-        ["Material / Build", item.specification],
+        ["Material / Build", specificationForDisplay],
         ["Dimensions", dimensions],
         ["Usage Type", item.physicalType],
         ["Warranty", item.warranty],
@@ -306,7 +313,7 @@ const buildCategorySpecifications = (item: CatalogItem): [string, string][] => {
       ...createSpecList(
         ["Model", item.productCode],
         ["Brand", item.brand],
-        ["Technical Specification", item.specification],
+        ["Technical Specification", specificationForDisplay],
         ["Product Type", item.productType],
         ["Warranty", item.warranty],
         ["HSN/SAC", item.hsnCode],
@@ -323,7 +330,7 @@ const buildCategorySpecifications = (item: CatalogItem): [string, string][] => {
         ["Model", item.productCode],
         ["Brand", item.brand],
         ["Product Type", item.productType],
-        ["Connectivity / Tech Spec", item.specification],
+        ["Connectivity / Tech Spec", specificationForDisplay],
         ["Warranty", item.warranty],
         ["Stock Visibility", stockVisibility],
         ["HSN/SAC", item.hsnCode],
@@ -339,7 +346,7 @@ const buildCategorySpecifications = (item: CatalogItem): [string, string][] => {
       ...createSpecList(
         ["Sub-category", item.subCategory],
         ["Brand", item.brand],
-        ["Material / Specification", item.specification],
+        ["Material / Specification", specificationForDisplay],
         ["Pack / Stock", stockVisibility],
         ["Usage Type", item.physicalType],
         ["Dimensions", dimensions],
@@ -356,7 +363,7 @@ const buildCategorySpecifications = (item: CatalogItem): [string, string][] => {
       ["Brand", item.brand],
       ["Product Type", item.productType],
       ["Physical Type", item.physicalType],
-      ["Specification", item.specification],
+      ["Specification", specificationForDisplay],
       ["Warranty", item.warranty],
       ["HSN/SAC", item.hsnCode],
       ["Dimensions", dimensions],
@@ -535,6 +542,7 @@ export default function MasterCataloguePage() {
   const [detailTab, setDetailTab] = useState("overview");
 
   const [form, setForm] = useState<Omit<CatalogItem, "id">>(emptyItem);
+  const [autoProductCode, setAutoProductCode] = useState(false);
   const [autoSku, setAutoSku] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [categories, setCategories] =
@@ -614,6 +622,16 @@ export default function MasterCataloguePage() {
     return `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
   };
 
+  const generateProductCode = () => {
+    const prefix =
+      form.category === "IT Hardware"
+        ? "ITH"
+        : form.category === "Stationery"
+          ? "STN"
+          : "OFS";
+    return `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+  };
+
   const openAddDialog = () => {
     setForm(emptyItem);
     setEditingItem(null);
@@ -621,6 +639,7 @@ export default function MasterCataloguePage() {
     setSpecCategoryInput("");
     setSpecAttributeInput("");
     setSpecValueInput("");
+    setAutoProductCode(false);
     setAutoSku(false);
     setAddDialogOpen(true);
   };
@@ -632,6 +651,8 @@ export default function MasterCataloguePage() {
     setSpecCategoryInput("");
     setSpecAttributeInput("");
     setSpecValueInput("");
+    setAutoProductCode(false);
+    setAutoSku(false);
     setAddDialogOpen(true);
   };
 
@@ -673,12 +694,10 @@ export default function MasterCataloguePage() {
       return;
     }
     const sku = autoSku ? generateSku() : form.sku;
-    const productCode = form.productCode.trim() || sku.trim() || generateSku();
-    const semanticSpecSummary = buildSemanticSpecificationSummary(
-      form.specAttributes,
-    );
-    const specification =
-      form.specification?.trim() || semanticSpecSummary || form.specification;
+    const productCode = autoProductCode
+      ? generateProductCode()
+      : form.productCode.trim() || sku.trim() || generateProductCode();
+    const specification = form.specification?.trim() || form.specification;
 
     const newItem: CatalogItem = {
       ...form,
@@ -1636,10 +1655,25 @@ export default function MasterCataloguePage() {
                       </Select>
                     </div>
                     <div>
-                      <Label>Product Code</Label>
+                      <div className="flex items-center gap-2">
+                        <Label>Product Code</Label>
+                        <div className="flex items-center gap-1 ml-auto">
+                          <Checkbox
+                            checked={autoProductCode}
+                            onCheckedChange={(v) =>
+                              setAutoProductCode(Boolean(v))
+                            }
+                            id="autoProductCode"
+                          />
+                          <Label htmlFor="autoProductCode" className="text-xs">
+                            Auto-Generate
+                          </Label>
+                        </div>
+                      </div>
                       <Input
                         placeholder="e.g., PRD-00001"
-                        value={form.productCode}
+                        value={autoProductCode ? "(auto)" : form.productCode}
+                        disabled={autoProductCode}
                         onChange={(e) =>
                           updateForm({ productCode: e.target.value })
                         }
