@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -46,11 +46,16 @@ import {
   Plus,
   Search,
   ShoppingCart,
-  Star,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
+
+interface SpecificationAttribute {
+  category: string;
+  attribute: string;
+  value: string;
+}
 
 interface CatalogItem {
   id: string;
@@ -89,6 +94,7 @@ interface CatalogItem {
   vendorPhone2?: string;
   trackPerformance?: boolean;
   performanceRating?: number;
+  specAttributes?: SpecificationAttribute[];
 }
 
 const defaultCategories: Record<string, string[]> = {
@@ -114,16 +120,8 @@ const defaultBrands = [
   "Lenovo",
   "Samsung",
 ];
-const defaultVendors = [
-  "HP Direct",
-  "Sandisk Global",
-  "Epson Hub",
-  "Apple Store B2B",
-  "Dell Enterprise",
-];
 const defaultProductTypes = ["Product", "Service", "Subscription"];
 const defaultPhysicalTypes = ["Physical", "Digital", "Hybrid"];
-const leadTimeOptions = ["10 Days", "1 Month", "On Backorder", "TBD"];
 const customsOptions = ["Exempt", "Taxable", "Restricted"];
 const defaultTags = [
   "CoreEssentials",
@@ -170,70 +168,201 @@ const formatWeightText = (item: CatalogItem) => {
   return `${item.weight}${item.weightUnit ? ` ${item.weightUnit}` : ""}`;
 };
 
+const hasMeaningfulValue = (value?: string | number | null) => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "number") return !Number.isNaN(value);
+
+  const normalized = value.trim().toLowerCase();
+  return (
+    normalized.length > 0 &&
+    normalized !== "not specified" &&
+    normalized !== "-" &&
+    normalized !== "n/a" &&
+    normalized !== "na"
+  );
+};
+
+const createSpecList = (
+  ...pairs: Array<[label: string, value?: string | number | null]>
+): [string, string][] =>
+  pairs
+    .filter(([, value]) => hasMeaningfulValue(value))
+    .map(([label, value]) => [label, String(value)]);
+
+const hasAnyKeyword = (source: string, keywords: string[]) =>
+  keywords.some((keyword) => source.includes(keyword));
+
+const buildSemanticSpecificationSummary = (
+  specAttributes?: SpecificationAttribute[],
+) => {
+  if (!specAttributes || specAttributes.length === 0) return "";
+  const grouped = specAttributes.reduce<Record<string, string[]>>(
+    (acc, spec) => {
+      const category = spec.category.trim();
+      const pair = `${spec.attribute.trim()}: ${spec.value.trim()}`;
+      if (!category || !spec.attribute.trim() || !spec.value.trim()) {
+        return acc;
+      }
+      acc[category] = [...(acc[category] || []), pair];
+      return acc;
+    },
+    {},
+  );
+
+  return Object.entries(grouped)
+    .map(([category, pairs]) => `${category} - ${pairs.join(", ")}`)
+    .join(" | ");
+};
+
 const buildCategoryOverviewDescription = (item: CatalogItem) => {
   const category = item.category || "General";
   const subCategory = item.subCategory || "catalogue";
   const brand = item.brand || "trusted";
-  const vendor = item.primaryVendor || "verified supply partner";
 
   if (isElectronicsCategory(item)) {
-    return `${item.name} is a ${category.toLowerCase()} product built for everyday performance and reliability. The ${brand} build, ${subCategory.toLowerCase()} form factor, and procurement-ready configuration make it suitable for business and retail demand. Sourced via ${vendor}, it is positioned for consistent availability, predictable delivery, and smooth after-sales support similar to top e-commerce product listings.`;
+    return `${item.name} is a ${category.toLowerCase()} product built for everyday performance and reliability. The ${brand} build, ${subCategory.toLowerCase()} form factor, and procurement-ready configuration make it suitable for business and retail demand, with consistent availability and predictable delivery similar to top e-commerce product listings.`;
   }
 
   if (normalizeCategoryValue(category).includes("stationery")) {
-    return `${item.name} is a ${subCategory.toLowerCase()} essential designed for repeat daily usage. It balances durability, practical utility, and cost efficiency for office and institutional buying. With sourcing from ${vendor}, this item supports steady replenishment cycles and dependable order fulfillment.`;
+    return `${item.name} is a ${subCategory.toLowerCase()} essential designed for repeat daily usage. It balances durability, practical utility, and cost efficiency for office and institutional buying, supporting steady replenishment cycles and dependable order fulfillment.`;
   }
 
   if (normalizeCategoryValue(category).includes("office")) {
-    return `${item.name} is an office-use ${subCategory.toLowerCase()} item focused on functionality and long-term value. The ${brand} positioning and vendor-backed supply model make it suitable for structured procurement and ongoing inventory planning.`;
+    return `${item.name} is an office-use ${subCategory.toLowerCase()} item focused on functionality and long-term value. The ${brand} positioning makes it suitable for structured procurement and ongoing inventory planning.`;
   }
 
-  return `${item.name} belongs to the ${category} category and is configured for catalogue-led procurement. It is sourced through ${vendor} with pricing, compliance, and stock controls aligned to business purchasing workflows.`;
+  return `${item.name} belongs to the ${category} category and is configured for catalogue-led procurement with pricing, compliance, and stock controls aligned to business purchasing workflows.`;
 };
 
 const buildCategorySpecifications = (item: CatalogItem): [string, string][] => {
-  const common = [
-    ["HSN/SAC", item.hsnCode || "Not specified"],
-    ["Dimensions", formatDimensionText(item)],
-    ["Shipping Weight", formatWeightText(item)],
-    ["Primary Vendor", item.primaryVendor || "Not specified"],
-    ["Vendor SKU", item.vendorSku || "Not specified"],
-    ["Lead Time", item.leadTime || "Not specified"],
-  ] as [string, string][];
+  const context =
+    `${item.category} ${item.subCategory} ${item.name} ${item.productType}`.toLowerCase();
+  const dimensions = formatDimensionText(item);
+  const weight = formatWeightText(item);
+  const stockVisibility = `${item.initialStock.toLocaleString()} Units`;
+  const semanticSpecPairs = (item.specAttributes || [])
+    .filter(
+      (spec) =>
+        hasMeaningfulValue(spec.category) &&
+        hasMeaningfulValue(spec.attribute) &&
+        hasMeaningfulValue(spec.value),
+    )
+    .map(
+      (spec) =>
+        [`${spec.category} / ${spec.attribute}`, spec.value] as [
+          string,
+          string,
+        ],
+    );
+
+  const furnitureKeywords = [
+    "chair",
+    "table",
+    "desk",
+    "stool",
+    "sofa",
+    "cabinet",
+    "shelf",
+    "furniture",
+    "seating",
+  ];
+  const electricalApplianceKeywords = [
+    "electrical",
+    "electronic",
+    "appliance",
+    "refrigerator",
+    "fridge",
+    "washing",
+    "microwave",
+    "oven",
+    "kettle",
+    "geyser",
+    "fan",
+    "heater",
+    "mixer",
+    "grinder",
+    "toaster",
+    "air conditioner",
+    "ac",
+    "printer",
+  ];
+
+  if (hasAnyKeyword(context, furnitureKeywords)) {
+    return [
+      ...createSpecList(
+        ["Material / Build", item.specification],
+        ["Dimensions", dimensions],
+        ["Usage Type", item.physicalType],
+        ["Warranty", item.warranty],
+        ["HSN/SAC", item.hsnCode],
+        ["Shipping Weight", weight],
+      ),
+      ...semanticSpecPairs,
+    ];
+  }
+
+  if (hasAnyKeyword(context, electricalApplianceKeywords)) {
+    return [
+      ...createSpecList(
+        ["Model", item.productCode],
+        ["Brand", item.brand],
+        ["Technical Specification", item.specification],
+        ["Product Type", item.productType],
+        ["Warranty", item.warranty],
+        ["HSN/SAC", item.hsnCode],
+        ["Dimensions", dimensions],
+        ["Shipping Weight", weight],
+      ),
+      ...semanticSpecPairs,
+    ];
+  }
 
   if (isElectronicsCategory(item)) {
     return [
-      ["Model", item.productCode || "Not specified"],
-      ["Brand", item.brand || "Not specified"],
-      ["Product Type", item.productType || "Not specified"],
-      ["Connectivity/Tech Spec", item.specification || "Not specified"],
-      ["Warranty", item.warranty || "Not specified"],
-      ["Stock Visibility", `${item.initialStock.toLocaleString()} Units`],
-      ...common,
+      ...createSpecList(
+        ["Model", item.productCode],
+        ["Brand", item.brand],
+        ["Product Type", item.productType],
+        ["Connectivity / Tech Spec", item.specification],
+        ["Warranty", item.warranty],
+        ["Stock Visibility", stockVisibility],
+        ["HSN/SAC", item.hsnCode],
+        ["Dimensions", dimensions],
+        ["Shipping Weight", weight],
+      ),
+      ...semanticSpecPairs,
     ];
   }
 
   if (normalizeCategoryValue(item.category).includes("stationery")) {
     return [
-      ["Sub-category", item.subCategory || "Not specified"],
-      ["Brand", item.brand || "Not specified"],
-      ["Material/Specification", item.specification || "Not specified"],
-      ["Pack/Stock", `${item.initialStock.toLocaleString()} Units`],
-      ["Product Type", item.productType || "Not specified"],
-      ["Usage Type", item.physicalType || "Not specified"],
-      ...common,
+      ...createSpecList(
+        ["Sub-category", item.subCategory],
+        ["Brand", item.brand],
+        ["Material / Specification", item.specification],
+        ["Pack / Stock", stockVisibility],
+        ["Usage Type", item.physicalType],
+        ["Dimensions", dimensions],
+        ["Shipping Weight", weight],
+      ),
+      ...semanticSpecPairs,
     ];
   }
 
   return [
-    ["Category", item.category || "Not specified"],
-    ["Sub-category", item.subCategory || "Not specified"],
-    ["Brand", item.brand || "Not specified"],
-    ["Product Type", item.productType || "Not specified"],
-    ["Physical Type", item.physicalType || "Not specified"],
-    ["Specification", item.specification || "Not specified"],
-    ["Warranty", item.warranty || "Not specified"],
-    ...common,
+    ...createSpecList(
+      ["Category", item.category],
+      ["Sub-category", item.subCategory],
+      ["Brand", item.brand],
+      ["Product Type", item.productType],
+      ["Physical Type", item.physicalType],
+      ["Specification", item.specification],
+      ["Warranty", item.warranty],
+      ["HSN/SAC", item.hsnCode],
+      ["Dimensions", dimensions],
+      ["Shipping Weight", weight],
+    ),
+    ...semanticSpecPairs,
   ];
 };
 
@@ -385,10 +514,12 @@ const emptyItem: Omit<CatalogItem, "id"> = {
   vendorPhone2: "",
   trackPerformance: false,
   performanceRating: 4,
+  specAttributes: [],
 };
 
 export default function MasterCataloguePage() {
   const navigate = useNavigate();
+  const { user, isOwner } = useAuth();
   const [items, setItems] = useState<CatalogItem[]>(initialItems);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -401,6 +532,7 @@ export default function MasterCataloguePage() {
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [viewItem, setViewItem] = useState<CatalogItem | null>(null);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
+  const [detailTab, setDetailTab] = useState("overview");
 
   const [form, setForm] = useState<Omit<CatalogItem, "id">>(emptyItem);
   const [autoSku, setAutoSku] = useState(false);
@@ -421,6 +553,15 @@ export default function MasterCataloguePage() {
   const [addingProductType, setAddingProductType] = useState(false);
   const [addingPhysicalType, setAddingPhysicalType] = useState(false);
   const [productImages, setProductImages] = useState<string[]>([]);
+  const [specCategoryInput, setSpecCategoryInput] = useState("");
+  const [specAttributeInput, setSpecAttributeInput] = useState("");
+  const [specValueInput, setSpecValueInput] = useState("");
+
+  const canManageSemanticSpecs =
+    isOwner ||
+    ["admin", "procurement_manager", "accounts_payable"].includes(
+      user?.role || "",
+    );
 
   const bulkFileRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -477,15 +618,53 @@ export default function MasterCataloguePage() {
     setForm(emptyItem);
     setEditingItem(null);
     setProductImages([]);
+    setSpecCategoryInput("");
+    setSpecAttributeInput("");
+    setSpecValueInput("");
     setAutoSku(false);
     setAddDialogOpen(true);
   };
 
   const openEditDialog = (item: CatalogItem) => {
-    setForm({ ...item });
+    setForm({ ...item, specAttributes: item.specAttributes || [] });
     setEditingItem(item);
     setProductImages(item.image ? [item.image] : []);
+    setSpecCategoryInput("");
+    setSpecAttributeInput("");
+    setSpecValueInput("");
     setAddDialogOpen(true);
+  };
+
+  const addSemanticSpecificationAttribute = () => {
+    if (!canManageSemanticSpecs) {
+      toast.error(
+        "Only owner and authorized internal users can add spec attributes",
+      );
+      return;
+    }
+
+    const category = specCategoryInput.trim();
+    const attribute = specAttributeInput.trim();
+    const value = specValueInput.trim();
+
+    if (!category || !attribute || !value) {
+      toast.error("Category, attribute, and value are required");
+      return;
+    }
+
+    updateForm({
+      specAttributes: [
+        ...(form.specAttributes || []),
+        {
+          category,
+          attribute,
+          value,
+        },
+      ],
+    });
+    setSpecCategoryInput("");
+    setSpecAttributeInput("");
+    setSpecValueInput("");
   };
 
   const handleAddItem = () => {
@@ -495,12 +674,18 @@ export default function MasterCataloguePage() {
     }
     const sku = autoSku ? generateSku() : form.sku;
     const productCode = form.productCode.trim() || sku.trim() || generateSku();
+    const semanticSpecSummary = buildSemanticSpecificationSummary(
+      form.specAttributes,
+    );
+    const specification =
+      form.specification?.trim() || semanticSpecSummary || form.specification;
 
     const newItem: CatalogItem = {
       ...form,
       id: editingItem ? editingItem.id : Date.now().toString(),
       productCode,
       sku,
+      specification,
       image: productImages[0] || undefined,
     };
 
@@ -700,19 +885,6 @@ export default function MasterCataloguePage() {
       toast.success("Physical type added");
     }
   };
-
-  const renderStars = (rating: number, onChange?: (r: number) => void) => (
-    <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((s) => (
-        <Star
-          key={s}
-          size={16}
-          className={`${s <= rating ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"} ${onChange ? "cursor-pointer" : ""}`}
-          onClick={() => onChange?.(s)}
-        />
-      ))}
-    </div>
-  );
 
   return (
     <div>
@@ -1139,223 +1311,278 @@ export default function MasterCataloguePage() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-          <DialogContent className="max-w-5xl">
+        <Dialog
+          open={viewDialogOpen}
+          onOpenChange={(open) => {
+            setViewDialogOpen(open);
+            if (open) {
+              setDetailTab("overview");
+            }
+          }}
+        >
+          <DialogContent className="max-w-6xl p-0">
             {viewItem && (
-              <div className="space-y-5">
-                <DialogHeader className="space-y-3">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-1">
-                      <DialogTitle className="text-2xl">
-                        {viewItem.name}
-                      </DialogTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {viewItem.productCode || viewItem.sku}
-                      </p>
+              <div className="space-y-0">
+                <DialogHeader className="border-b px-6 py-4">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setViewDialogOpen(false)}
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                        <div>
+                          <DialogTitle className="text-3xl">
+                            {viewItem.name}
+                          </DialogTitle>
+                          <p className="text-sm text-muted-foreground">
+                            {viewItem.productCode || viewItem.sku}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => {
+                            openEditDialog(viewItem);
+                            setViewDialogOpen(false);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" /> Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => {
+                            openEditDialog(viewItem);
+                            setViewDialogOpen(false);
+                            toast.success(
+                              "Open the item form to manage vendor and client mapping.",
+                            );
+                          }}
+                        >
+                          <ShoppingCart className="h-4 w-4" /> Manage Mapping
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() =>
+                            toast.success(
+                              "Delete is intentionally handled from the catalogue grid.",
+                            )
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" /> Delete
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => {
-                          openEditDialog(viewItem);
-                          setViewDialogOpen(false);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" /> Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() => {
-                          openEditDialog(viewItem);
-                          setViewDialogOpen(false);
-                          toast.success(
-                            "Open the item form to manage vendor and client mapping.",
-                          );
-                        }}
-                      >
-                        <ShoppingCart className="h-4 w-4" /> Manage Mapping
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                        onClick={() =>
-                          toast.success(
-                            "Delete is intentionally handled from the catalogue grid.",
-                          )
-                        }
-                      >
-                        <Trash2 className="h-4 w-4" /> Delete
-                      </Button>
-                      <Button variant="outline" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Tabs value={detailTab} onValueChange={setDetailTab}>
+                      <TabsList className="h-10 bg-transparent p-0">
+                        <TabsTrigger value="overview" className="h-9 px-5">
+                          Overview
+                        </TabsTrigger>
+                        <TabsTrigger value="history" className="h-9 px-5">
+                          History
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
                   </div>
                 </DialogHeader>
 
-                <div className="grid gap-0 overflow-hidden rounded-2xl border bg-card lg:grid-cols-[320px_1fr]">
-                  <div className="border-b bg-muted/20 p-6 lg:border-b-0 lg:border-r">
-                    <div className="flex h-full items-center justify-center rounded-2xl border bg-background p-4">
-                      <div className="aspect-square w-full max-w-[260px] overflow-hidden rounded-2xl bg-muted flex items-center justify-center">
-                        {viewItem.image ? (
-                          <img
-                            src={viewItem.image}
-                            alt={viewItem.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <ImageIcon className="h-16 w-16 text-muted-foreground" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-5 p-6">
-                    <div>
-                      <h4 className="text-2xl font-semibold">Overview</h4>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Product master record and operational controls.
-                      </p>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-xl border bg-background p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                          Product Code
-                        </p>
-                        <p className="mt-2 font-medium">
-                          {viewItem.productCode}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border bg-background p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                          Brand
-                        </p>
-                        <p className="mt-2 font-medium">
-                          {viewItem.brand || "-"}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border bg-background p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                          Supplier
-                        </p>
-                        <p className="mt-2 font-medium">
-                          {viewItem.primaryVendor || "Not specified"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="overflow-hidden rounded-xl border bg-background">
-                      <div className="grid grid-cols-2 border-b text-sm">
-                        <div className="border-r p-3 font-medium text-muted-foreground">
-                          SKU
-                        </div>
-                        <div className="p-3">{viewItem.sku}</div>
-                      </div>
-                      <div className="grid grid-cols-2 border-b text-sm">
-                        <div className="border-r p-3 font-medium text-muted-foreground">
-                          Category
-                        </div>
-                        <div className="p-3">{viewItem.category}</div>
-                      </div>
-                      <div className="grid grid-cols-2 border-b text-sm">
-                        <div className="border-r p-3 font-medium text-muted-foreground">
-                          HSN/SAC Code
-                        </div>
-                        <div className="p-3">{viewItem.hsnCode || "-"}</div>
-                      </div>
-                      <div className="grid grid-cols-2 border-b text-sm">
-                        <div className="border-r p-3 font-medium text-muted-foreground">
-                          Price
-                        </div>
-                        <div className="p-3">
-                          ₹{viewItem.price.toLocaleString()}
-                          {viewItem.discountPrice ? (
-                            <span className="ml-2 text-xs text-muted-foreground line-through">
-                              ₹{viewItem.discountPrice.toLocaleString()}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 border-b text-sm">
-                        <div className="border-r p-3 font-medium text-muted-foreground">
-                          Status
-                        </div>
-                        <div className="p-3">
-                          <Badge
-                            className={`${getStatusColor(viewItem.status)} border-none`}
-                          >
-                            {viewItem.status}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 text-sm">
-                        <div className="border-r p-3 font-medium text-muted-foreground">
-                          Stock Quantity
-                        </div>
-                        <div className="p-3">
-                          {viewItem.initialStock.toLocaleString()} Units
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 border-t text-sm">
-                        <div className="border-r p-3 font-medium text-muted-foreground">
-                          Shipping Weight
-                        </div>
-                        <div className="p-3">{formatWeightText(viewItem)}</div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-sm leading-7 text-foreground">
-                        {buildCategoryOverviewDescription(viewItem)}
-                      </p>
-                    </div>
-
-                    <div>
-                      <h5 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        Key Specifications
-                      </h5>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {buildCategorySpecifications(viewItem).map(
-                          ([label, value]) => (
-                            <div
-                              key={label}
-                              className="rounded-xl border bg-background p-3 text-sm"
-                            >
-                              <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                                {label}
-                              </p>
-                              <p className="mt-1 font-medium text-foreground">
-                                {value}
-                              </p>
+                <div className="p-5">
+                  {detailTab === "overview" ? (
+                    <div className="overflow-hidden rounded-xl border bg-card">
+                      <div className="grid lg:grid-cols-[300px_1fr]">
+                        <div className="border-b bg-muted/10 p-6 lg:border-b-0 lg:border-r">
+                          <div className="flex h-full min-h-[280px] items-center justify-center rounded-lg border bg-background p-4">
+                            <div className="aspect-[4/5] w-full max-w-[220px] overflow-hidden rounded-lg bg-muted flex items-center justify-center">
+                              {viewItem.image ? (
+                                <img
+                                  src={viewItem.image}
+                                  alt={viewItem.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <ImageIcon className="h-16 w-16 text-muted-foreground" />
+                              )}
                             </div>
-                          ),
-                        )}
+                          </div>
+                        </div>
+
+                        <div className="p-6 space-y-5">
+                          <h4 className="text-4xl font-semibold tracking-tight">
+                            Overview
+                          </h4>
+
+                          <div className="overflow-hidden rounded-lg border bg-background">
+                            <div className="grid grid-cols-4 border-b text-sm">
+                              <div className="border-r bg-muted/20 p-3 font-medium text-muted-foreground">
+                                SKU:
+                              </div>
+                              <div className="border-r p-3">{viewItem.sku}</div>
+                              <div className="border-r bg-muted/20 p-3 font-medium text-muted-foreground">
+                                Category:
+                              </div>
+                              <div className="p-3">{viewItem.category}</div>
+                            </div>
+                            <div className="grid grid-cols-4 border-b text-sm">
+                              <div className="border-r bg-muted/20 p-3 font-medium text-muted-foreground">
+                                Brand:
+                              </div>
+                              <div className="border-r p-3">
+                                {viewItem.brand || "-"}
+                              </div>
+                              <div className="border-r bg-muted/20 p-3 font-medium text-muted-foreground">
+                                Price:
+                              </div>
+                              <div className="p-3">
+                                ₹{viewItem.price.toLocaleString()}
+                                {viewItem.discountPrice ? (
+                                  <span className="ml-2 text-xs text-muted-foreground line-through">
+                                    ₹{viewItem.discountPrice.toLocaleString()}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-4 border-b text-sm">
+                              <div className="border-r bg-muted/20 p-3 font-medium text-muted-foreground">
+                                Supplier:
+                              </div>
+                              <div className="border-r p-3 text-primary">
+                                {viewItem.primaryVendor || "-"}
+                              </div>
+                              <div className="border-r bg-muted/20 p-3 font-medium text-muted-foreground">
+                                Status:
+                              </div>
+                              <div className="p-3">
+                                <Badge
+                                  className={`${getStatusColor(viewItem.status)} border-none`}
+                                >
+                                  {viewItem.status}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-4 text-sm">
+                              <div className="border-r bg-muted/20 p-3 font-medium text-muted-foreground">
+                                Stock Quantity:
+                              </div>
+                              <div className="border-r p-3">
+                                {viewItem.initialStock.toLocaleString()} Units
+                              </div>
+                              <div className="border-r bg-muted/20 p-3 font-medium text-muted-foreground">
+                                Shipping Weight:
+                              </div>
+                              <div className="p-3">
+                                {formatWeightText(viewItem)}
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-base leading-8 text-foreground">
+                            {buildCategoryOverviewDescription(viewItem)}
+                          </p>
+
+                          <div>
+                            <h5 className="mb-2 text-lg font-semibold">
+                              Key Specifications
+                            </h5>
+                            {buildCategorySpecifications(viewItem).length >
+                            0 ? (
+                              <ul className="columns-1 list-disc space-y-1 pl-5 text-base text-foreground md:columns-2">
+                                {buildCategorySpecifications(viewItem).map(
+                                  ([label, value]) => (
+                                    <li
+                                      key={label}
+                                      className="break-inside-avoid"
+                                    >
+                                      <span className="font-medium">
+                                        {label}:
+                                      </span>{" "}
+                                      <span>{value}</span>
+                                    </li>
+                                  ),
+                                )}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">
+                                No category-specific specifications are
+                                available yet.
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">History</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Event</TableHead>
+                              <TableHead>User</TableHead>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {auditLogs.map((log, i) => (
+                              <TableRow key={i}>
+                                <TableCell>
+                                  <p className="text-sm font-medium">
+                                    {log.event}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {log.detail}
+                                  </p>
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {log.user}
+                                </TableCell>
+                                <TableCell className="text-xs">
+                                  {log.date}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className="bg-success text-success-foreground border-none">
+                                    {log.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
 
-                <div className="flex items-center justify-between gap-3 border-t pt-4">
+                <div className="border-t px-6 py-4">
                   <Button
                     variant="outline"
-                    onClick={() => setViewDialogOpen(false)}
                     className="gap-2"
+                    onClick={() => setViewDialogOpen(false)}
                   >
                     <ArrowLeft className="h-4 w-4" /> Back
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setViewDialogOpen(false)}
-                    className="gap-2"
-                  >
-                    Close
                   </Button>
                 </div>
               </div>
@@ -1791,60 +2018,6 @@ export default function MasterCataloguePage() {
 
                 <div>
                   <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Vendor & Sourcing
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <Label>Primary Vendor</Label>
-                      <Select
-                        value={form.primaryVendor || ""}
-                        onValueChange={(v) => updateForm({ primaryVendor: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Vendor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {defaultVendors.map((vendor) => (
-                            <SelectItem key={vendor} value={vendor}>
-                              {vendor}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Vendor SKU (optional)</Label>
-                      <Input
-                        placeholder="e.g., V-HP-MB-M3"
-                        value={form.vendorSku || ""}
-                        onChange={(e) =>
-                          updateForm({ vendorSku: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label>Estimated Lead Time</Label>
-                      <Select
-                        value={form.leadTime || "10 Days"}
-                        onValueChange={(v) => updateForm({ leadTime: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Days/Weeks" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {leadTimeOptions.map((leadTime) => (
-                            <SelectItem key={leadTime} value={leadTime}>
-                              {leadTime}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
                     Pricing & Inventory
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
@@ -1935,6 +2108,93 @@ export default function MasterCataloguePage() {
                           }
                         />
                       </div>
+                      <div className="rounded-lg border p-3 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label className="text-sm">
+                            Specification Meaning Builder
+                          </Label>
+                          {!canManageSemanticSpecs && (
+                            <Badge variant="outline" className="text-xs">
+                              Restricted
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          <Input
+                            placeholder="Category (e.g. Display)"
+                            value={specCategoryInput}
+                            onChange={(e) =>
+                              setSpecCategoryInput(e.target.value)
+                            }
+                            disabled={!canManageSemanticSpecs}
+                          />
+                          <Input
+                            placeholder="Attribute (e.g. Size)"
+                            value={specAttributeInput}
+                            onChange={(e) =>
+                              setSpecAttributeInput(e.target.value)
+                            }
+                            disabled={!canManageSemanticSpecs}
+                          />
+                          <Input
+                            placeholder="Value (e.g. 10.9 inch)"
+                            value={specValueInput}
+                            onChange={(e) => setSpecValueInput(e.target.value)}
+                            disabled={!canManageSemanticSpecs}
+                          />
+                        </div>
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={addSemanticSpecificationAttribute}
+                          disabled={!canManageSemanticSpecs}
+                        >
+                          Add Specification Attribute
+                        </Button>
+
+                        {(form.specAttributes || []).length > 0 && (
+                          <div className="space-y-2">
+                            {(form.specAttributes || []).map((spec, index) => (
+                              <div
+                                key={`${spec.category}-${spec.attribute}-${index}`}
+                                className="flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-xs"
+                              >
+                                <span>
+                                  <span className="font-medium">
+                                    {spec.category}
+                                  </span>{" "}
+                                  / {spec.attribute}: {spec.value}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-destructive"
+                                  disabled={!canManageSemanticSpecs}
+                                  onClick={() =>
+                                    updateForm({
+                                      specAttributes: (
+                                        form.specAttributes || []
+                                      ).filter((_, i) => i !== index),
+                                    })
+                                  }
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <p className="text-xs text-muted-foreground">
+                          Owner can configure specification schema anytime.
+                          Authorized internal users can configure while creating
+                          or editing items.
+                        </p>
+                      </div>
                       <div>
                         <Label>Warranty Information</Label>
                         <Textarea
@@ -2008,29 +2268,6 @@ export default function MasterCataloguePage() {
                             </div>
                           ))}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Track Vendor Performance
-                  </h3>
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-2">
-                      <Label>Track Performance</Label>
-                      <Switch
-                        checked={form.trackPerformance || false}
-                        onCheckedChange={(v) =>
-                          updateForm({ trackPerformance: v })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label>Performance Rating</Label>
-                      {renderStars(form.performanceRating || 4, (r) =>
-                        updateForm({ performanceRating: r }),
                       )}
                     </div>
                   </div>
