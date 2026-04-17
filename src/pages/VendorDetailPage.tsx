@@ -62,6 +62,10 @@ import { toast } from "@/hooks/use-toast";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
 import VendorScorecard from "@/components/shared/VendorScorecard";
 import { normalizeOrderCode } from "@/lib/documentNumbering";
+import { safeReadJson } from "@/lib/storage";
+
+const VENDOR_ASSIGNMENT_STORAGE_KEY = "nido_order_vendor_assignments_v1";
+const PURCHASE_ORDER_STORAGE_KEY = "nido_purchase_orders_v1";
 
 const CHART_COLORS = [
   "hsl(213, 94%, 56%)",
@@ -215,17 +219,54 @@ export default function VendorDetailPage() {
     filteredVendorCatalog.length > 0 &&
     selectedVendorCatalogIds.length === filteredVendorCatalog.length;
 
+  const vendorAssignedOrderIds = useMemo(() => {
+    if (!vendor) return new Set<string>();
+    const allAssignments = safeReadJson<Record<string, Record<string, string>>>(
+      VENDOR_ASSIGNMENT_STORAGE_KEY,
+      {},
+    );
+
+    return new Set(
+      Object.entries(allAssignments)
+        .filter(([, itemAssignments]) =>
+          Object.values(itemAssignments || {}).includes(vendor.id),
+        )
+        .map(([orderId]) => orderId),
+    );
+  }, [vendor, orders]);
+
+  const vendorPurchaseOrderSourceNumbers = useMemo(() => {
+    if (!vendor) return new Set<string>();
+    const purchaseOrders = safeReadJson<
+      Array<{ vendorName?: string; sourceOrderNumber?: string }>
+    >(PURCHASE_ORDER_STORAGE_KEY, []);
+
+    return new Set(
+      purchaseOrders
+        .filter((entry) => (entry.vendorName || "") === vendor.name)
+        .map((entry) => normalizeOrderCode(entry.sourceOrderNumber || ""))
+        .filter((value) => Boolean(value)),
+    );
+  }, [vendor, orders]);
+
   const vendorOrders = useMemo(
     () =>
       vendor
         ? orders
-            .filter((o) => o.organization === vendor.name)
+            .filter(
+              (o) =>
+                o.organization === vendor.name ||
+                vendorAssignedOrderIds.has(o.id) ||
+                vendorPurchaseOrderSourceNumbers.has(
+                  normalizeOrderCode(o.orderNumber || o.id),
+                ),
+            )
             .map((o) => ({
               ...o,
               orderNumber: normalizeOrderCode(o.orderNumber || o.id),
             }))
         : [],
-    [vendor, orders],
+    [vendor, orders, vendorAssignedOrderIds, vendorPurchaseOrderSourceNumbers],
   );
   const totalSpend = useMemo(
     () => vendorOrders.reduce((s, o) => s + o.totalAmount, 0),
@@ -670,7 +711,9 @@ export default function VendorDetailPage() {
                           <Button
                             variant="link"
                             size="sm"
-                            onClick={() => navigate(`/orders/${o.id}`)}
+                            onClick={() =>
+                              navigate(`/orders/${o.id}?vendorId=${vendor.id}`)
+                            }
                           >
                             View Full Order →
                           </Button>
@@ -820,7 +863,9 @@ export default function VendorDetailPage() {
                         <TableRow
                           key={o.id}
                           className="cursor-pointer"
-                          onClick={() => navigate(`/orders/${o.id}`)}
+                          onClick={() =>
+                            navigate(`/orders/${o.id}?vendorId=${vendor.id}`)
+                          }
                         >
                           <TableCell className="font-medium text-primary">
                             {o.orderNumber}
@@ -892,7 +937,9 @@ export default function VendorDetailPage() {
                       <TableRow
                         key={o.id}
                         className="cursor-pointer"
-                        onClick={() => navigate(`/orders/${o.id}`)}
+                        onClick={() =>
+                          navigate(`/orders/${o.id}?vendorId=${vendor.id}`)
+                        }
                       >
                         <TableCell className="font-medium text-primary">
                           {o.orderNumber}
