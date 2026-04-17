@@ -712,7 +712,9 @@ export default function VendorDetailPage() {
                             variant="link"
                             size="sm"
                             onClick={() =>
-                              navigate(`/orders/${o.id}?vendorId=${vendor.id}`)
+                              navigate(
+                                `/procure/orders/${o.id}?vendorId=${vendor.id}`,
+                              )
                             }
                           >
                             View Full Order →
@@ -864,7 +866,9 @@ export default function VendorDetailPage() {
                           key={o.id}
                           className="cursor-pointer"
                           onClick={() =>
-                            navigate(`/orders/${o.id}?vendorId=${vendor.id}`)
+                            navigate(
+                              `/procure/orders/${o.id}?vendorId=${vendor.id}`,
+                            )
                           }
                         >
                           <TableCell className="font-medium text-primary">
@@ -938,7 +942,9 @@ export default function VendorDetailPage() {
                         key={o.id}
                         className="cursor-pointer"
                         onClick={() =>
-                          navigate(`/orders/${o.id}?vendorId=${vendor.id}`)
+                          navigate(
+                            `/procure/orders/${o.id}?vendorId=${vendor.id}`,
+                          )
                         }
                       >
                         <TableCell className="font-medium text-primary">

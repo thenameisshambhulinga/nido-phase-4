@@ -13,6 +13,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
@@ -42,17 +43,17 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Ellipsis,
   Link2,
   Mail,
   Pencil,
   Plus,
   Printer,
   ReceiptText,
+  ShieldAlert,
   X,
 } from "lucide-react";
 
-type PurchaseOrderStatus = "DRAFT" | "ISSUED";
+type PurchaseOrderStatus = "DRAFT" | "ISSUED" | "CANCELLED";
 type BilledStatus = "YET TO BE BILLED" | "BILLED";
 type ReceiveStatus = "YET TO BE RECEIVED" | "RECEIVED";
 
@@ -710,6 +711,7 @@ export default function PurchaseOrdersPage() {
   const [openForm, setOpenForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<PurchaseOrderForm>(emptyForm);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const printRef = useRef<HTMLDivElement>(null);
   const createMode = location.pathname.endsWith("/create");
@@ -910,6 +912,14 @@ export default function PurchaseOrdersPage() {
   const convertToBill = () => {
     if (!selectedOrder) return;
 
+    if (selectedOrder.status === "CANCELLED") {
+      toast({
+        title: "Cancelled purchase order",
+        description: "Cancelled purchase orders cannot be converted to bills.",
+      });
+      return;
+    }
+
     const existingBills = safeReadJson<BillFromPo[]>(BILLS_STORAGE_KEY, []);
     const existing = existingBills.find(
       (entry) => entry.sourcePurchaseOrderId === selectedOrder.id,
@@ -974,49 +984,27 @@ export default function PurchaseOrdersPage() {
     navigate(`/transactions/purchase/bills/${created.id}`);
   };
 
-  const toggleReceiveStatus = () => {
+  const cancelOrder = () => {
     if (!selectedOrder) return;
+
+    if (selectedOrder.status === "CANCELLED") {
+      toast({ title: "Purchase order is already cancelled" });
+      return;
+    }
+
     persist(
       orders.map((entry) =>
         entry.id === selectedOrder.id
           ? {
               ...entry,
-              receiveStatus:
-                entry.receiveStatus === "RECEIVED"
-                  ? "YET TO BE RECEIVED"
-                  : "RECEIVED",
+              status: "CANCELLED" as const,
+              receiveStatus: "YET TO BE RECEIVED",
             }
           : entry,
       ),
     );
-  };
-
-  const cloneOrder = () => {
-    if (!selectedOrder) return;
-    const cloned: PurchaseOrderEntry = {
-      ...selectedOrder,
-      id: `po-${Date.now()}`,
-      poNumber: nextPoNumber(orders),
-      status: "DRAFT",
-      billedStatus: "YET TO BE BILLED",
-      receiveStatus: "YET TO BE RECEIVED",
-      referenceNumber: "",
-      items: selectedOrder.items.map((item) => ({
-        ...item,
-        id: `item-${Date.now()}-${Math.random()}`,
-      })),
-    };
-    persist([cloned, ...orders]);
-    toast({ title: "Purchase order cloned" });
-    navigate(`/transactions/purchase/purchase-orders/${cloned.id}`);
-  };
-
-  const deleteOrder = () => {
-    if (!selectedOrder) return;
-    const next = orders.filter((entry) => entry.id !== selectedOrder.id);
-    persist(next);
-    toast({ title: "Purchase order deleted" });
-    navigate("/transactions/purchase/purchase-orders", { replace: true });
+    toast({ title: "Purchase order cancelled" });
+    setShowCancelDialog(false);
   };
 
   if (detailId && selectedOrder) {
@@ -1068,29 +1056,19 @@ export default function PurchaseOrdersPage() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Button onClick={convertToBill}>
+                  <Button
+                    onClick={convertToBill}
+                    disabled={selectedOrder.status === "CANCELLED"}
+                  >
                     <ReceiptText className="mr-2 h-4 w-4" /> Convert to Bill
                   </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon">
-                        <Ellipsis className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={toggleReceiveStatus}>
-                        {selectedOrder.receiveStatus === "RECEIVED"
-                          ? "Mark as Yet to Receive"
-                          : "Mark as Received"}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={cloneOrder}>
-                        Clone Purchase Order
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={deleteOrder}>
-                        Delete Purchase Order
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setShowCancelDialog(true)}
+                    disabled={selectedOrder.status === "CANCELLED"}
+                  >
+                    Cancel Purchase Order
+                  </Button>
                 </div>
                 <Button
                   variant="ghost"
@@ -1225,6 +1203,79 @@ export default function PurchaseOrdersPage() {
             />
           </DialogContent>
         </Dialog>
+
+        <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+          <DialogContent className="max-w-xl overflow-hidden border-rose-200 bg-gradient-to-br from-white via-rose-50 to-orange-50 p-0 shadow-2xl">
+            <div className="relative overflow-hidden p-6 md:p-7">
+              <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-rose-500/10 blur-3xl" />
+              <div className="absolute left-0 bottom-0 h-28 w-28 rounded-full bg-orange-400/10 blur-3xl" />
+
+              <DialogHeader className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-600 text-white shadow-lg shadow-rose-600/30">
+                    <ShieldAlert className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-2xl">
+                      Cancel purchase order?
+                    </DialogTitle>
+                    <DialogDescription className="text-sm text-slate-600">
+                      {selectedOrder?.poNumber} will be marked as cancelled and
+                      preserved in history for audit and traceability.
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="mt-6 grid gap-3 md:grid-cols-3">
+                {[
+                  {
+                    label: "PO",
+                    value: selectedOrder?.poNumber || "-",
+                  },
+                  {
+                    label: "Vendor",
+                    value: selectedOrder?.vendorName || "-",
+                  },
+                  {
+                    label: "Current status",
+                    value: selectedOrder?.status || "-",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur"
+                  >
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                      {item.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-rose-200 bg-white/80 p-4 text-sm text-slate-700">
+                Cancelling this PO will stop further billing actions, keep the
+                record in your procurement history, and make the status visibly
+                clear across vendor and internal views.
+              </div>
+
+              <div className="mt-6 flex flex-wrap justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCancelDialog(false)}
+                >
+                  Keep Purchase Order
+                </Button>
+                <Button variant="destructive" onClick={cancelOrder}>
+                  Confirm Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -1296,7 +1347,9 @@ export default function PurchaseOrdersPage() {
                           className={
                             entry.status === "ISSUED"
                               ? "text-blue-600"
-                              : "text-slate-500"
+                              : entry.status === "CANCELLED"
+                                ? "text-rose-600"
+                                : "text-slate-500"
                           }
                         >
                           {entry.status}

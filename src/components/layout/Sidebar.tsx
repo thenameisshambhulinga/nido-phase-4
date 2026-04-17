@@ -78,6 +78,7 @@ const NAV_ITEMS: NavItem[] = [
     module: "vendors",
     children: [
       { label: "Vendor List", path: "/vendors" },
+      { label: "Vendor Orders", path: "/vendors/orders" },
       { label: "Vendor Dashboard", path: "/dashboard/vendor" },
       { label: "Vendor Categories", path: "/vendors/categories" },
       { label: "Vendor Onboarding", path: "/vendors/onboarding" },

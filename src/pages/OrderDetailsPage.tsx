@@ -1,5 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  useParams,
+  useNavigate,
+  useSearchParams,
+  useLocation,
+} from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -217,6 +222,7 @@ const poItemMatchesOrderItem = (
 export default function OrderDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { orders, vendors, updateOrder, addAuditEntry } = useData();
   const { user, isOwner } = useAuth();
@@ -347,6 +353,16 @@ export default function OrderDetailsPage() {
       JSON.stringify(allAssignments),
     );
   }, [order, vendorByItemId]);
+
+  useEffect(() => {
+    if (location.hash !== "#sla-overall") return;
+    const timeoutId = window.setTimeout(() => {
+      document
+        .getElementById("sla-overall")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    return () => window.clearTimeout(timeoutId);
+  }, [location.hash, order?.id]);
 
   if (!order)
     return (
@@ -943,18 +959,61 @@ export default function OrderDetailsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card
+            id="sla-overall"
+            className="border-blue-200/70 bg-gradient-to-br from-blue-50 via-white to-cyan-50 shadow-sm"
+          >
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">
-                SLA Information (Overall)
-              </CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-sm">
+                  SLA Information (Overall)
+                </CardTitle>
+                <Badge
+                  variant="outline"
+                  className={
+                    order.slaStatus === "within_sla"
+                      ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                      : order.slaStatus === "at_risk"
+                        ? "bg-amber-100 text-amber-700 border-amber-300"
+                        : "bg-rose-100 text-rose-700 border-rose-300"
+                  }
+                >
+                  {order.slaStatus
+                    .replace("_", " ")
+                    .replace(/\b\w/g, (c) => c.toUpperCase())}
+                </Badge>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
               {isVendorScopedView && vendorContext && (
                 <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
                   Vendor SLA Mode: {vendorContext.name}
                 </div>
               )}
+
+              <div className="relative mx-auto w-full max-w-[360px]">
+                {!isDelivered && (
+                  <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-blue-300/35 via-cyan-300/30 to-sky-300/35 blur-md" />
+                )}
+                <div
+                  className={`relative rounded-2xl border px-4 py-5 text-center ${
+                    isDelivered
+                      ? "border-emerald-300 bg-emerald-50"
+                      : "border-blue-200 bg-white/95 shadow-[0_10px_30px_rgba(2,132,199,0.16)]"
+                  }`}
+                >
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                    Live SLA Timer
+                  </p>
+                  <p className="mt-2 text-5xl font-mono font-bold tracking-[0.18em] text-slate-800">
+                    {slaTime}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Started {new Date(order.slaStartTime).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={handleRefreshSla}>
                   <RefreshCw className="mr-1 h-4 w-4" /> Refresh SLA
@@ -981,6 +1040,7 @@ export default function OrderDetailsPage() {
                   <BellRing className="mr-1 h-4 w-4" /> Set Reminder
                 </Button>
               </div>
+
               <div className="flex flex-wrap items-end justify-end gap-2">
                 <div>
                   <p className="text-[11px] text-muted-foreground mb-1">
@@ -1017,47 +1077,41 @@ export default function OrderDetailsPage() {
                   </div>
                 </div>
               </div>
-              <div className="text-center space-y-3">
-                <div
-                  className={`text-4xl font-mono font-bold tracking-wider border-2 rounded-lg py-3 px-4 inline-block ${isDelivered ? "border-emerald-500 text-emerald-600 bg-emerald-50" : "border-border"} ${isVendorScopedView ? "shadow-[0_0_0_4px_rgba(59,130,246,0.08)]" : ""}`}
-                >
-                  {slaTime}
+
+              {isDelivered && (
+                <p className="text-center text-xs text-emerald-700 font-medium">
+                  SLA timer stopped because this order is delivered.
+                </p>
+              )}
+
+              <div className="rounded-lg border bg-white/80 p-3 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">SLA start time:</span>
+                  <span>{new Date(order.slaStartTime).toLocaleString()}</span>
                 </div>
-                {isDelivered && (
-                  <p className="text-xs text-emerald-600 font-medium">
-                    SLA timer stopped — Order Delivered
-                  </p>
-                )}
-                <div className="text-sm space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      SLA start time:
-                    </span>
-                    <span>{new Date(order.slaStartTime).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">SLA Status:</span>
-                    <span
-                      className={
-                        order.slaStatus === "within_sla"
-                          ? "text-success font-medium"
-                          : order.slaStatus === "at_risk"
-                            ? "text-warning font-medium"
-                            : "text-destructive font-medium"
-                      }
-                    >
-                      {order.slaStatus
-                        .replace("_", " ")
-                        .replace(/\b\w/g, (c) => c.toUpperCase())}
-                    </span>
-                  </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">SLA Status:</span>
+                  <span
+                    className={
+                      order.slaStatus === "within_sla"
+                        ? "text-success font-medium"
+                        : order.slaStatus === "at_risk"
+                          ? "text-warning font-medium"
+                          : "text-destructive font-medium"
+                    }
+                  >
+                    {order.slaStatus
+                      .replace("_", " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </span>
                 </div>
-                {isBulkOrder && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Click any Sub-Order ID below to view individual SLA details
-                  </p>
-                )}
               </div>
+
+              {isBulkOrder && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Click any Sub-Order ID below to view individual SLA details.
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -1598,134 +1652,136 @@ export default function OrderDetailsPage() {
         </div>
 
         {/* Comments & Collaboration */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <MessageSquare className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">
-                  Comments & Collaboration
-                </CardTitle>
-                <Badge variant="secondary" className="text-xs">
-                  {orderCommentHistory.length} messages
-                </Badge>
+        {!isVendorScopedView && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">
+                    Comments & Collaboration
+                  </CardTitle>
+                  <Badge variant="secondary" className="text-xs">
+                    {orderCommentHistory.length} messages
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Select
+                    onValueChange={(v) => {
+                      setMailRecipientType(v as "vendor" | "client");
+                      setShowMailComposer(true);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 w-auto text-sm gap-2 border-border">
+                      <Mail className="h-4 w-4" />
+                      <span>Send Email</span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="client">Mail to Client</SelectItem>
+                      <SelectItem value="vendor">Mail to Vendor</SelectItem>
+                      <SelectItem value="all">Mail to Any</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select onValueChange={handleStatusUpdate}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Update Status" />
+                    </SelectTrigger>
+
+                    <SelectContent>
+                      <SelectItem value="Processing">Processing</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                      <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="flex gap-2">
-                <Select
-                  onValueChange={(v) => {
-                    setMailRecipientType(v as "vendor" | "client");
-                    setShowMailComposer(true);
-                  }}
-                >
-                  <SelectTrigger className="h-9 w-auto text-sm gap-2 border-border">
-                    <Mail className="h-4 w-4" />
-                    <span>Send Email</span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="client">Mail to Client</SelectItem>
-                    <SelectItem value="vendor">Mail to Vendor</SelectItem>
-                    <SelectItem value="all">Mail to Any</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select onValueChange={handleStatusUpdate}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Update Status" />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    <SelectItem value="Processing">Processing</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                    <SelectItem value="Cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              {(["all", "internal", "external"] as const).map((f) => (
-                <Button
-                  key={f}
-                  variant={commentFilter === f ? "default" : "outline"}
-                  size="sm"
-                  className="text-xs capitalize"
-                  onClick={() => setCommentFilter(f)}
-                >
-                  {f === "all"
-                    ? "All Messages"
-                    : f === "internal"
-                      ? "Admin/Internal"
-                      : "External/Client"}
-                </Button>
-              ))}
-            </div>
-
-            <ScrollArea className="h-64 pr-4">
-              <div className="space-y-4">
-                {visibleComments.map((c) => (
-                  <div key={c.id} className="flex items-start gap-3">
-                    <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-sm text-primary-foreground font-bold shrink-0">
-                      {c.user.charAt(0)}
-                    </div>
-                    <div className="flex-1 bg-muted/40 rounded-xl p-4">
-                      <div className="flex items-center gap-3 mb-1">
-                        <span className="text-sm font-semibold text-foreground">
-                          {c.user}
-                        </span>
-                        <Badge variant="outline" className="text-[10px] h-5">
-                          {c.type === "internal" ? "INTERNAL" : "EXTERNAL"}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground ml-auto">
-                          {new Date(c.timestamp).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-foreground leading-relaxed">
-                        {c.text}
-                      </p>
-                    </div>
-                  </div>
+                {(["all", "internal", "external"] as const).map((f) => (
+                  <Button
+                    key={f}
+                    variant={commentFilter === f ? "default" : "outline"}
+                    size="sm"
+                    className="text-xs capitalize"
+                    onClick={() => setCommentFilter(f)}
+                  >
+                    {f === "all"
+                      ? "All Messages"
+                      : f === "internal"
+                        ? "Admin/Internal"
+                        : "External/Client"}
+                  </Button>
                 ))}
-                {filteredComments.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">No messages yet</p>
-                  </div>
-                )}
-                {filteredComments.length > visibleComments.length && (
-                  <div className="flex justify-center pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setVisibleCommentCount((prev) => prev + 30)
-                      }
-                    >
-                      Load Older Messages
-                    </Button>
-                  </div>
-                )}
               </div>
-            </ScrollArea>
 
-            <Separator />
+              <ScrollArea className="h-64 pr-4">
+                <div className="space-y-4">
+                  {visibleComments.map((c) => (
+                    <div key={c.id} className="flex items-start gap-3">
+                      <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-sm text-primary-foreground font-bold shrink-0">
+                        {c.user.charAt(0)}
+                      </div>
+                      <div className="flex-1 bg-muted/40 rounded-xl p-4">
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-sm font-semibold text-foreground">
+                            {c.user}
+                          </span>
+                          <Badge variant="outline" className="text-[10px] h-5">
+                            {c.type === "internal" ? "INTERNAL" : "EXTERNAL"}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            {new Date(c.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-foreground leading-relaxed">
+                          {c.text}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredComments.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">No messages yet</p>
+                    </div>
+                  )}
+                  {filteredComments.length > visibleComments.length && (
+                    <div className="flex justify-center pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setVisibleCommentCount((prev) => prev + 30)
+                        }
+                      >
+                        Load Older Messages
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
 
-            <div className="flex gap-3 items-center">
-              <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-sm text-primary-foreground font-bold shrink-0">
-                {user?.name?.charAt(0) || "U"}
+              <Separator />
+
+              <div className="flex gap-3 items-center">
+                <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-sm text-primary-foreground font-bold shrink-0">
+                  {user?.name?.charAt(0) || "U"}
+                </div>
+                <Input
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Write a comment or update..."
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && handleAddComment()}
+                />
+                <Button className="gap-2" onClick={handleAddComment}>
+                  <Send className="h-4 w-4" /> Send
+                </Button>
               </div>
-              <Input
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Write a comment or update..."
-                className="flex-1"
-                onKeyDown={(e) => e.key === "Enter" && handleAddComment()}
-              />
-              <Button className="gap-2" onClick={handleAddComment}>
-                <Send className="h-4 w-4" /> Send
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Document Attachments */}
         <Card>

@@ -32,6 +32,7 @@ import ApprovalWorkflowsPage from "@/pages/ApprovalWorkflowsPage";
 import VendorCategoriesPage from "@/pages/VendorCategoriesPage";
 import VendorsPage from "@/pages/VendorsPage";
 import VendorDetailPage from "@/pages/VendorDetailPage";
+import VendorOrdersPage from "@/pages/VendorOrdersPage";
 import VendorOnboardingPage from "@/pages/VendorOnboardingPage";
 import ClientsPage from "@/pages/ClientsPage";
 import AddClient from "@/pages/AddClient";
@@ -148,9 +149,11 @@ function AppRoutes() {
           }
         />
         <Route path="vendors" element={<VendorsPage />} />
+        <Route path="vendors/orders" element={<VendorOrdersPage />} />
         <Route path="vendors/categories" element={<VendorCategoriesPage />} />
         <Route path="vendors/onboarding" element={<VendorOnboardingPage />} />
         <Route path="vendors/:id" element={<VendorDetailPage />} />
+        <Route path="procure/orders/:id" element={<OrderDetailsPage />} />
         <Route
           path="clients"
           element={

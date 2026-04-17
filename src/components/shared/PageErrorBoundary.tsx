@@ -1,6 +1,5 @@
 import { Component, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import ModernErrorPage from "@/components/shared/ModernErrorPage";
 
 type PageErrorBoundaryProps = {
   children: ReactNode;
@@ -30,28 +29,27 @@ export default class PageErrorBoundary extends Component<
 
   render() {
     if (this.state.hasError) {
+      const offline =
+        typeof navigator !== "undefined" && navigator.onLine === false;
       return (
-        <div className="p-6">
-          <Card className="mx-auto max-w-2xl border-border/60 shadow-sm">
-            <CardContent className="space-y-4 py-8 text-center">
-              <div>
-                <p className="text-lg font-semibold">
-                  {this.props.title || "Unable to open page"}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  The page hit a runtime error. Reloading or navigating back
-                  will restore the app shell.
-                </p>
-              </div>
-              <div className="flex justify-center gap-2">
-                <Button onClick={() => window.location.reload()}>Reload</Button>
-                <Button variant="outline" onClick={() => history.back()}>
-                  Go Back
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <ModernErrorPage
+          variant={offline ? "offline" : "server"}
+          title={this.props.title || "Unable to open page"}
+          description={
+            offline
+              ? "The page could not load because the device is offline. Reconnect to the network and try again."
+              : "The page hit a runtime error. Reloading or navigating back will restore the app shell."
+          }
+          detail={
+            offline
+              ? "Offline mode detected by the browser connection monitor."
+              : undefined
+          }
+          primaryActionLabel={offline ? "Retry connection" : "Reload page"}
+          secondaryActionLabel="Go back"
+          onPrimaryAction={() => window.location.reload()}
+          onSecondaryAction={() => history.back()}
+        />
       );
     }
 
