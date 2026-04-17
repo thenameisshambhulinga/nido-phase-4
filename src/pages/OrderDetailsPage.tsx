@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -217,9 +217,14 @@ const poItemMatchesOrderItem = (
 export default function OrderDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { orders, vendors, updateOrder, addAuditEntry } = useData();
   const { user, isOwner } = useAuth();
   const order = orders.find((o) => o.id === id);
+  const vendorContextId = searchParams.get("vendorId") || "";
+  const vendorContext =
+    vendors.find((vendor) => vendor.id === vendorContextId) || null;
+  const isVendorScopedView = Boolean(vendorContext && vendorContextId);
   const [newComment, setNewComment] = useState("");
   const [slaTime, setSlaTime] = useState("00:00:00");
   const [slaSetHours, setSlaSetHours] = useState("0");
@@ -358,6 +363,14 @@ export default function OrderDetailsPage() {
   const orderAttachments = Array.isArray(order.attachments)
     ? order.attachments
     : [];
+  const vendorScopedItemIds = isVendorScopedView
+    ? Object.entries(vendorByItemId)
+        .filter(([, assignedVendorId]) => assignedVendorId === vendorContextId)
+        .map(([itemId]) => itemId)
+    : [];
+  const scopedOrderItems = isVendorScopedView
+    ? orderItems.filter((item) => vendorScopedItemIds.includes(item.id))
+    : orderItems;
 
   const handleStatusUpdate = (status: string) => {
     updateOrder(order.id, { status });
@@ -434,21 +447,34 @@ export default function OrderDetailsPage() {
     return <Paperclip className="h-4 w-4 text-muted-foreground" />;
   };
 
-  const isBulkOrder = orderItems.length > 1;
+  const isBulkOrder = scopedOrderItems.length > 1;
   const formattedOrderNumber = normalizeOrderCode(order.orderNumber);
   const masterOrderId = formattedOrderNumber;
+  const scopedSubOrders = isVendorScopedView
+    ? subOrders.filter((_, index) => {
+        const itemId = orderItems[index]?.id;
+        return Boolean(itemId && vendorScopedItemIds.includes(itemId));
+      })
+    : subOrders;
+  const scopedTotalAmount = scopedOrderItems.reduce(
+    (sum, item) => sum + item.totalCost,
+    0,
+  );
 
-  const selectedItems = orderItems.filter((item) =>
+  const selectedItems = scopedOrderItems.filter((item) =>
     selectedItemIds.includes(item.id),
   );
 
-  const existingPurchaseOrders = useMemo(
-    () =>
-      safeReadJson<PurchaseOrderEntry[]>(PURCHASE_ORDER_STORAGE_KEY, []).filter(
-        (entry) => entry.sourceOrderNumber === order.orderNumber,
-      ),
-    [order.orderNumber, poRefreshTick],
-  );
+  const existingPurchaseOrders = useMemo(() => {
+    const normalizedOrder = normalizeOrderCode(order.orderNumber);
+    return safeReadJson<PurchaseOrderEntry[]>(
+      PURCHASE_ORDER_STORAGE_KEY,
+      [],
+    ).filter((entry) => {
+      const sourceOrder = normalizeOrderCode(entry.sourceOrderNumber || "");
+      return sourceOrder === normalizedOrder;
+    });
+  }, [order.orderNumber, poRefreshTick]);
 
   const activePoItemIds = useMemo(() => {
     const ids = new Set<string>();
@@ -460,7 +486,7 @@ export default function OrderDetailsPage() {
         statusValue === "cancelled" || statusValue === "canceled";
       if (isCancelled) return;
       entry.items.forEach((poItem) => {
-        orderItems.forEach((item) => {
+        scopedOrderItems.forEach((item) => {
           if (poItemMatchesOrderItem(poItem, item.id)) {
             ids.add(item.id);
           }
@@ -468,7 +494,7 @@ export default function OrderDetailsPage() {
       });
     });
     return ids;
-  }, [existingPurchaseOrders, orderItems]);
+  }, [existingPurchaseOrders, scopedOrderItems]);
 
   const isItemProcurementLocked = (itemId: string) =>
     activePoItemIds.has(itemId);
@@ -521,7 +547,7 @@ export default function OrderDetailsPage() {
       "Delivered",
     ];
 
-    const eligibleItems = orderItems.filter(
+    const eligibleItems = scopedOrderItems.filter(
       (item) => vendorByItemId[item.id] || activePoItemIds.has(item.id),
     );
 
@@ -547,11 +573,40 @@ export default function OrderDetailsPage() {
     isDelivered,
     order.status,
     order.trackingNumber,
-    orderItems,
+    scopedOrderItems,
     order.orderNumber,
     vendorByItemId,
     activePoItemIds,
   ]);
+
+  const vendorProcurementTimeline = useMemo(() => {
+    const statusToStageIndex: Record<string, number> = {
+      Pending: 0,
+      New: 0,
+      Approved: 1,
+      Processing: 2,
+      Shipped: 3,
+      Delivered: 5,
+      Completed: 5,
+      Cancelled: 0,
+    };
+
+    const current = isDelivered ? 5 : (statusToStageIndex[order.status] ?? 2);
+    const steps = [
+      "Order Created",
+      "PO Created",
+      "Sent to Vendor",
+      "Acknowledged",
+      "Split Shipment",
+      "Delivered",
+    ];
+
+    return steps.map((step, index) => ({
+      step,
+      state:
+        index < current ? "done" : index === current ? "current" : "pending",
+    }));
+  }, [isDelivered, order.status]);
 
   const matchingVendors = useMemo(() => {
     if (selectedItems.length === 0) return [];
@@ -572,7 +627,7 @@ export default function OrderDetailsPage() {
 
   const toggleSelectAllItems = (checked: boolean) => {
     if (checked) {
-      setSelectedItemIds(orderItems.map((item) => item.id));
+      setSelectedItemIds(scopedOrderItems.map((item) => item.id));
       return;
     }
     setSelectedItemIds([]);
@@ -819,10 +874,15 @@ export default function OrderDetailsPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate("/orders")}
+          onClick={() =>
+            isVendorScopedView
+              ? navigate(`/vendors/${vendorContextId}`)
+              : navigate("/orders")
+          }
           className="gap-2"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to Orders
+          <ArrowLeft className="h-4 w-4" />
+          {isVendorScopedView ? "Back to Vendor Orders" : "Back to Orders"}
         </Button>
 
         {/* Master Order Header */}
@@ -890,6 +950,11 @@ export default function OrderDetailsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {isVendorScopedView && vendorContext && (
+                <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                  Vendor SLA Mode: {vendorContext.name}
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={handleRefreshSla}>
                   <RefreshCw className="mr-1 h-4 w-4" /> Refresh SLA
@@ -954,7 +1019,7 @@ export default function OrderDetailsPage() {
               </div>
               <div className="text-center space-y-3">
                 <div
-                  className={`text-4xl font-mono font-bold tracking-wider border-2 rounded-lg py-3 px-4 inline-block ${isDelivered ? "border-emerald-500 text-emerald-600 bg-emerald-50" : "border-border"}`}
+                  className={`text-4xl font-mono font-bold tracking-wider border-2 rounded-lg py-3 px-4 inline-block ${isDelivered ? "border-emerald-500 text-emerald-600 bg-emerald-50" : "border-border"} ${isVendorScopedView ? "shadow-[0_0_0_4px_rgba(59,130,246,0.08)]" : ""}`}
                 >
                   {slaTime}
                 </div>
@@ -1034,17 +1099,19 @@ export default function OrderDetailsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={
-                        orderItems.length > 0 &&
-                        selectedItemIds.length === orderItems.length
-                      }
-                      onCheckedChange={(checked) =>
-                        toggleSelectAllItems(Boolean(checked))
-                      }
-                    />
-                  </TableHead>
+                  {!isVendorScopedView && (
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          scopedOrderItems.length > 0 &&
+                          selectedItemIds.length === scopedOrderItems.length
+                        }
+                        onCheckedChange={(checked) =>
+                          toggleSelectAllItems(Boolean(checked))
+                        }
+                      />
+                    </TableHead>
+                  )}
                   <TableHead>
                     {isBulkOrder ? "Sub Order ID" : "Order/Service No."}
                   </TableHead>
@@ -1058,22 +1125,26 @@ export default function OrderDetailsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orderItems.map((item, i) => (
+                {scopedOrderItems.map((item, i) => (
                   <TableRow key={item.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedItemIds.includes(item.id)}
-                        onCheckedChange={() => toggleItemSelection(item.id)}
-                      />
-                    </TableCell>
+                    {!isVendorScopedView && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedItemIds.includes(item.id)}
+                          onCheckedChange={() => toggleItemSelection(item.id)}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell>
                       {isBulkOrder ? (
                         <button
                           className="text-primary font-medium font-mono text-xs hover:underline cursor-pointer flex items-center gap-1"
-                          onClick={() => setSelectedSubOrder(subOrders[i])}
+                          onClick={() =>
+                            setSelectedSubOrder(scopedSubOrders[i])
+                          }
                         >
                           <Timer className="h-3 w-3" />
-                          {subOrders[i]?.subOrderId}
+                          {scopedSubOrders[i]?.subOrderId}
                         </button>
                       ) : (
                         <span className="text-primary font-medium font-mono text-xs">
@@ -1084,7 +1155,7 @@ export default function OrderDetailsPage() {
                     {isBulkOrder && (
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
-                          {subOrders[i]?.category}
+                          {scopedSubOrders[i]?.category}
                         </Badge>
                       </TableCell>
                     )}
@@ -1104,12 +1175,12 @@ export default function OrderDetailsPage() {
                     {isBulkOrder && (
                       <TableCell>
                         <Badge
-                          className={getSlaColor(subOrders[i]?.slaStatus)}
+                          className={getSlaColor(scopedSubOrders[i]?.slaStatus)}
                           variant="outline"
                         >
                           {isDelivered
                             ? "Completed"
-                            : subOrders[i]?.slaStatus.replace("_", " ")}
+                            : scopedSubOrders[i]?.slaStatus.replace("_", " ")}
                         </Badge>
                       </TableCell>
                     )}
@@ -1120,24 +1191,32 @@ export default function OrderDetailsPage() {
             <div className="flex justify-end mt-4">
               <div className="text-sm space-y-1 text-right">
                 {isBulkOrder &&
-                  orderItems.map((item, i) => (
+                  scopedOrderItems.map((item, i) => (
                     <div
                       key={i}
                       className="flex justify-between gap-8 text-xs text-muted-foreground"
                     >
                       <button
                         className="text-primary hover:underline cursor-pointer"
-                        onClick={() => setSelectedSubOrder(subOrders[i])}
+                        onClick={() => setSelectedSubOrder(scopedSubOrders[i])}
                       >
-                        {subOrders[i]?.subOrderId}
+                        {scopedSubOrders[i]?.subOrderId}
                       </button>
                       <span>${item.totalCost.toLocaleString()}</span>
                     </div>
                   ))}
                 <div className="border-t pt-1 flex justify-between gap-8">
-                  <span className="font-semibold">Overall order total</span>
+                  <span className="font-semibold">
+                    {isVendorScopedView
+                      ? "Vendor assigned total"
+                      : "Overall order total"}
+                  </span>
                   <span className="font-bold text-lg">
-                    ${order.totalAmount.toLocaleString()}
+                    $
+                    {(isVendorScopedView
+                      ? scopedTotalAmount
+                      : order.totalAmount
+                    ).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -1151,269 +1230,315 @@ export default function OrderDetailsPage() {
               Item-wise Procurement Tracking Timeline
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {itemWiseTracking.length === 0 && (
-              <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                Timeline appears only for items that have a vendor assigned or
-                an active purchase order.
-              </p>
-            )}
-
-            {itemWiseTracking.map(({ item, stages, progress, rowCode }) => (
-              <div
-                key={item.id}
-                className="rounded-xl border bg-background/80 p-4 shadow-sm"
-              >
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-foreground">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Ref {rowCode} • SKU/{item.sku} • Qty {item.quantity}
-                    </p>
-                  </div>
-                  <Badge variant="secondary">{progress}% Tracked</Badge>
-                </div>
-
-                <div className="space-y-3">
-                  {stages.map((step, index) => (
-                    <div
-                      key={`${item.id}-${step.label}`}
-                      className="flex gap-3"
-                    >
-                      <div className="flex w-4 flex-col items-center">
-                        {step.state === "done" ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        ) : step.state === "current" ? (
-                          <CheckCircle2 className="h-4 w-4 text-blue-600" />
-                        ) : (
-                          <Circle className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        {index < stages.length - 1 && (
-                          <span className="mt-1 h-6 w-px bg-border" />
-                        )}
-                      </div>
-                      <div
-                        className={`rounded-lg border px-3 py-2 text-xs w-full ${
-                          step.state === "done"
-                            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                            : step.state === "current"
-                              ? "border-blue-300 bg-blue-50 text-blue-700"
-                              : "border-border bg-muted/30 text-muted-foreground"
-                        }`}
-                      >
-                        <p className="font-semibold">{step.label}</p>
-                        <p className="mt-1">{step.etaHint}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center justify-between">
-              <span>Vendor Selection</span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={handleRefreshVendorRecommendations}
-              >
-                <RefreshCw className="h-4 w-4" /> Refresh vendors
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Select a vendor to fulfill each selected item using quantity, unit
-              price, delivery estimate, and availability score.
-            </p>
-
-            <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-              <div className="space-y-3">
-                {selectedItems.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No items selected yet. Tick item checkboxes above to enable
-                    vendor assignment.
+          <CardContent>
+            <div
+              className={`grid gap-4 ${isVendorScopedView ? "lg:grid-cols-[1fr_320px]" : "grid-cols-1"}`}
+            >
+              <div className="space-y-4">
+                {itemWiseTracking.length === 0 && (
+                  <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                    Timeline appears only for items that have a vendor assigned
+                    or an active purchase order.
                   </p>
                 )}
 
-                {selectedItems.map((item) => {
-                  const vendorRows = buildVendorRowsForItem(item);
-                  const bestVendor = vendorRows[0]?.vendor;
-                  const selectedVendorId = resolveVendorIdForItem(item);
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="rounded-lg border p-3 space-y-3"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            SKU/{item.sku} • Qty {item.quantity} • $
-                            {item.totalCost.toLocaleString()}
-                          </p>
-                          {!!item.description && (
-                            <p className="text-xs text-muted-foreground">
-                              Specs: {item.description}
-                            </p>
-                          )}
-                        </div>
-                        {isItemProcurementLocked(item.id) && (
-                          <Badge className="bg-amber-100 text-amber-800">
-                            PO already generated
-                          </Badge>
-                        )}
+                {itemWiseTracking.map(({ item, stages, progress, rowCode }) => (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border bg-background/80 p-4 shadow-sm"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-foreground">
+                          {item.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Ref {rowCode} • SKU/{item.sku} • Qty {item.quantity}
+                        </p>
                       </div>
-
-                      {!!bestVendor && (
-                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-                          <span className="font-semibold">
-                            Best Vendor: {bestVendor.name}
-                          </span>{" "}
-                          has been selected based on price, delivery time, and
-                          availability score.
-                        </div>
-                      )}
-
-                      <div className="rounded-lg border overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Vendor Matching Panel</TableHead>
-                              <TableHead className="text-right">
-                                Available Qty
-                              </TableHead>
-                              <TableHead className="text-right">
-                                Price per Unit
-                              </TableHead>
-                              <TableHead className="text-right">
-                                Est. Delivery Time
-                              </TableHead>
-                              <TableHead className="text-right">
-                                Availability Score
-                              </TableHead>
-                              <TableHead className="text-center">
-                                Select
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {vendorRows.map(({ vendor, metric }) => (
-                              <TableRow key={`${item.id}-${vendor.id}`}>
-                                <TableCell className="font-medium">
-                                  {vendor.name}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {metric.availableQty}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  ${metric.pricePerUnit.toLocaleString()}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {metric.estDeliveryDays}d
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <span className="inline-flex items-center gap-2">
-                                    <span className="h-2 w-16 rounded bg-muted">
-                                      <span
-                                        className="block h-2 rounded bg-emerald-500"
-                                        style={{
-                                          width: `${Math.min(100, metric.availabilityScore)}%`,
-                                        }}
-                                      />
-                                    </span>
-                                    {metric.availabilityScore}
-                                  </span>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <button
-                                    className="inline-flex items-center justify-center"
-                                    onClick={() => {
-                                      if (isItemProcurementLocked(item.id)) {
-                                        toast({
-                                          title: "Cannot change vendor",
-                                          description:
-                                            "PO already exists for this item. Cancel it first to reassign vendor.",
-                                        });
-                                        return;
-                                      }
-                                      setVendorByItemId((prev) => ({
-                                        ...prev,
-                                        [item.id]: vendor.id,
-                                      }));
-                                    }}
-                                  >
-                                    {selectedVendorId === vendor.id ? (
-                                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                                    ) : (
-                                      <Circle className="h-5 w-5 text-muted-foreground" />
-                                    )}
-                                  </button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-
-                      <p className="text-xs text-muted-foreground">
-                        The best vendor is recommended using price, estimated
-                        delivery time, and availability score. You can manually
-                        override before PO generation.
-                      </p>
+                      <Badge variant="secondary">{progress}% Tracked</Badge>
                     </div>
-                  );
-                })}
+
+                    <div className="space-y-3">
+                      {stages.map((step, index) => (
+                        <div
+                          key={`${item.id}-${step.label}`}
+                          className="flex gap-3"
+                        >
+                          <div className="flex w-4 flex-col items-center">
+                            {step.state === "done" ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                            ) : step.state === "current" ? (
+                              <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <Circle className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            {index < stages.length - 1 && (
+                              <span className="mt-1 h-6 w-px bg-border" />
+                            )}
+                          </div>
+                          <div
+                            className={`rounded-lg border px-3 py-2 text-xs w-full ${
+                              step.state === "done"
+                                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                : step.state === "current"
+                                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                                  : "border-border bg-muted/30 text-muted-foreground"
+                            }`}
+                          >
+                            <p className="font-semibold">{step.label}</p>
+                            <p className="mt-1">{step.etaHint}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <Card className="border-primary/20 bg-primary/5">
-                <CardContent className="pt-4 space-y-2 text-sm">
-                  <p className="font-medium">Selection Summary</p>
-                  <p className="text-muted-foreground">
-                    Items Selected: {selectedItems.length}
+              {isVendorScopedView && (
+                <div className="rounded-xl border bg-background/90 p-4">
+                  <p className="text-sm font-semibold mb-3">
+                    Procurement Tracking Timeline
                   </p>
-                  <p className="text-muted-foreground">
-                    Matching Vendors: {matchingVendors.length}
-                  </p>
-                  <p className="text-muted-foreground">
-                    Ready for PO:{" "}
-                    {
-                      selectedItems.filter(
-                        (item) =>
-                          resolveVendorIdForItem(item) &&
-                          !isItemProcurementLocked(item.id),
-                      ).length
-                    }
-                  </p>
-
-                  <Button
-                    className="mt-3 w-full"
-                    onClick={handleCreatePurchaseOrders}
-                    disabled={selectedItems.length === 0}
-                  >
-                    Create Purchase Orders
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      setSelectedItemIds([]);
-                      setVendorByItemId({});
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </CardContent>
-              </Card>
+                  <div className="space-y-3">
+                    {vendorProcurementTimeline.map((entry, index) => (
+                      <div key={entry.step} className="flex gap-3">
+                        <div className="flex w-4 flex-col items-center">
+                          {entry.state === "done" ? (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          ) : entry.state === "current" ? (
+                            <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          {index < vendorProcurementTimeline.length - 1 && (
+                            <span className="mt-1 h-6 w-px bg-border" />
+                          )}
+                        </div>
+                        <div className="text-sm">
+                          <p className="font-medium">{entry.step}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {entry.state === "done"
+                              ? "Completed"
+                              : entry.state === "current"
+                                ? "In progress"
+                                : "Pending"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        {!isVendorScopedView && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center justify-between">
+                <span>Vendor Selection</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={handleRefreshVendorRecommendations}
+                >
+                  <RefreshCw className="h-4 w-4" /> Refresh vendors
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Select a vendor to fulfill each selected item using quantity,
+                unit price, delivery estimate, and availability score.
+              </p>
+
+              <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+                <div className="space-y-3">
+                  {selectedItems.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No items selected yet. Tick item checkboxes above to
+                      enable vendor assignment.
+                    </p>
+                  )}
+
+                  {selectedItems.map((item) => {
+                    const vendorRows = buildVendorRowsForItem(item);
+                    const bestVendor = vendorRows[0]?.vendor;
+                    const selectedVendorId = resolveVendorIdForItem(item);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-lg border p-3 space-y-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium">{item.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              SKU/{item.sku} • Qty {item.quantity} • $
+                              {item.totalCost.toLocaleString()}
+                            </p>
+                            {!!item.description && (
+                              <p className="text-xs text-muted-foreground">
+                                Specs: {item.description}
+                              </p>
+                            )}
+                          </div>
+                          {isItemProcurementLocked(item.id) && (
+                            <Badge className="bg-amber-100 text-amber-800">
+                              PO already generated
+                            </Badge>
+                          )}
+                        </div>
+
+                        {!!bestVendor && (
+                          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                            <span className="font-semibold">
+                              Best Vendor: {bestVendor.name}
+                            </span>{" "}
+                            has been selected based on price, delivery time, and
+                            availability score.
+                          </div>
+                        )}
+
+                        <div className="rounded-lg border overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Vendor Matching Panel</TableHead>
+                                <TableHead className="text-right">
+                                  Available Qty
+                                </TableHead>
+                                <TableHead className="text-right">
+                                  Price per Unit
+                                </TableHead>
+                                <TableHead className="text-right">
+                                  Est. Delivery Time
+                                </TableHead>
+                                <TableHead className="text-right">
+                                  Availability Score
+                                </TableHead>
+                                <TableHead className="text-center">
+                                  Select
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {vendorRows.map(({ vendor, metric }) => (
+                                <TableRow key={`${item.id}-${vendor.id}`}>
+                                  <TableCell className="font-medium">
+                                    {vendor.name}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {metric.availableQty}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    ${metric.pricePerUnit.toLocaleString()}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {metric.estDeliveryDays}d
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <span className="inline-flex items-center gap-2">
+                                      <span className="h-2 w-16 rounded bg-muted">
+                                        <span
+                                          className="block h-2 rounded bg-emerald-500"
+                                          style={{
+                                            width: `${Math.min(100, metric.availabilityScore)}%`,
+                                          }}
+                                        />
+                                      </span>
+                                      {metric.availabilityScore}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <button
+                                      className="inline-flex items-center justify-center"
+                                      onClick={() => {
+                                        if (isItemProcurementLocked(item.id)) {
+                                          toast({
+                                            title: "Cannot change vendor",
+                                            description:
+                                              "PO already exists for this item. Cancel it first to reassign vendor.",
+                                          });
+                                          return;
+                                        }
+                                        setVendorByItemId((prev) => ({
+                                          ...prev,
+                                          [item.id]: vendor.id,
+                                        }));
+                                      }}
+                                    >
+                                      {selectedVendorId === vendor.id ? (
+                                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                      ) : (
+                                        <Circle className="h-5 w-5 text-muted-foreground" />
+                                      )}
+                                    </button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground">
+                          The best vendor is recommended using price, estimated
+                          delivery time, and availability score. You can
+                          manually override before PO generation.
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="pt-4 space-y-2 text-sm">
+                    <p className="font-medium">Selection Summary</p>
+                    <p className="text-muted-foreground">
+                      Items Selected: {selectedItems.length}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Matching Vendors: {matchingVendors.length}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Ready for PO:{" "}
+                      {
+                        selectedItems.filter(
+                          (item) =>
+                            resolveVendorIdForItem(item) &&
+                            !isItemProcurementLocked(item.id),
+                        ).length
+                      }
+                    </p>
+
+                    <Button
+                      className="mt-3 w-full"
+                      onClick={handleCreatePurchaseOrders}
+                      disabled={selectedItems.length === 0}
+                    >
+                      Create Purchase Orders
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setSelectedItemIds([]);
+                        setVendorByItemId({});
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Billing & Shipping + Requestor */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
