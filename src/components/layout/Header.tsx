@@ -92,12 +92,12 @@ export default function Header({ title }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card px-3 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/70 bg-card/85 px-3 backdrop-blur-md sm:px-6">
       <div className="flex items-center gap-2 sm:gap-3">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 transition-transform hover:scale-105 active:scale-95"
+          className="h-8 w-8 rounded-lg border border-transparent transition-transform hover:scale-105 hover:border-border/60 hover:bg-background/80 active:scale-95"
           onClick={() => navigate(-1)}
           title="Go back"
         >
@@ -111,7 +111,9 @@ export default function Header({ title }: HeaderProps) {
       <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-3">
         {!isMobile && (
           <div className="hidden flex-1 px-4 md:block">
-            <GlobalSearch />
+            <div className="rounded-xl border border-border/70 bg-background/80 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+              <GlobalSearch />
+            </div>
           </div>
         )}
 
@@ -120,7 +122,7 @@ export default function Header({ title }: HeaderProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="relative h-9 w-9 transition-transform hover:scale-105 active:scale-95"
+              className="relative h-9 w-9 rounded-lg border border-transparent transition-transform hover:scale-105 hover:border-border/60 hover:bg-background/80 active:scale-95"
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
@@ -245,7 +247,7 @@ export default function Header({ title }: HeaderProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 transition-transform hover:scale-105 active:scale-95"
+              className="h-9 w-9 rounded-lg border border-transparent transition-transform hover:scale-105 hover:border-border/60 hover:bg-background/80 active:scale-95"
             >
               <Settings className="h-4 w-4" />
             </Button>
