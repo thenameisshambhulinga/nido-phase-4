@@ -1,0 +1,67 @@
+[
+  {
+    "id": "ven-001",
+    "vendorCode": "VEN001",
+    "vendorName": "TechSupply Global",
+    "category": "IT Hardware",
+    "email": "sales@techsupply.com",
+    "phone": "+91-9112223334",
+    "address": "100 Enterprise Park",
+    "city": "Bangalore",
+    "state": "Karnataka",
+    "status": "active",
+    "rating": 4.5
+  },
+  {
+    "id": "ven-002",
+    "vendorCode": "VEN002",
+    "vendorName": "Reliable Electronics",
+    "category": "Electronics",
+    "email": "procurement@relelectronics.com",
+    "phone": "+91-9223334445",
+    "address": "200 Trade Center",
+    "city": "Delhi",
+    "state": "Delhi",
+    "status": "active",
+    "rating": 4.2
+  },
+  {
+    "id": "ven-003",
+    "vendorCode": "VEN003",
+    "vendorName": "Office Solutions Inc",
+    "category": "Office Supplies",
+    "email": "orders@officesolutions.in",
+    "phone": "+91-9334445556",
+    "address": "300 Business Hub",
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "status": "active",
+    "rating": 4.0
+  },
+  {
+    "id": "ven-004",
+    "vendorCode": "VEN004",
+    "vendorName": "Industrial Components Ltd",
+    "category": "Industrial",
+    "email": "sales@industrialcomp.com",
+    "phone": "+91-9445556667",
+    "address": "400 Manufacturing Zone",
+    "city": "Pune",
+    "state": "Maharashtra",
+    "status": "active",
+    "rating": 4.3
+  },
+  {
+    "id": "ven-005",
+    "vendorCode": "VEN005",
+    "vendorName": "Premium Equipment Group",
+    "category": "Equipment",
+    "email": "sales@premiumequip.com",
+    "phone": "+91-9556667778",
+    "address": "500 Equipment Park",
+    "city": "Bangalore",
+    "state": "Karnataka",
+    "status": "active",
+    "rating": 4.6
+  }
+]

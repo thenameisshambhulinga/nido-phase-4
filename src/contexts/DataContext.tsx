@@ -2855,6 +2855,88 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   }, [setInvoices, setSalesOrders, setSalesQuotes]);
 
+  // Fetch clients and vendors from backend
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch clients from backend
+        const clientsResponse = await fetch(
+          "http://localhost:5000/api/clients",
+        );
+        if (clientsResponse.ok) {
+          const clientsData = await clientsResponse.json();
+          const transformedClients: Client[] = clientsData.map(
+            (client: any) => ({
+              id: client._id || client.id || `cli-${Date.now()}`,
+              name: client.companyName || client.name,
+              companyName: client.companyName,
+              clientCode: client.clientCode,
+              contactPerson: client.contactPerson || "N/A",
+              contactNumber: client.phone,
+              email: client.email,
+              industryType: client.industry,
+              businessType: client.businessType || "Registered",
+              locationDetails: {
+                address: client.address || "",
+                city: client.city || "",
+                state: client.state || "",
+                country: "India",
+                currency: "INR",
+                zipCode: "",
+                timeZone: "Asia/Kolkata",
+              },
+              contractType: client.contractType || "Annual",
+              paymentTerms: "NET 30",
+              phone: client.phone,
+              address: client.address,
+              status: "active",
+              contractStart:
+                client.contractStart || new Date().toISOString().split("T")[0],
+              contractEnd:
+                client.contractEnd ||
+                new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+                  .toISOString()
+                  .split("T")[0],
+              totalOrders: client.totalOrders || 0,
+            }),
+          );
+          setClients(transformedClients);
+        }
+
+        // Fetch vendors from backend
+        const vendorsResponse = await fetch(
+          "http://localhost:5000/api/vendors",
+        );
+        if (vendorsResponse.ok) {
+          const vendorsData = await vendorsResponse.json();
+          const transformedVendors: Vendor[] = vendorsData.map(
+            (vendor: any) => ({
+              id: vendor._id || vendor.id || `ven-${Date.now()}`,
+              name: vendor.vendorName || vendor.name,
+              vendorCode: vendor.vendorCode,
+              category: vendor.category,
+              contactEmail: vendor.email,
+              contactPhone: vendor.phone,
+              address: vendor.address || "",
+              status: "active",
+              rating: vendor.rating || 0,
+              totalOrders: 0,
+              totalSpend: 0,
+              joinDate:
+                vendor.createdAt || new Date().toISOString().split("T")[0],
+            }),
+          );
+          setVendors(transformedVendors);
+        }
+      } catch (error) {
+        console.error("Error fetching data from backend:", error);
+        // Continue with default data if backend is not available
+      }
+    };
+
+    fetchData();
+  }, [setClients, setVendors]);
+
   const makeCrud = <T extends { id: string }>(
     setter: React.Dispatch<React.SetStateAction<T[]>>,
   ) => ({
