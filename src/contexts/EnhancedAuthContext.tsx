@@ -562,6 +562,15 @@ export const EnhancedAuthProvider: React.FC<{ children: ReactNode }> = ({
         return { success: false };
       }
 
+      const recentInvite = invitations.find(
+        (inv) =>
+          inv.email.toLowerCase() === email.toLowerCase() &&
+          Date.now() - new Date(inv.sentAt).getTime() < 24 * 60 * 60 * 1000,
+      );
+      if (recentInvite) {
+        return { success: false };
+      }
+
       const tempPassword = generateTemporaryPassword();
       const invitation: UserInvitation = {
         id: `inv-${Date.now()}`,
@@ -587,7 +596,7 @@ export const EnhancedAuthProvider: React.FC<{ children: ReactNode }> = ({
 
       return { success: true, invitationId: invitation.id };
     },
-    [users, user],
+    [users, user, invitations],
   );
 
   const acceptInvitation = useCallback(

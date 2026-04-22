@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,9 +30,27 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Search, Copy } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Copy,
+  Pencil,
+  Trash2,
+  MoreVertical,
+  Download,
+  Upload,
+  FileText,
+} from "lucide-react";
 import type { UserRole, ModulePermission } from "@/types";
 import { MODULES } from "@/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 const defaultModulePermissions = (): ModulePermission[] =>
   MODULES.map((m) => ({
@@ -43,12 +61,17 @@ const defaultModulePermissions = (): ModulePermission[] =>
     edit: false,
     delete: false,
     export: false,
+    import: false,
+    approve: false,
   }));
 
 export default function NidoRolesPanel() {
   const { userRoles, addUserRole, updateUserRole, deleteUserRole } = useData();
+  const importFileRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [overviewRole, setOverviewRole] = useState<UserRole | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserRole | null>(null);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState<Omit<UserRole, "id">>({
     name: "",
@@ -96,10 +119,20 @@ export default function NidoRolesPanel() {
     setForm({
       ...rest,
       modulePermissions: rest.modulePermissions.length
-        ? rest.modulePermissions
+        ? rest.modulePermissions.map((perm) => ({
+            ...perm,
+            import: !!perm.import,
+            approve: !!perm.approve,
+          }))
         : defaultModulePermissions(),
     });
     setDialogOpen(true);
+  };
+
+  const openOverview = (id: string) => {
+    const role = userRoles.find((r) => r.id === id);
+    if (!role) return;
+    setOverviewRole(role);
   };
 
   const cloneRole = (id: string) => {
@@ -111,10 +144,105 @@ export default function NidoRolesPanel() {
       ...rest,
       name: `${rest.name} (Copy)`,
       modulePermissions: rest.modulePermissions.length
-        ? rest.modulePermissions
+        ? rest.modulePermissions.map((perm) => ({
+            ...perm,
+            import: !!perm.import,
+            approve: !!perm.approve,
+          }))
         : defaultModulePermissions(),
     });
     setDialogOpen(true);
+  };
+
+  const exportRolesCsv = () => {
+    const header = [
+      "Role Code",
+      "Role Name",
+      "Description",
+      "Status",
+      "Role Type",
+      "Assigned Users",
+    ];
+    const rows = userRoles.map((role) => [
+      role.roleCode,
+      role.name,
+      role.description,
+      role.status,
+      role.roleType,
+      String(role.assignedUsers),
+    ]);
+    const csv = [header, ...rows]
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "nido-roles.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadRoleTemplate = () => {
+    const template = [
+      "roleCode,roleName,description,roleType,status,isDefault",
+      "PM,Procurement Manager,Manages procurement,Internal User,Active,false",
+    ].join("\n");
+    const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "role-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importRolesCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const lines = text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length < 2) {
+      toast({
+        title: "Import failed",
+        description: "CSV has no role rows",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let created = 0;
+    for (const line of lines.slice(1)) {
+      const [roleCode, roleName, description, roleType, status, isDefault] =
+        line.split(",").map((v) => v?.trim()?.replace(/^"|"$/g, ""));
+
+      if (!roleName) continue;
+      addUserRole({
+        name: roleName,
+        description: description || "",
+        roleType: roleType === "Client User" ? "Client User" : "Internal User",
+        roleCode: roleCode || roleName.slice(0, 3).toUpperCase(),
+        status: status === "Inactive" ? "Inactive" : "Active",
+        isDefault: isDefault === "true",
+        assignedUsers: 0,
+        modulePermissions: defaultModulePermissions(),
+        dataVisibility: "All",
+        locationAccess: "All",
+        canApproveOrders: false,
+        approvalLimit: 0,
+      });
+      created += 1;
+    }
+
+    toast({
+      title: "Import completed",
+      description: `${created} roles imported`,
+    });
+    e.target.value = "";
   };
 
   const handleSave = () => {
@@ -126,11 +254,12 @@ export default function NidoRolesPanel() {
       });
       return;
     }
+    const sanitizedForm = { ...form, roleType: "Internal User" as const };
     if (editingId) {
-      updateUserRole(editingId, form);
+      updateUserRole(editingId, sanitizedForm);
       toast({ title: "Updated", description: `Role "${form.name}" updated` });
     } else {
-      addUserRole(form);
+      addUserRole(sanitizedForm);
       toast({ title: "Created", description: `Role "${form.name}" created` });
     }
     setDialogOpen(false);
@@ -148,7 +277,14 @@ export default function NidoRolesPanel() {
     setForm((prev) => {
       const perms = [...prev.modulePermissions];
       const p = perms[modIdx];
-      const allChecked = p.view && p.create && p.edit && p.delete && p.export;
+      const allChecked =
+        p.view &&
+        p.create &&
+        p.edit &&
+        p.delete &&
+        p.export &&
+        !!p.import &&
+        !!p.approve;
       perms[modIdx] = {
         ...p,
         view: !allChecked,
@@ -156,6 +292,8 @@ export default function NidoRolesPanel() {
         edit: !allChecked,
         delete: !allChecked,
         export: !allChecked,
+        import: !allChecked,
+        approve: !allChecked,
       };
       return { ...prev, modulePermissions: perms };
     });
@@ -179,15 +317,35 @@ export default function NidoRolesPanel() {
           Define roles and their permissions.
         </p>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            Export CSV
-          </Button>
-          <Button variant="outline" size="sm">
-            Export PDF
-          </Button>
-          <Button onClick={openCreate} className="gap-1.5">
-            <Plus size={14} /> Add Role
-          </Button>
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={importRolesCsv}
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Role actions">
+                <MoreVertical size={14} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportRolesCsv}>
+                <Download size={14} className="mr-2" /> Export CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => importFileRef.current?.click()}>
+                <Upload size={14} className="mr-2" /> Import CSV
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={openCreate}>
+                <Plus size={14} className="mr-2" /> Add Role
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={downloadRoleTemplate}>
+                <FileText size={14} className="mr-2" /> Role Template
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -209,6 +367,7 @@ export default function NidoRolesPanel() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Role Code</TableHead>
                 <TableHead>Role Name</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Status</TableHead>
@@ -219,9 +378,10 @@ export default function NidoRolesPanel() {
             <TableBody>
               {filtered.map((role) => (
                 <TableRow key={role.id}>
+                  <TableCell className="font-medium">{role.roleCode}</TableCell>
                   <TableCell
                     className="font-medium text-primary cursor-pointer hover:underline"
-                    onClick={() => openEdit(role.id)}
+                    onClick={() => openOverview(role.id)}
                   >
                     {role.name}
                   </TableCell>
@@ -239,13 +399,24 @@ export default function NidoRolesPanel() {
                     <span>{role.assignedUsers} Users</span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEdit(role.id)}
-                    >
-                      Edit
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(role.id)}
+                        aria-label="Edit role"
+                      >
+                        <Pencil size={14} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteTarget(role)}
+                        aria-label="Delete role"
+                      >
+                        <Trash2 size={14} className="text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -308,20 +479,7 @@ export default function NidoRolesPanel() {
               </div>
               <div>
                 <Label className="text-xs">Role Type</Label>
-                <Select
-                  value={form.roleType}
-                  onValueChange={(v) =>
-                    setForm((p) => ({ ...p, roleType: v as any }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Internal User">Internal User</SelectItem>
-                    <SelectItem value="Client User">Client User</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input value="Internal User" readOnly />
               </div>
               <div>
                 <Label className="text-xs">Description</Label>
@@ -398,6 +556,8 @@ export default function NidoRolesPanel() {
                   <TableHead className="w-16 text-center">Edit</TableHead>
                   <TableHead className="w-16 text-center">Delete</TableHead>
                   <TableHead className="w-16 text-center">Export</TableHead>
+                  <TableHead className="w-16 text-center">Import</TableHead>
+                  <TableHead className="w-16 text-center">Approval</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -448,6 +608,18 @@ export default function NidoRolesPanel() {
                       <Checkbox
                         checked={perm.export}
                         onCheckedChange={() => togglePerm(idx, "export")}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={!!perm.import}
+                        onCheckedChange={() => togglePerm(idx, "import")}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={!!perm.approve}
+                        onCheckedChange={() => togglePerm(idx, "approve")}
                       />
                     </TableCell>
                   </TableRow>
@@ -549,6 +721,110 @@ export default function NidoRolesPanel() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Role Overview Dialog */}
+      <Dialog open={!!overviewRole} onOpenChange={() => setOverviewRole(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Role Overview</DialogTitle>
+          </DialogHeader>
+          {overviewRole && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs">Role Code</Label>
+                  <Input value={overviewRole.roleCode} readOnly />
+                </div>
+                <div>
+                  <Label className="text-xs">Role Name</Label>
+                  <Input value={overviewRole.name} readOnly />
+                </div>
+                <div>
+                  <Label className="text-xs">Role Type</Label>
+                  <Input value={overviewRole.roleType} readOnly />
+                </div>
+                <div>
+                  <Label className="text-xs">Status</Label>
+                  <Input value={overviewRole.status} readOnly />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Description</Label>
+                <Textarea value={overviewRole.description} readOnly rows={3} />
+              </div>
+              <div>
+                <Label className="text-xs">Module Permissions</Label>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Module</TableHead>
+                      <TableHead className="text-center">View</TableHead>
+                      <TableHead className="text-center">Create</TableHead>
+                      <TableHead className="text-center">Edit</TableHead>
+                      <TableHead className="text-center">Delete</TableHead>
+                      <TableHead className="text-center">Export</TableHead>
+                      <TableHead className="text-center">Import</TableHead>
+                      <TableHead className="text-center">Approval</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {overviewRole.modulePermissions.map((perm) => (
+                      <TableRow key={perm.module}>
+                        <TableCell>{perm.module}</TableCell>
+                        <TableCell className="text-center">
+                          {perm.view ? "Yes" : "No"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {perm.create ? "Yes" : "No"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {perm.edit ? "Yes" : "No"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {perm.delete ? "Yes" : "No"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {perm.export ? "Yes" : "No"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {perm.import ? "Yes" : "No"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {perm.approve ? "Yes" : "No"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmationDialog
+        open={!!deleteTarget}
+        title="Delete Role"
+        description={
+          deleteTarget
+            ? `Delete role \"${deleteTarget.name}\"? This action cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        tone="destructive"
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteUserRole(deleteTarget.id);
+          toast({
+            title: "Deleted",
+            description: `Role "${deleteTarget.name}" removed`,
+          });
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

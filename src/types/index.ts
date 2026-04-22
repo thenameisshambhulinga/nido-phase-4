@@ -2,6 +2,7 @@
 export interface GeneralSettings {
   companyName: string;
   companyLogo?: string;
+  primaryColor?: string;
   apiBaseUrl?: string;
   apiClientId?: string;
   apiKeyLabel?: string;
@@ -27,6 +28,16 @@ export interface GeneralSettings {
   salesOrderPrefix?: string;
   deliveryChallanPrefix?: string;
   creditNotePrefix?: string;
+  orderCodePrefix?: string;
+  serviceCodePrefix?: string;
+  supportTicketPrefix?: string;
+  billPrefix?: string;
+  recurringPoPrefix?: string;
+  recurringInvoicePrefix?: string;
+  userCodePrefix?: string;
+  vendorUserPrefix?: string;
+  recurringBillPrefix?: string;
+  vendorCreditPrefix?: string;
 }
 
 // ── MODULE PERMISSIONS ─────────────────────────────────────────────
@@ -38,6 +49,8 @@ export interface ModulePermission {
   edit: boolean;
   delete: boolean;
   export: boolean;
+  import?: boolean;
+  approve?: boolean;
 }
 
 // ── USER ROLES ────────────────────────────────────────────────────
@@ -60,6 +73,7 @@ export interface UserRole {
 // ── APP USER ──────────────────────────────────────────────────────
 export interface AppUser {
   id: string;
+  employeeId?: string;
   username: string;
   email: string;
   fullName: string;
@@ -67,7 +81,7 @@ export interface AppUser {
   jobTitle: string;
   department: string;
   roleId: string;
-  organizationAccess: string;
+  organizationAccess: string | string[];
   userType: "Internal User" | "Client User";
   status: "Active" | "Inactive" | "Suspended";
   createdAt: string;

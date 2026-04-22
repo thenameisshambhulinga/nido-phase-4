@@ -36,10 +36,10 @@ export default function UserRolesTab() {
         <Tabs value={activePanel} onValueChange={setActivePanel}>
           <TabsList className="bg-muted h-auto p-1 gap-1">
             <TabsTrigger value="roles" className="text-sm">
-              User Roles
+              Roles
             </TabsTrigger>
             <TabsTrigger value="users" className="text-sm">
-              Add / Manage Users
+              Users
             </TabsTrigger>
           </TabsList>
 

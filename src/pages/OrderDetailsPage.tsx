@@ -113,6 +113,7 @@ interface PurchaseOrderEntry {
 
 const PURCHASE_ORDER_STORAGE_KEY = "nido_purchase_orders_v1";
 const VENDOR_ASSIGNMENT_STORAGE_KEY = "nido_order_vendor_assignments_v1";
+const PROCUREMENT_LOCKED_STATUSES = new Set(["rejected", "cancelled"]);
 
 const nextPoNumber = (entries: PurchaseOrderEntry[]) => {
   const max = entries.reduce((current, entry) => {
@@ -255,6 +256,9 @@ export default function OrderDetailsPage() {
   const [poRefreshTick, setPoRefreshTick] = useState(0);
 
   const isDelivered = order?.status === "Delivered";
+  const isProcurementLocked = PROCUREMENT_LOCKED_STATUSES.has(
+    String(order?.status || "").toLowerCase(),
+  );
   const canSetSlaTimer =
     isOwner || ["admin", "procurement_manager"].includes(user?.role || "");
   const canSetSlaAnytime = isOwner;
@@ -634,6 +638,14 @@ export default function OrderDetailsPage() {
   }, [selectedItems, vendors]);
 
   const toggleItemSelection = (itemId: string) => {
+    if (isProcurementLocked) {
+      toast({
+        title: "Order is locked",
+        description:
+          "Rejected or cancelled orders cannot be selected for vendor assignment.",
+      });
+      return;
+    }
     setSelectedItemIds((prev) =>
       prev.includes(itemId)
         ? prev.filter((idEntry) => idEntry !== itemId)
@@ -642,6 +654,14 @@ export default function OrderDetailsPage() {
   };
 
   const toggleSelectAllItems = (checked: boolean) => {
+    if (isProcurementLocked) {
+      toast({
+        title: "Order is locked",
+        description:
+          "Rejected or cancelled orders cannot be selected for vendor assignment.",
+      });
+      return;
+    }
     if (checked) {
       setSelectedItemIds(scopedOrderItems.map((item) => item.id));
       return;
@@ -650,6 +670,15 @@ export default function OrderDetailsPage() {
   };
 
   const handleCreatePurchaseOrders = () => {
+    if (isProcurementLocked) {
+      toast({
+        title: "Procurement blocked",
+        description:
+          "Vendor assignment and purchase order creation are disabled for rejected/cancelled orders.",
+      });
+      return;
+    }
+
     if (selectedItems.length === 0) {
       toast({ title: "Select at least one item to create purchase orders" });
       return;
@@ -773,96 +802,15 @@ export default function OrderDetailsPage() {
     navigate("/transactions/purchase/purchase-orders");
   };
 
-  const handleRefreshSla = () => {
-    if (isDelivered) {
-      toast({ title: "SLA already completed for delivered order" });
-      return;
-    }
-    const start = new Date(order.slaStartTime).getTime();
-    const diff = Date.now() - start;
-    const h = Math.floor(diff / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    setSlaTime(
-      `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`,
-    );
-    toast({ title: "SLA timer refreshed" });
-  };
-
-  const handleResetSla = () => {
-    if (isDelivered) {
-      toast({ title: "Delivered order SLA cannot be reset" });
-      return;
-    }
-    const nowIso = new Date().toISOString();
-    updateOrder(order.id, { slaStartTime: nowIso, slaStatus: "within_sla" });
-    setSlaTime("00:00:00");
-    toast({ title: "SLA reset", description: "SLA timer restarted from now." });
-  };
-
-  const handleSetSlaReminder = () => {
-    const reminderTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-    const reminderText = `Reminder set for SLA follow-up at ${new Date(reminderTime).toLocaleString()}`;
-    updateOrder(order.id, {
-      commentHistory: [
-        ...orderCommentHistory,
-        {
-          id: `c-${Date.now()}-sla-reminder`,
-          user: user?.name || "System",
-          text: reminderText,
-          timestamp: new Date().toISOString(),
-          type: "internal",
-        },
-      ],
-    });
-    toast({ title: "Reminder set", description: reminderText });
-  };
-
-  const handleSetSlaTimer = () => {
-    if (!canSetSlaTimer) {
-      toast({
-        title: "Not authorized",
-        description:
-          "Only owner and authorized internal users can set SLA timer.",
-      });
-      return;
-    }
-
-    if (isDelivered && !canSetSlaAnytime) {
-      toast({
-        title: "SLA locked",
-        description: "Only owner can set SLA timer after delivery.",
-      });
-      return;
-    }
-
-    const hours = Math.max(0, Number.parseInt(slaSetHours || "0", 10) || 0);
-    const minutes = Math.max(
-      0,
-      Math.min(59, Number.parseInt(slaSetMinutes || "0", 10) || 0),
-    );
-    const elapsedMs = (hours * 60 + minutes) * 60 * 1000;
-
-    if (elapsedMs <= 0) {
-      toast({
-        title: "Invalid SLA timer",
-        description: "Set at least 1 minute to apply the SLA timer.",
-      });
-      return;
-    }
-
-    const adjustedStartIso = new Date(Date.now() - elapsedMs).toISOString();
-    updateOrder(order.id, {
-      slaStartTime: adjustedStartIso,
-      slaStatus: "within_sla",
-    });
-    toast({
-      title: "SLA timer set",
-      description: `Timer updated to ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00 elapsed.`,
-    });
-  };
-
   const handleRefreshVendorRecommendations = () => {
+    if (isProcurementLocked) {
+      toast({
+        title: "Procurement blocked",
+        description:
+          "Rejected/cancelled orders cannot refresh vendor recommendations.",
+      });
+      return;
+    }
     if (selectedItems.length === 0) {
       toast({
         title: "Select at least one item to refresh vendor recommendations",
@@ -1015,67 +963,9 @@ export default function OrderDetailsPage() {
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={handleRefreshSla}>
-                  <RefreshCw className="mr-1 h-4 w-4" /> Refresh SLA
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleResetSla}>
-                  Reset SLA
-                </Button>
-                <Select onValueChange={handleStatusUpdate}>
-                  <SelectTrigger className="h-8 w-[150px] text-xs">
-                    <SelectValue placeholder="Update Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Processing">Processing</SelectItem>
-                    <SelectItem value="Shipped">Shipped</SelectItem>
-                    <SelectItem value="Delivered">Delivered</SelectItem>
-                    <SelectItem value="Cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSetSlaReminder}
-                >
-                  <BellRing className="mr-1 h-4 w-4" /> Set Reminder
-                </Button>
-              </div>
-
-              <div className="flex flex-wrap items-end justify-end gap-2">
-                <div>
-                  <p className="text-[11px] text-muted-foreground mb-1">
-                    Set SLA Timer (Elapsed)
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={0}
-                      value={slaSetHours}
-                      onChange={(e) => setSlaSetHours(e.target.value)}
-                      className="h-8 w-20"
-                      disabled={!canSetSlaTimer}
-                    />
-                    <span className="text-xs text-muted-foreground">h</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={59}
-                      value={slaSetMinutes}
-                      onChange={(e) => setSlaSetMinutes(e.target.value)}
-                      className="h-8 w-20"
-                      disabled={!canSetSlaTimer}
-                    />
-                    <span className="text-xs text-muted-foreground">m</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSetSlaTimer}
-                      disabled={!canSetSlaTimer}
-                    >
-                      Set SLA Timer
-                    </Button>
-                  </div>
-                </div>
+                <Badge variant="outline" className="text-xs">
+                  SLA controls moved to Client Configuration
+                </Badge>
               </div>
 
               {isDelivered && (
@@ -1185,6 +1075,7 @@ export default function OrderDetailsPage() {
                       <TableCell>
                         <Checkbox
                           checked={selectedItemIds.includes(item.id)}
+                          disabled={isProcurementLocked}
                           onCheckedChange={() => toggleItemSelection(item.id)}
                         />
                       </TableCell>
@@ -1399,6 +1290,7 @@ export default function OrderDetailsPage() {
                   size="sm"
                   className="gap-2"
                   onClick={handleRefreshVendorRecommendations}
+                  disabled={isProcurementLocked}
                 >
                   <RefreshCw className="h-4 w-4" /> Refresh vendors
                 </Button>
@@ -1417,6 +1309,13 @@ export default function OrderDetailsPage() {
                       No items selected yet. Tick item checkboxes above to
                       enable vendor assignment.
                     </p>
+                  )}
+
+                  {isProcurementLocked && (
+                    <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                      Vendor assignment is disabled because this order is in a
+                      terminal state ({order.status}).
+                    </div>
                   )}
 
                   {selectedItems.map((item) => {
@@ -1513,6 +1412,14 @@ export default function OrderDetailsPage() {
                                     <button
                                       className="inline-flex items-center justify-center"
                                       onClick={() => {
+                                        if (isProcurementLocked) {
+                                          toast({
+                                            title: "Procurement blocked",
+                                            description:
+                                              "Rejected/cancelled orders cannot assign vendors.",
+                                          });
+                                          return;
+                                        }
                                         if (isItemProcurementLocked(item.id)) {
                                           toast({
                                             title: "Cannot change vendor",
@@ -1573,7 +1480,9 @@ export default function OrderDetailsPage() {
                     <Button
                       className="mt-3 w-full"
                       onClick={handleCreatePurchaseOrders}
-                      disabled={selectedItems.length === 0}
+                      disabled={
+                        selectedItems.length === 0 || isProcurementLocked
+                      }
                     >
                       Create Purchase Orders
                     </Button>
@@ -1582,7 +1491,9 @@ export default function OrderDetailsPage() {
                       className="w-full"
                       onClick={() => {
                         setSelectedItemIds([]);
-                        setVendorByItemId({});
+                        if (!isProcurementLocked) {
+                          setVendorByItemId({});
+                        }
                       }}
                     >
                       Cancel

@@ -29,8 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 export default function DepartmentsPage() {
   const {
@@ -44,6 +45,7 @@ export default function DepartmentsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [selectedDept, setSelectedDept] = useState<UserDepartment | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<
     Omit<UserDepartment, "id" | "createdAt">
@@ -79,10 +81,8 @@ export default function DepartmentsPage() {
   };
 
   const handleDelete = (deptId: string) => {
-    if (confirm("Delete this department?")) {
-      deleteDepartment(deptId);
-      toast({ title: "Department deleted" });
-    }
+    deleteDepartment(deptId);
+    toast({ title: "Department deleted" });
   };
 
   const handleEditClick = (dept: UserDepartment) => {
@@ -251,7 +251,7 @@ export default function DepartmentsPage() {
                             variant="outline"
                             onClick={() => handleEditClick(dept)}
                           >
-                            <Edit className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
                         <DialogContent>
@@ -323,7 +323,7 @@ export default function DepartmentsPage() {
                         size="sm"
                         variant="outline"
                         className="text-red-600"
-                        onClick={() => handleDelete(dept.id)}
+                        onClick={() => setDeleteTargetId(dept.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -414,6 +414,22 @@ export default function DepartmentsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmationDialog
+        open={!!deleteTargetId}
+        title="Delete Department"
+        description="Delete this department? Users can lose department mappings."
+        confirmLabel="Delete"
+        tone="destructive"
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null);
+        }}
+        onConfirm={() => {
+          if (!deleteTargetId) return;
+          handleDelete(deleteTargetId);
+          setDeleteTargetId(null);
+        }}
+      />
     </div>
   );
 }

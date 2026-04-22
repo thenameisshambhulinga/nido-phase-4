@@ -44,12 +44,13 @@ import {
   Zap,
   Settings,
   Copy,
-  Edit,
+  Pencil,
   Trash2,
   X,
   Sparkles,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 interface PricingRule {
   id: string;
@@ -112,6 +113,7 @@ export default function PricingDiscountsPage() {
   const [showCreateCoupon, setShowCreateCoupon] = useState(false);
   const [showCouponCodeRule, setShowCouponCodeRule] = useState(false);
   const [showAddTierPolicy, setShowAddTierPolicy] = useState(false);
+  const [deletePolicyId, setDeletePolicyId] = useState<string | null>(null);
 
   const [discountComputation, setDiscountComputation] = useState("before_tax");
   const [gstRate, setGstRate] = useState("18");
@@ -531,6 +533,18 @@ export default function PricingDiscountsPage() {
     toast({ title: "Service-tier policy added" });
   };
 
+  // Coupon pagination
+  const [couponPage, setCouponPage] = useState(1);
+  const COUPON_PAGE_SIZE = 10;
+  const totalCouponPages = Math.max(
+    1,
+    Math.ceil(couponCodes.length / COUPON_PAGE_SIZE),
+  );
+  const paginatedCoupons = couponCodes.slice(
+    (couponPage - 1) * COUPON_PAGE_SIZE,
+    couponPage * COUPON_PAGE_SIZE,
+  );
+
   return (
     <div>
       <Header title="Pricing & Discounts" />
@@ -699,7 +713,7 @@ export default function PricingDiscountsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => deleteServiceTierPolicy(policy.id)}
+                            onClick={() => setDeletePolicyId(policy.id)}
                             disabled={!isOwner}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1017,7 +1031,7 @@ export default function PricingDiscountsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {couponCodes.map((c) => (
+                    {paginatedCoupons.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell className="font-mono font-medium text-xs">
                           {c.code}
@@ -1047,13 +1061,46 @@ export default function PricingDiscountsPage() {
                             size="icon"
                             className="h-6 w-6"
                           >
-                            <Edit className="h-3 w-3" />
+                            <Pencil className="h-3 w-3" />
                           </Button>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                <div className="flex items-center justify-between mt-2">
+                  <div className="text-xs text-muted-foreground">
+                    Showing {(couponPage - 1) * COUPON_PAGE_SIZE + 1} -{" "}
+                    {Math.min(
+                      couponPage * COUPON_PAGE_SIZE,
+                      couponCodes.length,
+                    )}{" "}
+                    of {couponCodes.length}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setCouponPage((p) => Math.max(1, p - 1))}
+                      disabled={couponPage === 1}
+                    >
+                      Prev
+                    </Button>
+                    <div className="text-xs">
+                      Page {couponPage} / {totalCouponPages}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setCouponPage((p) => Math.min(totalCouponPages, p + 1))
+                      }
+                      disabled={couponPage >= totalCouponPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -2285,6 +2332,22 @@ export default function PricingDiscountsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmationDialog
+        open={!!deletePolicyId}
+        title="Delete Tier Policy"
+        description="Delete this service tier policy? This action cannot be undone."
+        confirmLabel="Delete"
+        tone="destructive"
+        onOpenChange={(open) => {
+          if (!open) setDeletePolicyId(null);
+        }}
+        onConfirm={() => {
+          if (!deletePolicyId) return;
+          deleteServiceTierPolicy(deletePolicyId);
+          setDeletePolicyId(null);
+        }}
+      />
     </div>
   );
 }

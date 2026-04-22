@@ -37,7 +37,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   ChevronDown,
   Download,
-  Edit3,
+  Pencil,
   Mail,
   Printer,
   Share2,
@@ -419,7 +419,7 @@ export default function InvoiceDetails() {
               className="rounded-xl"
               onClick={() => setEditOpen(true)}
             >
-              <Edit3 className="mr-2 h-4 w-4" /> Edit
+              <Pencil className="mr-2 h-4 w-4" /> Edit
             </Button>
             <Button
               variant="outline"

@@ -41,6 +41,7 @@ import { useData, type Invoice } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
 import { MoreHorizontal, Pencil, Plus, X } from "lucide-react";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 type Frequency = "weekly" | "monthly" | "quarterly";
 type RecurringStatus = "active" | "stopped";
@@ -291,6 +292,21 @@ export default function RecurringInvoicesPage() {
   const [selectedId, setSelectedId] = useState<string>(
     params.id || profiles[0]?.id || "",
   );
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    confirmLabel: string;
+    tone: "default" | "destructive";
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    confirmLabel: "Confirm",
+    tone: "default",
+    onConfirm: () => {},
+  });
   const [formOpen, setFormOpen] = useState(createMode);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -754,13 +770,39 @@ export default function RecurringInvoicesPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={handleStop}>
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          setConfirmState({
+                            open: true,
+                            title: "Stop Recurring Profile",
+                            description:
+                              "Stop this recurring profile from generating future invoices?",
+                            confirmLabel: "Stop",
+                            tone: "default",
+                            onConfirm: handleStop,
+                          });
+                        }}
+                      >
                         Stop
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={handleClone}>
                         Clone
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={handleDelete}>
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          setConfirmState({
+                            open: true,
+                            title: "Delete Recurring Profile",
+                            description:
+                              "Delete this recurring profile? This action cannot be undone.",
+                            confirmLabel: "Delete",
+                            tone: "destructive",
+                            onConfirm: handleDelete,
+                          });
+                        }}
+                      >
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -772,6 +814,20 @@ export default function RecurringInvoicesPage() {
                       navigate("/sales/recurring-invoices", { replace: true })
                     }
                   >
+                    <ConfirmationDialog
+                      open={confirmState.open}
+                      title={confirmState.title}
+                      description={confirmState.description}
+                      confirmLabel={confirmState.confirmLabel}
+                      tone={confirmState.tone}
+                      onOpenChange={(open) =>
+                        setConfirmState((prev) => ({ ...prev, open }))
+                      }
+                      onConfirm={() => {
+                        confirmState.onConfirm();
+                        setConfirmState((prev) => ({ ...prev, open: false }));
+                      }}
+                    />
                     <X className="h-5 w-5" />
                   </Button>
                 </div>

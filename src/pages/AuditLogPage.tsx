@@ -39,7 +39,7 @@ import {
   Download,
   Eye,
   Plus,
-  Edit,
+  Pencil,
   Trash2,
   LogIn,
   LogOut,
@@ -86,7 +86,7 @@ export default function AuditLogPage() {
       case "create":
         return <Plus className="h-4 w-4 text-blue-600" />;
       case "update":
-        return <Edit className="h-4 w-4 text-yellow-600" />;
+        return <Pencil className="h-4 w-4 text-yellow-600" />;
       case "delete":
         return <Trash2 className="h-4 w-4 text-red-600" />;
       case "approve":

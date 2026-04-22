@@ -37,7 +37,7 @@ import {
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Edit,
+  Pencil,
   Trash2,
   Search,
   Download,
@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
 import { toast } from "@/hooks/use-toast";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 const EMPTY_FILTER = "all";
 const STATUS_TABS = ["All", "Active", "Pending", "Inactive"] as const;
@@ -109,6 +110,7 @@ export default function ClientsPage() {
   const [mailTo, setMailTo] = useState("");
   const [showEdit, setShowEdit] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -571,12 +573,12 @@ export default function ClientsPage() {
                               className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
                               onClick={() => handleEdit(client.id)}
                             >
-                              <Edit className="h-4 w-4" /> Edit
+                              <Pencil className="h-4 w-4" /> Edit
                             </button>
                             <button
                               type="button"
                               className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-                              onClick={() => handleDelete(client.id)}
+                              onClick={() => setDeleteTargetId(client.id)}
                             >
                               <Trash2 className="h-4 w-4" /> Delete
                             </button>
@@ -616,7 +618,7 @@ export default function ClientsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Client</DialogTitle>
             <DialogDescription>Update client profile details</DialogDescription>
@@ -705,6 +707,22 @@ export default function ClientsPage() {
         onClose={() => setShowMailComposer(false)}
         recipientType="client"
         defaultTo={mailTo}
+      />
+
+      <ConfirmationDialog
+        open={!!deleteTargetId}
+        title="Delete Client"
+        description="Delete this client record? This action cannot be undone."
+        confirmLabel="Delete"
+        tone="destructive"
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null);
+        }}
+        onConfirm={() => {
+          if (!deleteTargetId) return;
+          handleDelete(deleteTargetId);
+          setDeleteTargetId(null);
+        }}
       />
     </div>
   );

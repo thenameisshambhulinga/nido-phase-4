@@ -34,7 +34,7 @@ import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus,
-  Edit,
+  Pencil,
   Trash2,
   Search,
   Star,
@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import BulkUploadModal from "@/components/shared/BulkUploadModal";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import { downloadVendorTemplate } from "@/lib/templateUtils";
 import type { BulkUploadResult } from "@/lib/templateUtils";
 import { nextSequentialCode } from "@/lib/documentNumbering";
@@ -74,6 +75,7 @@ export default function VendorsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -494,13 +496,13 @@ export default function VendorsPage() {
                           className="h-7 w-7"
                           onClick={() => handleEdit(v)}
                         >
-                          <Edit className="h-3.5 w-3.5" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => handleDelete(v)}
+                          onClick={() => setDeleteTargetId(v.id)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -555,7 +557,7 @@ export default function VendorsPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Edit className="h-5 w-5 text-primary" /> Edit Vendor
+                <Pencil className="h-5 w-5 text-primary" /> Edit Vendor
               </DialogTitle>
               <DialogDescription>
                 Update vendor details and contact information
@@ -581,6 +583,24 @@ export default function VendorsPage() {
             contactEmail: v.contactEmail,
           }))}
           onSuccess={handleBulkSuccess}
+        />
+
+        <ConfirmationDialog
+          open={!!deleteTargetId}
+          title="Delete Vendor"
+          description="Delete this vendor? This action cannot be undone."
+          confirmLabel="Delete"
+          tone="destructive"
+          onOpenChange={(open) => {
+            if (!open) setDeleteTargetId(null);
+          }}
+          onConfirm={() => {
+            if (!deleteTargetId) return;
+            const target = vendors.find((entry) => entry.id === deleteTargetId);
+            if (!target) return;
+            handleDelete(target);
+            setDeleteTargetId(null);
+          }}
         />
       </div>
     </div>

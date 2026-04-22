@@ -26,6 +26,8 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { emailTemplates, sendEmail } from "@/lib/emailService";
 import { normalizeOrderCode } from "@/lib/documentNumbering";
+import { safeReadJson } from "@/lib/storage";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import {
   Upload,
   Download,
@@ -41,6 +43,7 @@ import {
 } from "lucide-react";
 
 export default function OrdersPage() {
+  const VENDOR_ASSIGNMENT_STORAGE_KEY = "nido_order_vendor_assignments_v1";
   const { orders, updateOrder, addAuditEntry } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -52,6 +55,21 @@ export default function OrdersPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [teamFilter, setTeamFilter] = useState("all");
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    confirmLabel: string;
+    tone: "default" | "destructive";
+    onConfirm: () => void | Promise<void>;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    confirmLabel: "Confirm",
+    tone: "default",
+    onConfirm: () => {},
+  });
 
   const normalizedOrders = useMemo(
     () =>
@@ -236,6 +254,18 @@ export default function OrdersPage() {
       ],
     });
 
+    const allAssignments = safeReadJson<Record<string, Record<string, string>>>(
+      VENDOR_ASSIGNMENT_STORAGE_KEY,
+      {},
+    );
+    if (allAssignments[orderId]) {
+      delete allAssignments[orderId];
+      localStorage.setItem(
+        VENDOR_ASSIGNMENT_STORAGE_KEY,
+        JSON.stringify(allAssignments),
+      );
+    }
+
     await notifyClient("rejected", order, reason);
     addAuditEntry({
       module: "Procure",
@@ -271,46 +301,82 @@ export default function OrdersPage() {
       return;
     }
 
-    selected.forEach((id) => {
-      const target = normalizedOrders.find((o) => o.id === id);
-      if (!target) return;
+    const executeBulk = () => {
+      selected.forEach((id) => {
+        const target = normalizedOrders.find((o) => o.id === id);
+        if (!target) return;
 
-      if (bulkAction === "complete") {
-        updateOrder(id, { status: "Completed" });
-        return;
-      }
+        if (bulkAction === "complete") {
+          updateOrder(id, { status: "Completed" });
+          return;
+        }
 
-      if (bulkAction === "cancel") {
-        updateOrder(id, { status: "Rejected" });
-        return;
-      }
+        if (bulkAction === "cancel") {
+          updateOrder(id, { status: "Rejected" });
+          const allAssignments = safeReadJson<
+            Record<string, Record<string, string>>
+          >(VENDOR_ASSIGNMENT_STORAGE_KEY, {});
+          if (allAssignments[id]) {
+            delete allAssignments[id];
+            localStorage.setItem(
+              VENDOR_ASSIGNMENT_STORAGE_KEY,
+              JSON.stringify(allAssignments),
+            );
+          }
+          return;
+        }
 
-      if (bulkAction === "approve") {
-        updateOrder(id, { status: "Processing" });
-        return;
-      }
+        if (bulkAction === "approve") {
+          updateOrder(id, { status: "Processing" });
+          return;
+        }
 
-      if (bulkAction === "comments") {
-        updateOrder(id, {
-          comments: bulkComment || "Bulk comment updated",
-          commentHistory: [
-            ...(target.commentHistory || []),
-            {
-              id: `c-${Date.now()}-${id}`,
-              user: "System",
-              text: bulkComment || "Bulk comment updated",
-              timestamp: new Date().toISOString(),
-              type: "internal",
-            },
-          ],
-        });
-      }
-    });
+        if (bulkAction === "comments") {
+          updateOrder(id, {
+            comments: bulkComment || "Bulk comment updated",
+            commentHistory: [
+              ...(target.commentHistory || []),
+              {
+                id: `c-${Date.now()}-${id}`,
+                user: "System",
+                text: bulkComment || "Bulk comment updated",
+                timestamp: new Date().toISOString(),
+                type: "internal",
+              },
+            ],
+          });
+        }
+      });
 
-    toast({ title: "Bulk update applied" });
-    setSelected([]);
-    setBulkComment("");
-    setBulkAction("");
+      toast({ title: "Bulk update applied" });
+      setSelected([]);
+      setBulkComment("");
+      setBulkAction("");
+    };
+
+    if (
+      bulkAction === "approve" ||
+      bulkAction === "cancel" ||
+      bulkAction === "complete"
+    ) {
+      const actionLabel =
+        bulkAction === "approve"
+          ? "Approve to Processing"
+          : bulkAction === "cancel"
+            ? "Reject Orders"
+            : "Mark Completed";
+      setConfirmState({
+        open: true,
+        title: `Confirm ${actionLabel}`,
+        description: `This will update ${selected.length} selected orders.`,
+        confirmLabel: "Confirm",
+        tone: bulkAction === "cancel" ? "destructive" : "default",
+        onConfirm: executeBulk,
+      });
+      return;
+    }
+
+    executeBulk();
   };
 
   const onUploadTemplate = (evt: ChangeEvent<HTMLInputElement>) => {
@@ -596,7 +662,16 @@ export default function OrdersPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => void handleApprove(order.id)}
+                            onClick={() =>
+                              setConfirmState({
+                                open: true,
+                                title: "Approve Order",
+                                description: `Approve ${order.orderNumber} and move it to Processing?`,
+                                confirmLabel: "Approve",
+                                tone: "default",
+                                onConfirm: () => void handleApprove(order.id),
+                              })
+                            }
                             title="Approve"
                           >
                             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
@@ -604,7 +679,16 @@ export default function OrdersPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => void handleReject(order.id)}
+                            onClick={() =>
+                              setConfirmState({
+                                open: true,
+                                title: "Reject Order",
+                                description: `Reject ${order.orderNumber}? This action removes vendor assignments for the order.`,
+                                confirmLabel: "Reject",
+                                tone: "destructive",
+                                onConfirm: () => void handleReject(order.id),
+                              })
+                            }
                             title="Reject"
                           >
                             <XCircle className="h-4 w-4 text-rose-600" />
@@ -658,6 +742,19 @@ export default function OrdersPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmationDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        description={confirmState.description}
+        confirmLabel={confirmState.confirmLabel}
+        tone={confirmState.tone}
+        onOpenChange={(open) => setConfirmState((prev) => ({ ...prev, open }))}
+        onConfirm={async () => {
+          await confirmState.onConfirm();
+          setConfirmState((prev) => ({ ...prev, open: false }));
+        }}
+      />
     </div>
   );
 }

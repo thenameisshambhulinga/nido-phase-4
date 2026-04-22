@@ -204,6 +204,16 @@ function ProductCard({
     <Card className="group overflow-hidden border-border/70 bg-card/80 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
       <div className="relative h-44 overflow-hidden bg-slate-100">
         <ProductImage product={product} />
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 translate-y-4 rounded-xl border border-white/30 bg-slate-950/75 p-2.5 text-[11px] text-white opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+          <p className="font-semibold">Quick Overview</p>
+          <p className="mt-0.5 line-clamp-1 text-white/85">
+            {product.specification}
+          </p>
+          <div className="mt-1.5 flex items-center justify-between text-[10px] text-white/80">
+            <span>{product.primaryVendor}</span>
+            <span>{product.leadTime}</span>
+          </div>
+        </div>
         <Badge
           className={cn(
             "absolute right-3 top-3 text-[11px]",

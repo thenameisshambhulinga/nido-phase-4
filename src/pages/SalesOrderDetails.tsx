@@ -28,7 +28,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   ArrowRightCircle,
   ChevronDown,
-  Edit3,
+  Pencil,
   FileText,
   Mail,
   Plus,
@@ -345,7 +345,7 @@ export default function SalesOrderDetails() {
           <CardContent className="flex flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" onClick={() => setEditOpen(true)}>
-                <Edit3 className="mr-2 h-4 w-4" /> Edit
+                <Pencil className="mr-2 h-4 w-4" /> Edit
               </Button>
               <Button variant="outline" onClick={handleSendEmail}>
                 <Mail className="mr-2 h-4 w-4" /> Send Email

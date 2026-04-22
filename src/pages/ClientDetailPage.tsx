@@ -39,6 +39,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   ArrowLeft,
+  Clock3,
   Building2,
   Calendar,
   Download,
@@ -54,6 +55,9 @@ import {
   Image as ImageIcon,
   AlertTriangle,
   Sparkles,
+  RefreshCw,
+  RotateCcw,
+  Settings2,
   X,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -220,9 +224,16 @@ export default function ClientDetailPage() {
     applyDiscountRules,
     applyTax,
   } = useData();
-  const { users, createUser, updateUser, deleteUser, isOwner } = useAuth();
+  const { user, users, createUser, updateUser, deleteUser, isOwner } =
+    useAuth();
 
   const [activeTab, setActiveTab] = useState("overview");
+  const [configFocus, setConfigFocus] = useState<
+    "pricing" | "discount" | "tax" | "sla"
+  >("pricing");
+  const [selectedSlaOrderId, setSelectedSlaOrderId] = useState("");
+  const [slaSetHours, setSlaSetHours] = useState("0");
+  const [slaSetMinutes, setSlaSetMinutes] = useState("30");
   const [showMail, setShowMail] = useState(false);
 
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
@@ -419,6 +430,45 @@ export default function ClientDetailPage() {
     [client, getClientCatalog],
   );
 
+  const slaEligibleOrders = useMemo(
+    () =>
+      clientOrders.filter(
+        (order) =>
+          !["rejected", "cancelled"].includes(
+            String(order.status || "").toLowerCase(),
+          ),
+      ),
+    [clientOrders],
+  );
+
+  const selectedSlaOrder = useMemo(
+    () =>
+      slaEligibleOrders.find((order) => order.id === selectedSlaOrderId) ||
+      slaEligibleOrders[0] ||
+      null,
+    [selectedSlaOrderId, slaEligibleOrders],
+  );
+
+  const canManageSlaControls =
+    isOwner || ["admin", "procurement_manager"].includes(user?.role || "");
+
+  useEffect(() => {
+    if (!slaEligibleOrders.length) {
+      setSelectedSlaOrderId("");
+      return;
+    }
+    if (!selectedSlaOrderId) {
+      setSelectedSlaOrderId(slaEligibleOrders[0].id);
+      return;
+    }
+    const isStillAvailable = slaEligibleOrders.some(
+      (order) => order.id === selectedSlaOrderId,
+    );
+    if (!isStillAvailable) {
+      setSelectedSlaOrderId(slaEligibleOrders[0].id);
+    }
+  }, [slaEligibleOrders, selectedSlaOrderId]);
+
   const selectedMasterProduct = useMemo(
     () =>
       masterCatalogItems.find((item) => item.id === selectedMasterProductId),
@@ -501,6 +551,96 @@ export default function ClientDetailPage() {
     () => (client ? users.filter((u) => u.organization === client.name) : []),
     [client, users],
   );
+
+  const handleRefreshSlaControl = () => {
+    if (!selectedSlaOrder) return;
+    const start = new Date(selectedSlaOrder.slaStartTime).getTime();
+    const diff = Date.now() - start;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    toast({
+      title: "SLA refreshed",
+      description: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")} elapsed for ${selectedSlaOrder.orderNumber}.`,
+    });
+  };
+
+  const handleResetSlaControl = () => {
+    if (!selectedSlaOrder || !canManageSlaControls) {
+      toast({ title: "Not authorized" });
+      return;
+    }
+    updateOrder(selectedSlaOrder.id, {
+      slaStartTime: new Date().toISOString(),
+      slaStatus: "within_sla",
+    });
+    toast({
+      title: "SLA reset",
+      description: `SLA restarted for ${selectedSlaOrder.orderNumber}.`,
+    });
+  };
+
+  const handleSetSlaTimerControl = () => {
+    if (!selectedSlaOrder || !canManageSlaControls) {
+      toast({ title: "Not authorized" });
+      return;
+    }
+
+    const hours = Math.max(0, Number.parseInt(slaSetHours || "0", 10) || 0);
+    const minutes = Math.max(
+      0,
+      Math.min(59, Number.parseInt(slaSetMinutes || "0", 10) || 0),
+    );
+    const elapsedMs = (hours * 60 + minutes) * 60 * 1000;
+
+    if (elapsedMs <= 0) {
+      toast({
+        title: "Invalid SLA timer",
+        description: "Set at least 1 minute to apply SLA elapsed time.",
+      });
+      return;
+    }
+
+    updateOrder(selectedSlaOrder.id, {
+      slaStartTime: new Date(Date.now() - elapsedMs).toISOString(),
+      slaStatus: "within_sla",
+    });
+
+    toast({
+      title: "SLA timer set",
+      description: `Updated SLA elapsed to ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00 for ${selectedSlaOrder.orderNumber}.`,
+    });
+  };
+
+  const handleSetSlaReminderControl = () => {
+    if (!selectedSlaOrder) return;
+    const reminderText = `SLA reminder set from client configuration at ${new Date().toLocaleString()}`;
+    updateOrder(selectedSlaOrder.id, {
+      commentHistory: [
+        ...(selectedSlaOrder.commentHistory || []),
+        {
+          id: `c-${Date.now()}-client-sla-reminder`,
+          user: user?.name || "System",
+          text: reminderText,
+          timestamp: new Date().toISOString(),
+          type: "internal",
+        },
+      ],
+    });
+    toast({ title: "Reminder set", description: reminderText });
+  };
+
+  const handleUpdateSlaOrderStatus = (status: string) => {
+    if (!selectedSlaOrder || !canManageSlaControls) {
+      toast({ title: "Not authorized" });
+      return;
+    }
+    updateOrder(selectedSlaOrder.id, { status });
+    toast({
+      title: "Order status updated",
+      description: `${selectedSlaOrder.orderNumber} moved to ${status}.`,
+    });
+  };
 
   const serviceHistory = useMemo(() => {
     return clientOrders.map((order, index) => ({
@@ -1701,7 +1841,7 @@ export default function ClientDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <Card className="lg:col-span-4 rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-white">
+          <Card className="lg:col-span-3 lg:max-w-[320px] rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-white">
             <div className="h-24 bg-gradient-to-br from-blue-600 to-blue-400" />
             <CardContent className="pt-0 -mt-10 text-center space-y-4">
               <div className="mx-auto h-20 w-20 rounded-full border-4 border-white bg-blue-100 text-blue-700 shadow-sm flex items-center justify-center text-2xl font-semibold">
@@ -1777,7 +1917,7 @@ export default function ClientDetailPage() {
             </CardContent>
           </Card>
 
-          <div className="lg:col-span-8">
+          <div className="lg:col-span-9">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="flex flex-wrap h-auto">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -2741,6 +2881,64 @@ export default function ClientDetailPage() {
               </TabsContent>
 
               <TabsContent value="config" className="space-y-4 mt-4">
+                <Card className="border-primary/20 bg-gradient-to-br from-white via-blue-50/40 to-cyan-50/70">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Settings2 className="h-4 w-4 text-primary" />
+                      Configuration Explorer
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Explore one configuration feature at a time for faster,
+                      less cluttered workflows.
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {[
+                        {
+                          key: "pricing" as const,
+                          title: "Pricing Rules",
+                          description: "Price adjustments and tier strategy",
+                        },
+                        {
+                          key: "discount" as const,
+                          title: "Discount Rules",
+                          description: "Coupons, thresholds, and promos",
+                        },
+                        {
+                          key: "tax" as const,
+                          title: "Tax Settings",
+                          description: "Compliance, rates, and tax rules",
+                        },
+                        {
+                          key: "sla" as const,
+                          title: "SLA Operations",
+                          description:
+                            "Refresh, reset, timer, reminder, status",
+                        },
+                      ].map((entry) => (
+                        <button
+                          key={entry.key}
+                          type="button"
+                          onClick={() => setConfigFocus(entry.key)}
+                          className={`rounded-xl border p-3 text-left transition-all ${
+                            configFocus === entry.key
+                              ? "border-primary bg-primary/10 shadow-sm"
+                              : "border-slate-200 bg-white hover:border-primary/40"
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-foreground">
+                            {entry.title}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {entry.description}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {ruleConflicts.length > 0 && (
                   <Alert className="border-amber-300 bg-amber-50 text-amber-900">
                     <AlertTriangle className="h-4 w-4" />
@@ -2755,487 +2953,635 @@ export default function ClientDetailPage() {
                   </Alert>
                 )}
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Pricing & Discount</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex flex-wrap gap-2 justify-between">
-                      <p className="text-sm text-muted-foreground max-w-xl">
-                        Manage pricing, discount rules, coupons, and promotion
-                        code logic for this client profile.
-                      </p>
+                {(configFocus === "pricing" || configFocus === "discount") && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Pricing & Discount</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-wrap gap-2 justify-between">
+                        <p className="text-sm text-muted-foreground max-w-xl">
+                          Manage pricing, discount rules, coupons, and promotion
+                          code logic for this client profile.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={handleAutoConfigureCommercialRules}
+                          >
+                            Auto Configure Rules
+                          </Button>
+                          <Button onClick={() => setCouponDialogOpen(true)}>
+                            + Create Coupon
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <Card className="lg:col-span-2">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">
+                              Pricing Rules
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                              {pricingRules.map((rule) => (
+                                <div
+                                  key={rule.id}
+                                  className="rounded border px-3 py-2 flex items-center justify-between"
+                                >
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      {rule.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {rule.ruleType} · Min Qty{" "}
+                                      {rule.minimumQuantity} · {rule.value}
+                                      {rule.valueType === "percentage"
+                                        ? "%"
+                                        : " INR"}
+                                    </p>
+                                  </div>
+                                  <Badge
+                                    className={
+                                      rule.status === "active"
+                                        ? "bg-success text-success-foreground"
+                                        : "bg-muted text-muted-foreground"
+                                    }
+                                  >
+                                    {rule.status}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                            <Button
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => setPricingRuleDialogOpen(true)}
+                            >
+                              + Add Pricing Rule
+                            </Button>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">
+                              Discount Computation
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2 text-sm">
+                            <p className="text-xs text-muted-foreground">
+                              Computation Order
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Checkbox checked={true} />
+                              <span>Apply Discount Before Tax</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Checkbox checked={false} />
+                              <span>Apply Discount After Tax</span>
+                            </div>
+                            <div className="pt-2 border-t text-xs text-muted-foreground">
+                              Current GST Rate: {activeTaxSetting?.taxRate ?? 0}
+                              %
+                            </div>
+                            <div className="space-y-1 max-h-24 overflow-y-auto border rounded p-2">
+                              {(couponCodeRules.length > 0
+                                ? couponCodeRules
+                                : [
+                                    {
+                                      id: "seed-rule",
+                                      name: "Holiday Sale 20% OFF - New Codes Only",
+                                      triggerType: "specific",
+                                      triggerValue: "HOLIDAY20",
+                                      conditionField: "cart_total",
+                                      comparator: ">=",
+                                      threshold: 10000,
+                                      discountType: "percentage",
+                                      discountValue: 20,
+                                      calculationOrder: "before_tax",
+                                      maxUsageGlobal: 500,
+                                      maxUsagePerCustomer: 1,
+                                      stackable: false,
+                                      active: true,
+                                    },
+                                  ]
+                              ).map((rule) => (
+                                <div
+                                  key={rule.id}
+                                  className="text-xs rounded bg-muted px-2 py-1"
+                                >
+                                  {rule.name}
+                                </div>
+                              ))}
+                            </div>
+                            <Button
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => setCouponCodeRuleDialogOpen(true)}
+                            >
+                              + Add Coupon Code Rule
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <Card className="lg:col-span-2">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">
+                              Discount Rules
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                              {discountRules.map((rule) => (
+                                <div
+                                  key={rule.id}
+                                  className="rounded border px-3 py-2 flex items-center justify-between"
+                                >
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      {rule.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {rule.ruleType} · Min Order ₹
+                                      {rule.minimumOrderAmount.toLocaleString()}{" "}
+                                      · {rule.discountPercent}%
+                                    </p>
+                                  </div>
+                                  <Badge
+                                    className={
+                                      rule.status === "active"
+                                        ? "bg-success text-success-foreground"
+                                        : "bg-muted text-muted-foreground"
+                                    }
+                                  >
+                                    {rule.status}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                            <Button
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => setDiscountRuleDialogOpen(true)}
+                            >
+                              + Add Discount Rule
+                            </Button>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">
+                              Coupon Codes
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                              {(couponCodes.length > 0
+                                ? couponCodes
+                                : [
+                                    {
+                                      id: "seed-coupon",
+                                      title: "Flash Sale",
+                                      code: "NIDO1000",
+                                      discountType: "percentage",
+                                      discountValue: 15,
+                                      minPurchase: 25000,
+                                      usageLimit: 500,
+                                      usagePerCustomer: 1,
+                                      validFrom: "2026-11-01",
+                                      validTo: "2026-12-31",
+                                      active: true,
+                                      notes: "",
+                                    },
+                                  ]
+                              ).map((coupon) => (
+                                <div
+                                  key={coupon.id}
+                                  className="rounded border px-3 py-2"
+                                >
+                                  <p className="text-sm font-medium">
+                                    {coupon.title}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {coupon.code} ·{" "}
+                                    {coupon.discountType === "percentage"
+                                      ? `${coupon.discountValue}%`
+                                      : `₹${coupon.discountValue}`}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                            <Button
+                              className="w-full"
+                              onClick={() => setCouponDialogOpen(true)}
+                            >
+                              + Create Coupon
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      </div>
+
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
-                          onClick={handleAutoConfigureCommercialRules}
+                          onClick={downloadRuleTemplate}
                         >
-                          Auto Configure Rules
+                          Download Rules Template
                         </Button>
-                        <Button onClick={() => setCouponDialogOpen(true)}>
-                          + Create Coupon
+                        <input
+                          ref={ruleTemplateInputRef}
+                          type="file"
+                          accept=".csv"
+                          className="hidden"
+                          onChange={handleRuleTemplateUpload}
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => ruleTemplateInputRef.current?.click()}
+                        >
+                          Upload Rules Template
                         </Button>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      <Card className="lg:col-span-2">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">
-                            Pricing Rules
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                            {pricingRules.map((rule) => (
-                              <div
-                                key={rule.id}
-                                className="rounded border px-3 py-2 flex items-center justify-between"
-                              >
-                                <div>
-                                  <p className="text-sm font-medium">
-                                    {rule.name}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {rule.ruleType} · Min Qty{" "}
-                                    {rule.minimumQuantity} · {rule.value}
-                                    {rule.valueType === "percentage"
-                                      ? "%"
-                                      : " INR"}
-                                  </p>
-                                </div>
-                                <Badge
-                                  className={
-                                    rule.status === "active"
-                                      ? "bg-success text-success-foreground"
-                                      : "bg-muted text-muted-foreground"
-                                  }
-                                >
-                                  {rule.status}
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
-                          <Button
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => setPricingRuleDialogOpen(true)}
-                          >
-                            + Add Pricing Rule
-                          </Button>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">
-                            Discount Computation
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm">
-                          <p className="text-xs text-muted-foreground">
-                            Computation Order
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Checkbox checked={true} />
-                            <span>Apply Discount Before Tax</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Checkbox checked={false} />
-                            <span>Apply Discount After Tax</span>
-                          </div>
-                          <div className="pt-2 border-t text-xs text-muted-foreground">
-                            Current GST Rate: {activeTaxSetting?.taxRate ?? 0}%
-                          </div>
-                          <div className="space-y-1 max-h-24 overflow-y-auto border rounded p-2">
-                            {(couponCodeRules.length > 0
-                              ? couponCodeRules
-                              : [
-                                  {
-                                    id: "seed-rule",
-                                    name: "Holiday Sale 20% OFF - New Codes Only",
-                                    triggerType: "specific",
-                                    triggerValue: "HOLIDAY20",
-                                    conditionField: "cart_total",
-                                    comparator: ">=",
-                                    threshold: 10000,
-                                    discountType: "percentage",
-                                    discountValue: 20,
-                                    calculationOrder: "before_tax",
-                                    maxUsageGlobal: 500,
-                                    maxUsagePerCustomer: 1,
-                                    stackable: false,
-                                    active: true,
-                                  },
-                                ]
-                            ).map((rule) => (
-                              <div
-                                key={rule.id}
-                                className="text-xs rounded bg-muted px-2 py-1"
-                              >
-                                {rule.name}
-                              </div>
-                            ))}
-                          </div>
-                          <Button
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => setCouponCodeRuleDialogOpen(true)}
-                          >
-                            + Add Coupon Code Rule
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      <Card className="lg:col-span-2">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">
-                            Discount Rules
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                            {discountRules.map((rule) => (
-                              <div
-                                key={rule.id}
-                                className="rounded border px-3 py-2 flex items-center justify-between"
-                              >
-                                <div>
-                                  <p className="text-sm font-medium">
-                                    {rule.name}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {rule.ruleType} · Min Order ₹
-                                    {rule.minimumOrderAmount.toLocaleString()} ·{" "}
-                                    {rule.discountPercent}%
-                                  </p>
-                                </div>
-                                <Badge
-                                  className={
-                                    rule.status === "active"
-                                      ? "bg-success text-success-foreground"
-                                      : "bg-muted text-muted-foreground"
-                                  }
-                                >
-                                  {rule.status}
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
-                          <Button
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => setDiscountRuleDialogOpen(true)}
-                          >
-                            + Add Discount Rule
-                          </Button>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">
-                            Coupon Codes
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                            {(couponCodes.length > 0
-                              ? couponCodes
-                              : [
-                                  {
-                                    id: "seed-coupon",
-                                    title: "Flash Sale",
-                                    code: "NIDO1000",
-                                    discountType: "percentage",
-                                    discountValue: 15,
-                                    minPurchase: 25000,
-                                    usageLimit: 500,
-                                    usagePerCustomer: 1,
-                                    validFrom: "2026-11-01",
-                                    validTo: "2026-12-31",
-                                    active: true,
-                                    notes: "",
-                                  },
-                                ]
-                            ).map((coupon) => (
-                              <div
-                                key={coupon.id}
-                                className="rounded border px-3 py-2"
-                              >
-                                <p className="text-sm font-medium">
-                                  {coupon.title}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {coupon.code} ·{" "}
-                                  {coupon.discountType === "percentage"
-                                    ? `${coupon.discountValue}%`
-                                    : `₹${coupon.discountValue}`}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                          <Button
-                            className="w-full"
-                            onClick={() => setCouponDialogOpen(true)}
-                          >
-                            + Create Coupon
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" onClick={downloadRuleTemplate}>
-                        Download Rules Template
-                      </Button>
-                      <input
-                        ref={ruleTemplateInputRef}
-                        type="file"
-                        accept=".csv"
-                        className="hidden"
-                        onChange={handleRuleTemplateUpload}
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => ruleTemplateInputRef.current?.click()}
-                      >
-                        Upload Rules Template
-                      </Button>
-                    </div>
-
-                    <div className="rounded-md border p-3 space-y-3 mt-3">
-                      <p className="text-sm font-medium">
-                        Pricing Engine Validation
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                        <Input
-                          placeholder="Amount"
-                          value={pricingPreview.amount}
-                          onChange={(e) =>
-                            setPricingPreview((prev) => ({
-                              ...prev,
-                              amount: e.target.value,
-                            }))
-                          }
-                        />
-                        <Input
-                          placeholder="Quantity"
-                          value={pricingPreview.quantity}
-                          onChange={(e) =>
-                            setPricingPreview((prev) => ({
-                              ...prev,
-                              quantity: e.target.value,
-                            }))
-                          }
-                        />
-                        <Input
-                          placeholder="Category"
-                          value={pricingPreview.category}
-                          onChange={(e) =>
-                            setPricingPreview((prev) => ({
-                              ...prev,
-                              category: e.target.value,
-                            }))
-                          }
-                        />
-                        <Input
-                          placeholder="Product Code"
-                          value={pricingPreview.productCode}
-                          onChange={(e) =>
-                            setPricingPreview((prev) => ({
-                              ...prev,
-                              productCode: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-                        <div className="rounded bg-muted px-2 py-1">
-                          Base: ₹{pricingSimulation.baseAmount.toFixed(2)}
+                      <div className="rounded-md border p-3 space-y-3 mt-3">
+                        <p className="text-sm font-medium">
+                          Pricing Engine Validation
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                          <Input
+                            placeholder="Amount"
+                            value={pricingPreview.amount}
+                            onChange={(e) =>
+                              setPricingPreview((prev) => ({
+                                ...prev,
+                                amount: e.target.value,
+                              }))
+                            }
+                          />
+                          <Input
+                            placeholder="Quantity"
+                            value={pricingPreview.quantity}
+                            onChange={(e) =>
+                              setPricingPreview((prev) => ({
+                                ...prev,
+                                quantity: e.target.value,
+                              }))
+                            }
+                          />
+                          <Input
+                            placeholder="Category"
+                            value={pricingPreview.category}
+                            onChange={(e) =>
+                              setPricingPreview((prev) => ({
+                                ...prev,
+                                category: e.target.value,
+                              }))
+                            }
+                          />
+                          <Input
+                            placeholder="Product Code"
+                            value={pricingPreview.productCode}
+                            onChange={(e) =>
+                              setPricingPreview((prev) => ({
+                                ...prev,
+                                productCode: e.target.value,
+                              }))
+                            }
+                          />
                         </div>
-                        <div className="rounded bg-muted px-2 py-1">
-                          After Pricing: ₹
-                          {pricingSimulation.adjustedAmount.toFixed(2)}
-                        </div>
-                        <div className="rounded bg-muted px-2 py-1">
-                          After Discount: ₹
-                          {pricingSimulation.discountedAmount.toFixed(2)}
-                        </div>
-                        <div className="rounded bg-muted px-2 py-1">
-                          With Tax: ₹{pricingSimulation.taxedAmount.toFixed(2)}
-                        </div>
-                        <div className="rounded bg-primary/10 px-2 py-1 font-semibold">
-                          Total: ₹{pricingSimulation.total.toFixed(2)}
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+                          <div className="rounded bg-muted px-2 py-1">
+                            Base: ₹{pricingSimulation.baseAmount.toFixed(2)}
+                          </div>
+                          <div className="rounded bg-muted px-2 py-1">
+                            After Pricing: ₹
+                            {pricingSimulation.adjustedAmount.toFixed(2)}
+                          </div>
+                          <div className="rounded bg-muted px-2 py-1">
+                            After Discount: ₹
+                            {pricingSimulation.discountedAmount.toFixed(2)}
+                          </div>
+                          <div className="rounded bg-muted px-2 py-1">
+                            With Tax: ₹
+                            {pricingSimulation.taxedAmount.toFixed(2)}
+                          </div>
+                          <div className="rounded bg-primary/10 px-2 py-1 font-semibold">
+                            Total: ₹{pricingSimulation.total.toFixed(2)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                )}
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Tax Settings</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm text-muted-foreground">
-                        Define tax categories, rates, fiscal periods, and
-                        advanced application rules for the client.
-                      </p>
-                      <Button onClick={() => setTaxRuleDialogOpen(true)}>
-                        + Add Tax Rule
-                      </Button>
-                    </div>
+                {configFocus === "tax" && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Tax Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm text-muted-foreground">
+                          Define tax categories, rates, fiscal periods, and
+                          advanced application rules for the client.
+                        </p>
+                        <Button onClick={() => setTaxRuleDialogOpen(true)}>
+                          + Add Tax Rule
+                        </Button>
+                      </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <Card>
-                        <CardContent className="pt-4">
-                          <p className="text-xs text-muted-foreground">
-                            Tax Compliance
-                          </p>
-                          <p className="text-2xl font-semibold">
-                            {configTaxForm.taxType}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {configTaxForm.taxRegistrationNo ||
-                              "Registration pending"}
-                          </p>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="pt-4">
-                          <p className="text-xs text-muted-foreground">
-                            Tax Categories
-                          </p>
-                          <p className="text-2xl font-semibold">
-                            {new Set(taxSettings.map((t) => t.taxType)).size ||
-                              1}
-                          </p>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="pt-4">
-                          <p className="text-xs text-muted-foreground">
-                            Active Tax Rules
-                          </p>
-                          <p className="text-2xl font-semibold">
-                            {taxSettings.filter((t) => t.active).length}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <Card>
+                          <CardContent className="pt-4">
+                            <p className="text-xs text-muted-foreground">
+                              Tax Compliance
+                            </p>
+                            <p className="text-2xl font-semibold">
+                              {configTaxForm.taxType}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {configTaxForm.taxRegistrationNo ||
+                                "Registration pending"}
+                            </p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="pt-4">
+                            <p className="text-xs text-muted-foreground">
+                              Tax Categories
+                            </p>
+                            <p className="text-2xl font-semibold">
+                              {new Set(taxSettings.map((t) => t.taxType))
+                                .size || 1}
+                            </p>
+                          </CardContent>
+                        </Card>
+                        <Card>
+                          <CardContent className="pt-4">
+                            <p className="text-xs text-muted-foreground">
+                              Active Tax Rules
+                            </p>
+                            <p className="text-2xl font-semibold">
+                              {taxSettings.filter((t) => t.active).length}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </div>
 
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>ID</TableHead>
-                            <TableHead>Rule Name</TableHead>
-                            <TableHead>Tax Rate</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Active</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {taxSettings.map((setting) => (
-                            <TableRow key={setting.id}>
-                              <TableCell>{setting.id}</TableCell>
-                              <TableCell>{setting.taxType} Tax</TableCell>
-                              <TableCell>
-                                {setting.taxRate.toFixed(2)}%
-                              </TableCell>
-                              <TableCell>{setting.taxType}</TableCell>
-                              <TableCell>
-                                <Badge className="bg-success text-success-foreground">
-                                  Active
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Switch
-                                  checked={setting.active}
-                                  onCheckedChange={(checked) =>
-                                    upsertPrimaryTaxSetting({
-                                      taxType: setting.taxType,
-                                      taxRate: setting.taxRate,
-                                      taxRegistrationNo:
-                                        setting.taxRegistrationNo,
-                                      active: checked,
-                                    })
-                                  }
-                                />
-                              </TableCell>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>ID</TableHead>
+                              <TableHead>Rule Name</TableHead>
+                              <TableHead>Tax Rate</TableHead>
+                              <TableHead>Category</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Active</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          </TableHeader>
+                          <TableBody>
+                            {taxSettings.map((setting) => (
+                              <TableRow key={setting.id}>
+                                <TableCell>{setting.id}</TableCell>
+                                <TableCell>{setting.taxType} Tax</TableCell>
+                                <TableCell>
+                                  {setting.taxRate.toFixed(2)}%
+                                </TableCell>
+                                <TableCell>{setting.taxType}</TableCell>
+                                <TableCell>
+                                  <Badge className="bg-success text-success-foreground">
+                                    Active
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Switch
+                                    checked={setting.active}
+                                    onCheckedChange={(checked) =>
+                                      upsertPrimaryTaxSetting({
+                                        taxType: setting.taxType,
+                                        taxRate: setting.taxRate,
+                                        taxRegistrationNo:
+                                          setting.taxRegistrationNo,
+                                        active: checked,
+                                      })
+                                    }
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <Label>Tax Type</Label>
-                        <Input
-                          placeholder="GST / VAT"
-                          value={configTaxForm.taxType}
-                          onChange={(e) =>
-                            setConfigTaxForm((prev) => ({
-                              ...prev,
-                              taxType: e.target.value,
-                            }))
-                          }
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <Label>Tax Type</Label>
+                          <Input
+                            placeholder="GST / VAT"
+                            value={configTaxForm.taxType}
+                            onChange={(e) =>
+                              setConfigTaxForm((prev) => ({
+                                ...prev,
+                                taxType: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Tax Rate (%)</Label>
+                          <Input
+                            placeholder="18"
+                            value={configTaxForm.taxRate}
+                            onChange={(e) =>
+                              setConfigTaxForm((prev) => ({
+                                ...prev,
+                                taxRate: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Tax Registration No</Label>
+                          <Input
+                            placeholder="Enter registration no"
+                            value={configTaxForm.taxRegistrationNo}
+                            onChange={(e) =>
+                              setConfigTaxForm((prev) => ({
+                                ...prev,
+                                taxRegistrationNo: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label>Tax Rate (%)</Label>
-                        <Input
-                          placeholder="18"
-                          value={configTaxForm.taxRate}
-                          onChange={(e) =>
-                            setConfigTaxForm((prev) => ({
-                              ...prev,
-                              taxRate: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Tax Registration No</Label>
-                        <Input
-                          placeholder="Enter registration no"
-                          value={configTaxForm.taxRegistrationNo}
-                          onChange={(e) =>
-                            setConfigTaxForm((prev) => ({
-                              ...prev,
-                              taxRegistrationNo: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    </div>
 
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={() => {
-                          upsertPrimaryTaxSetting({
-                            taxType: configTaxForm.taxType || "GST",
-                            taxRate: Number(configTaxForm.taxRate) || 0,
-                            taxRegistrationNo:
-                              configTaxForm.taxRegistrationNo ||
-                              client.gst ||
-                              "",
-                            active: true,
-                          });
-                          toast({ title: "Tax settings saved" });
-                        }}
-                      >
-                        Save Tax Settings
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={() => {
+                            upsertPrimaryTaxSetting({
+                              taxType: configTaxForm.taxType || "GST",
+                              taxRate: Number(configTaxForm.taxRate) || 0,
+                              taxRegistrationNo:
+                                configTaxForm.taxRegistrationNo ||
+                                client.gst ||
+                                "",
+                              active: true,
+                            });
+                            toast({ title: "Tax settings saved" });
+                          }}
+                        >
+                          Save Tax Settings
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {configFocus === "sla" && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock3 className="h-4 w-4 text-primary" />
+                        SLA & Status Controls
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid gap-3 md:grid-cols-[1fr_200px]">
+                        <div>
+                          <Label>Select Active Client Order</Label>
+                          <Select
+                            value={selectedSlaOrder?.id || ""}
+                            onValueChange={setSelectedSlaOrderId}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Select order" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {slaEligibleOrders.map((order) => (
+                                <SelectItem key={order.id} value={order.id}>
+                                  {order.orderNumber} • {order.status}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="rounded-xl border bg-muted/30 p-3 text-xs">
+                          <p className="text-muted-foreground">Current SLA</p>
+                          <p className="mt-1 font-semibold">
+                            {selectedSlaOrder
+                              ? selectedSlaOrder.slaStatus.replace("_", " ")
+                              : "No eligible orders"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {!selectedSlaOrder ? (
+                        <p className="text-sm text-muted-foreground">
+                          No active orders available for SLA controls.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <Button
+                              variant="outline"
+                              className="gap-2"
+                              onClick={handleRefreshSlaControl}
+                            >
+                              <RefreshCw className="h-4 w-4" /> Refresh SLA
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="gap-2"
+                              onClick={handleResetSlaControl}
+                              disabled={!canManageSlaControls}
+                            >
+                              <RotateCcw className="h-4 w-4" /> Reset SLA
+                            </Button>
+                          </div>
+
+                          <div className="grid gap-3 md:grid-cols-[90px_90px_auto] md:items-end">
+                            <div>
+                              <Label>Hours</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={slaSetHours}
+                                onChange={(e) => setSlaSetHours(e.target.value)}
+                                className="mt-1"
+                                disabled={!canManageSlaControls}
+                              />
+                            </div>
+                            <div>
+                              <Label>Minutes</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={59}
+                                value={slaSetMinutes}
+                                onChange={(e) =>
+                                  setSlaSetMinutes(e.target.value)
+                                }
+                                className="mt-1"
+                                disabled={!canManageSlaControls}
+                              />
+                            </div>
+                            <Button
+                              className="gap-2"
+                              onClick={handleSetSlaTimerControl}
+                              disabled={!canManageSlaControls}
+                            >
+                              <Clock3 className="h-4 w-4" /> Set SLA Timer
+                            </Button>
+                          </div>
+
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <Button
+                              variant="outline"
+                              onClick={handleSetSlaReminderControl}
+                            >
+                              Set Reminder
+                            </Button>
+                            <Select onValueChange={handleUpdateSlaOrderStatus}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Update Status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from(
+                                  new Set([
+                                    "Processing",
+                                    "Shipped",
+                                    "Delivered",
+                                    "Completed",
+                                    "Cancelled",
+                                    ...orderStatuses.map((entry) => entry.name),
+                                  ]),
+                                ).map((status) => (
+                                  <SelectItem key={status} value={status}>
+                                    {status}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {!canManageSlaControls && (
+                            <p className="text-xs text-amber-700">
+                              Only owner, admin, and procurement manager can
+                              execute reset/timer/status SLA operations.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
             </Tabs>
           </div>

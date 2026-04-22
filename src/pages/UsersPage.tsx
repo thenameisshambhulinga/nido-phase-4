@@ -28,8 +28,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth, UserRole } from "@/contexts/AuthContext";
-import { Plus, Edit, Trash2, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 export default function UsersPage() {
   const { users, createUser, updateUser, deleteUser, isOwner } = useAuth();
@@ -38,6 +39,7 @@ export default function UsersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const [form, setForm] = useState<{
     name: string;
@@ -183,9 +185,12 @@ export default function UsersPage() {
 
                     <TableCell className="flex gap-2">
                       <Button size="icon" onClick={() => handleEdit(u)}>
-                        <Edit />
+                        <Pencil />
                       </Button>
-                      <Button size="icon" onClick={() => deleteUser(u.id)}>
+                      <Button
+                        size="icon"
+                        onClick={() => setDeleteTargetId(u.id)}
+                      >
                         <Trash2 />
                       </Button>
                     </TableCell>
@@ -196,6 +201,22 @@ export default function UsersPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmationDialog
+        open={!!deleteTargetId}
+        title="Delete User"
+        description="Delete this user account? This action cannot be undone."
+        confirmLabel="Delete"
+        tone="destructive"
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null);
+        }}
+        onConfirm={() => {
+          if (!deleteTargetId) return;
+          deleteUser(deleteTargetId);
+          setDeleteTargetId(null);
+        }}
+      />
     </div>
   );
 }

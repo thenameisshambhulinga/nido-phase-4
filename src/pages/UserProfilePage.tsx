@@ -317,7 +317,7 @@ export default function UserProfilePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <Card className="lg:col-span-4 rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-white">
+          <Card className="lg:col-span-3 lg:max-w-[320px] rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-white">
             <div className="h-24 bg-gradient-to-br from-blue-600 to-blue-400" />
             <CardContent className="pt-0 -mt-10 space-y-4">
               <div className="mx-auto h-20 w-20 rounded-full border-4 border-white bg-blue-100 text-blue-700 shadow-sm flex items-center justify-center text-2xl font-semibold overflow-hidden">
@@ -379,7 +379,7 @@ export default function UserProfilePage() {
             </CardContent>
           </Card>
 
-          <div className="lg:col-span-8 space-y-4">
+          <div className="lg:col-span-9 space-y-4">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="h-auto w-full justify-start rounded-xl border border-gray-100 bg-white p-1">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -674,7 +674,7 @@ export default function UserProfilePage() {
       </div>
 
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="rounded-2xl">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Assign Device by Serial Number</DialogTitle>
           </DialogHeader>

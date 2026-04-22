@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { GeneralSettings } from "@/types";
 import { useData } from "@/contexts/DataContext";
@@ -23,6 +23,32 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { Upload, Save, Eye, ArrowLeft } from "lucide-react";
+
+const hexToHsl = (hex: string): string | null => {
+  const normalized = hex.replace("#", "");
+  if (normalized.length !== 6) return null;
+  const r = parseInt(normalized.slice(0, 2), 16) / 255;
+  const g = parseInt(normalized.slice(2, 4), 16) / 255;
+  const b = parseInt(normalized.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const l = (max + min) / 2;
+
+  if (delta === 0) {
+    return `0 0% ${Math.round(l * 100)}%`;
+  }
+
+  const s = delta / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (max === r) h = ((g - b) / delta) % 6;
+  else if (max === g) h = (b - r) / delta + 2;
+  else h = (r - g) / delta + 4;
+  h = Math.round(h * 60);
+  if (h < 0) h += 360;
+
+  return `${h} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+};
 
 export default function GeneralSettingsTab() {
   const navigate = useNavigate();
@@ -62,6 +88,22 @@ export default function GeneralSettingsTab() {
   const handleChange = (field: string, value: string) => {
     updateGeneralSettings(selectedOrgId, { [field]: value });
   };
+
+  const handlePrimaryColorChange = (value: string) => {
+    updateGeneralSettings(selectedOrgId, { primaryColor: value });
+    const hsl = hexToHsl(value);
+    if (hsl) {
+      document.documentElement.style.setProperty("--primary", hsl);
+    }
+  };
+
+  useEffect(() => {
+    if (!settings.primaryColor) return;
+    const hsl = hexToHsl(settings.primaryColor);
+    if (hsl) {
+      document.documentElement.style.setProperty("--primary", hsl);
+    }
+  }, [settings.primaryColor]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -141,10 +183,7 @@ export default function GeneralSettingsTab() {
               Localization
             </TabsTrigger>
             <TabsTrigger value="procurement" className="text-sm">
-              Procurement Defaults
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="text-sm">
-              Notification & Alerts
+              Procurement Prefixes
             </TabsTrigger>
             <TabsTrigger value="api" className="text-sm">
               API
@@ -272,7 +311,8 @@ export default function GeneralSettingsTab() {
                 <div>
                   <Label className="text-xs">Primary Color</Label>
                   <Input
-                    defaultValue="#1e3a5f"
+                    value={settings.primaryColor || "#1e3a5f"}
+                    onChange={(e) => handlePrimaryColorChange(e.target.value)}
                     type="color"
                     className="w-20 h-10"
                   />
@@ -383,27 +423,10 @@ export default function GeneralSettingsTab() {
           <TabsContent value="procurement" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Procurement Defaults</CardTitle>
+                <CardTitle className="text-sm">Procurement Prefixes</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <Label className="text-xs">Default Approval Workflow</Label>
-                    <Select defaultValue="standard">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">
-                          Standard Approval
-                        </SelectItem>
-                        <SelectItem value="multi">
-                          Multi-level Approval
-                        </SelectItem>
-                        <SelectItem value="auto">Auto Approve</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <div>
                     <Label className="text-xs">Default PO Prefix</Label>
                     <Input
@@ -502,31 +525,106 @@ export default function GeneralSettingsTab() {
                       placeholder="CN"
                     />
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="notifications" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Notification & Alerts</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Configure email and in-app notification preferences.
-                </p>
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" defaultChecked id="emailNotif" />
-                  <Label htmlFor="emailNotif" className="text-xs">
-                    Enable email notifications
-                  </Label>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" defaultChecked id="inAppNotif" />
-                  <Label htmlFor="inAppNotif" className="text-xs">
-                    Enable in-app alerts
-                  </Label>
+                  <div>
+                    <Label className="text-xs">Default Order Code Prefix</Label>
+                    <Input
+                      value={settings.orderCodePrefix || ""}
+                      onChange={(e) =>
+                        handleChange("orderCodePrefix", e.target.value)
+                      }
+                      placeholder="ORD"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Service Code Prefix</Label>
+                    <Input
+                      value={settings.serviceCodePrefix || ""}
+                      onChange={(e) =>
+                        handleChange("serviceCodePrefix", e.target.value)
+                      }
+                      placeholder="SVC"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Support Ticket Prefix</Label>
+                    <Input
+                      value={settings.supportTicketPrefix || ""}
+                      onChange={(e) =>
+                        handleChange("supportTicketPrefix", e.target.value)
+                      }
+                      placeholder="SUP"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Bill Prefix</Label>
+                    <Input
+                      value={settings.billPrefix || ""}
+                      onChange={(e) =>
+                        handleChange("billPrefix", e.target.value)
+                      }
+                      placeholder="BILL"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Recurring PO Prefix</Label>
+                    <Input
+                      value={settings.recurringPoPrefix || ""}
+                      onChange={(e) =>
+                        handleChange("recurringPoPrefix", e.target.value)
+                      }
+                      placeholder="RPO"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Recurring Invoice Prefix</Label>
+                    <Input
+                      value={settings.recurringInvoicePrefix || ""}
+                      onChange={(e) =>
+                        handleChange("recurringInvoicePrefix", e.target.value)
+                      }
+                      placeholder="RINV"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">User Code Prefix</Label>
+                    <Input
+                      value={settings.userCodePrefix || ""}
+                      onChange={(e) =>
+                        handleChange("userCodePrefix", e.target.value)
+                      }
+                      placeholder="USR"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Vendor User Prefix</Label>
+                    <Input
+                      value={settings.vendorUserPrefix || ""}
+                      onChange={(e) =>
+                        handleChange("vendorUserPrefix", e.target.value)
+                      }
+                      placeholder="VUSR"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Recurring Bill Prefix</Label>
+                    <Input
+                      value={settings.recurringBillPrefix || ""}
+                      onChange={(e) =>
+                        handleChange("recurringBillPrefix", e.target.value)
+                      }
+                      placeholder="RBILL"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Vendor Credit Prefix</Label>
+                    <Input
+                      value={settings.vendorCreditPrefix || ""}
+                      onChange={(e) =>
+                        handleChange("vendorCreditPrefix", e.target.value)
+                      }
+                      placeholder="VC"
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>

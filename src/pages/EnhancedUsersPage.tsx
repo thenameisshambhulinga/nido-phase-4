@@ -46,7 +46,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import {
   Plus,
-  Edit,
   Trash2,
   Search,
   Mail,
@@ -56,6 +55,7 @@ import {
   Download,
   Upload,
 } from "lucide-react";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function EnhancedUsersPage() {
@@ -73,6 +73,7 @@ export default function EnhancedUsersPage() {
   const [selectedUser, setSelectedUser] = useState<EnhancedAppUser | null>(
     null,
   );
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<EnhancedAppUser>>({
     fullName: "",
@@ -143,10 +144,7 @@ export default function EnhancedUsersPage() {
 
   // Handle delete user
   const handleDeleteUser = async (userId: string) => {
-    if (confirm("Are you sure you want to delete this user?")) {
-      await deleteUser(userId);
-      toast({ title: "User deleted" });
-    }
+    setDeleteUserId(userId);
   };
 
   // Reset form
@@ -404,27 +402,7 @@ export default function EnhancedUsersPage() {
 
                     <div>
                       <Label>User Type</Label>
-                      <Select
-                        value={formData.userType || "Internal User"}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, userType: v as UserType })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Internal User">
-                            Internal User
-                          </SelectItem>
-                          <SelectItem value="Client User">
-                            Client User
-                          </SelectItem>
-                          <SelectItem value="Vendor User">
-                            Vendor User
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Input value={"Internal User"} disabled />
                     </div>
 
                     <div className="col-span-2">
@@ -574,6 +552,22 @@ export default function EnhancedUsersPage() {
                 </Table>
               </CardContent>
             </Card>
+            <ConfirmationDialog
+              open={!!deleteUserId}
+              title="Delete User"
+              description="Are you sure you want to delete this user? This action cannot be undone."
+              confirmLabel="Delete"
+              tone="destructive"
+              onOpenChange={(open) => {
+                if (!open) setDeleteUserId(null);
+              }}
+              onConfirm={async () => {
+                if (!deleteUserId) return;
+                await deleteUser(deleteUserId);
+                toast({ title: "User deleted" });
+                setDeleteUserId(null);
+              }}
+            />
           </TabsContent>
 
           {/* Bulk Import Tab */}

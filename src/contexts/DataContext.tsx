@@ -1840,6 +1840,7 @@ const DEFAULT_ORGANIZATIONS: Organization[] = [
 
 const buildDefaultGeneralSettings = (): GeneralSettings => ({
   companyName: "Nido Tech Pvt. Ltd.",
+  primaryColor: "#1e3a5f",
   currency: "INR",
   dateFormat: "DD/MM/YYYY",
   timezone: "Asia/Kolkata",
@@ -1861,6 +1862,16 @@ const buildDefaultGeneralSettings = (): GeneralSettings => ({
   salesOrderPrefix: "SO",
   deliveryChallanPrefix: "DC",
   creditNotePrefix: "CN",
+  orderCodePrefix: "ORD",
+  serviceCodePrefix: "SVC",
+  supportTicketPrefix: "SUP",
+  billPrefix: "BILL",
+  recurringPoPrefix: "RPO",
+  recurringInvoicePrefix: "RINV",
+  userCodePrefix: "USR",
+  vendorUserPrefix: "VUSR",
+  recurringBillPrefix: "RBILL",
+  vendorCreditPrefix: "VC",
 });
 
 // ── DEFAULT GENERAL SETTINGS ───────────────────────────────────────

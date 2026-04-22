@@ -48,6 +48,7 @@ import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { safeReadJson } from "@/lib/storage";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 interface Invoice {
   id: string;
@@ -214,6 +215,21 @@ export default function InvoicesPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    confirmLabel: string;
+    tone: "default" | "destructive";
+    onConfirm: () => void;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    confirmLabel: "Confirm",
+    tone: "default",
+    onConfirm: () => {},
+  });
   const [newInvoice, setNewInvoice] = useState({
     vendorOrClient: "",
     type: "client" as "vendor" | "client",
@@ -982,7 +998,16 @@ Notes: ${inv.notes || "N/A"}
                     {inv.status === "draft" && (
                       <Button
                         size="sm"
-                        onClick={() => updateStatus(inv.id, "sent")}
+                        onClick={() =>
+                          setConfirmState({
+                            open: true,
+                            title: "Send Invoice",
+                            description: `Send ${inv.invoiceNumber} now?`,
+                            confirmLabel: "Send",
+                            tone: "default",
+                            onConfirm: () => updateStatus(inv.id, "sent"),
+                          })
+                        }
                       >
                         <Send className="h-3.5 w-3.5 mr-1" /> Send
                       </Button>
@@ -990,7 +1015,16 @@ Notes: ${inv.notes || "N/A"}
                     {(inv.status === "sent" || inv.status === "pending") && (
                       <Button
                         size="sm"
-                        onClick={() => updateStatus(inv.id, "paid")}
+                        onClick={() =>
+                          setConfirmState({
+                            open: true,
+                            title: "Mark Invoice Paid",
+                            description: `Mark ${inv.invoiceNumber} as paid?`,
+                            confirmLabel: "Mark Paid",
+                            tone: "default",
+                            onConfirm: () => updateStatus(inv.id, "paid"),
+                          })
+                        }
                       >
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark Paid
                       </Button>
@@ -1006,7 +1040,16 @@ Notes: ${inv.notes || "N/A"}
                         </Button>
                         <Button
                           size="sm"
-                          onClick={() => updateStatus(inv.id, "paid")}
+                          onClick={() =>
+                            setConfirmState({
+                              open: true,
+                              title: "Mark Invoice Paid",
+                              description: `Mark ${inv.invoiceNumber} as paid?`,
+                              confirmLabel: "Mark Paid",
+                              tone: "default",
+                              onConfirm: () => updateStatus(inv.id, "paid"),
+                            })
+                          }
                         >
                           <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark
                           Paid
@@ -1016,7 +1059,16 @@ Notes: ${inv.notes || "N/A"}
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => deleteInvoice(inv.id)}
+                      onClick={() =>
+                        setConfirmState({
+                          open: true,
+                          title: "Delete Invoice",
+                          description: `Delete ${inv.invoiceNumber}? This action cannot be undone.`,
+                          confirmLabel: "Delete",
+                          tone: "destructive",
+                          onConfirm: () => deleteInvoice(inv.id),
+                        })
+                      }
                     >
                       <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                     </Button>
@@ -1026,6 +1078,19 @@ Notes: ${inv.notes || "N/A"}
             })()}
         </DialogContent>
       </Dialog>
+
+      <ConfirmationDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        description={confirmState.description}
+        confirmLabel={confirmState.confirmLabel}
+        tone={confirmState.tone}
+        onOpenChange={(open) => setConfirmState((prev) => ({ ...prev, open }))}
+        onConfirm={() => {
+          confirmState.onConfirm();
+          setConfirmState((prev) => ({ ...prev, open: false }));
+        }}
+      />
     </div>
   );
 }

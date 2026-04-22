@@ -24,8 +24,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MODULES } from "@/types";
 import { toast } from "@/hooks/use-toast";
-import { Search, Plus, Edit, Trash2 } from "lucide-react";
+import { Search, Plus, Pencil, Trash2 } from "lucide-react";
 import type { Role } from "@/contexts/DataContext";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 type PermissionKey = "view" | "create" | "edit" | "delete" | "export";
 
@@ -59,6 +60,7 @@ export default function PermissionsPage() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Role | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -198,15 +200,12 @@ export default function PermissionsPage() {
                         size="icon"
                         onClick={() => openEdit(role)}
                       >
-                        <Edit className="h-4 w-4" />
+                        <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          deleteRole(role.id);
-                          toast({ title: "Role removed" });
-                        }}
+                        onClick={() => setDeleteTarget(role)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -316,6 +315,27 @@ export default function PermissionsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmationDialog
+        open={!!deleteTarget}
+        title="Delete Role"
+        description={
+          deleteTarget
+            ? `Delete role \"${deleteTarget.name}\"? This action cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        tone="destructive"
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteRole(deleteTarget.id);
+          toast({ title: "Role removed" });
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

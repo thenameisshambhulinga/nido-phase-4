@@ -34,7 +34,7 @@ import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Plus,
-  Edit,
+  Pencil,
   Trash2,
   Search,
   Settings,
@@ -46,6 +46,7 @@ import {
   Download,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
 const APPROVAL_WORKFLOWS = [
   "IT Service Approval",
@@ -78,6 +79,7 @@ export default function VendorCategoriesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     code: "",
@@ -369,16 +371,13 @@ export default function VendorCategoriesPage() {
                           onClick={() => handleEdit(cat)}
                           disabled={!isOwner}
                         >
-                          <Edit className="h-3.5 w-3.5" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => {
-                            deleteVendorCategory(cat.id);
-                            toast({ title: "Deleted" });
-                          }}
+                          onClick={() => setDeleteTargetId(cat.id)}
                           disabled={!isOwner}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -479,7 +478,7 @@ export default function VendorCategoriesPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Edit className="h-5 w-5 text-primary" /> Edit Category
+                <Pencil className="h-5 w-5 text-primary" /> Edit Category
               </DialogTitle>
               <DialogDescription>
                 Update category details, SLA templates, and approval settings
@@ -494,6 +493,23 @@ export default function VendorCategoriesPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <ConfirmationDialog
+          open={!!deleteTargetId}
+          title="Delete Vendor Category"
+          description="Delete this category? Existing vendor mappings may be affected."
+          confirmLabel="Delete"
+          tone="destructive"
+          onOpenChange={(open) => {
+            if (!open) setDeleteTargetId(null);
+          }}
+          onConfirm={() => {
+            if (!deleteTargetId) return;
+            deleteVendorCategory(deleteTargetId);
+            toast({ title: "Deleted" });
+            setDeleteTargetId(null);
+          }}
+        />
       </div>
     </div>
   );

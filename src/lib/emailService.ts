@@ -254,6 +254,140 @@ Please contact our support team for assistance.
 Support: support@nidotech.com | (123) 456-7890
     `.trim(),
   }),
+
+  orderReceivedForOwner: (order: {
+    id: string;
+    orderDate: string;
+    shippingInfo: { email: string; fullName: string; companyName?: string };
+    items: Array<{
+      name: string;
+      quantity: number;
+      price: number;
+      category?: string;
+    }>;
+    total: number;
+    paymentMethod: string;
+    shippingMethod: string;
+  }): EmailTemplate => ({
+    subject: `New Client Order Received - ${order.id}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { margin: 0; padding: 24px; background: #eef3fa; font-family: "Segoe UI", Arial, sans-serif; color: #1e293b; }
+            .shell { max-width: 720px; margin: 0 auto; background: #ffffff; border: 1px solid #d9e2f1; border-radius: 14px; overflow: hidden; }
+            .hero { background: linear-gradient(120deg, #1e3a5f, #2b4f7d); padding: 24px 28px; color: #f8fafc; }
+            .hero h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 0.01em; }
+            .hero p { margin: 8px 0 0; font-size: 13px; opacity: 0.92; }
+            .content { padding: 26px 28px; }
+            .tag { display: inline-block; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; }
+            .title { margin: 18px 0 8px; font-size: 22px; color: #0f172a; }
+            .lead { margin: 0 0 18px; color: #475569; line-height: 1.55; }
+            .meta { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin: 16px 0 20px; }
+            .meta-row { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; padding: 6px 0; }
+            .meta-row span:first-child { color: #64748b; }
+            .meta-row span:last-child { font-weight: 600; color: #0f172a; text-align: right; }
+            .table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+            .table th { background: #f1f5f9; text-align: left; font-size: 12px; color: #334155; padding: 10px; border-bottom: 1px solid #e2e8f0; }
+            .table td { padding: 10px; font-size: 13px; border-bottom: 1px solid #edf2f7; }
+            .table tr:last-child td { border-bottom: none; }
+            .right { text-align: right; }
+            .cta { margin: 20px 0 8px; text-align: center; }
+            .cta a { display: inline-block; padding: 12px 26px; border-radius: 10px; background: linear-gradient(120deg, #2563eb, #1d4ed8); color: white; text-decoration: none; font-weight: 600; }
+            .footer { background: #f1f5f9; border-top: 1px solid #e2e8f0; padding: 16px 20px; text-align: center; font-size: 12px; color: #64748b; }
+          </style>
+        </head>
+        <body>
+          <div class="shell">
+            <div class="hero">
+              <h1>Nido Tech</h1>
+              <p>Order Intelligence Notification</p>
+            </div>
+            <div class="content">
+              <span class="tag">New Order Received</span>
+              <h2 class="title">Order ${order.id} is now awaiting procurement review</h2>
+              <p class="lead">
+                A client has submitted a checkout request. You can now review, approve/reject,
+                and proceed with vendor assignment from the procurement queue.
+              </p>
+
+              <div class="meta">
+                <div class="meta-row"><span>Order ID</span><span>${order.id}</span></div>
+                <div class="meta-row"><span>Order Date</span><span>${new Date(order.orderDate).toLocaleString()}</span></div>
+                <div class="meta-row"><span>Client Name</span><span>${order.shippingInfo.fullName}</span></div>
+                <div class="meta-row"><span>Client Email</span><span>${order.shippingInfo.email}</span></div>
+                <div class="meta-row"><span>Organization</span><span>${order.shippingInfo.companyName || "Client Organization"}</span></div>
+                <div class="meta-row"><span>Payment Method</span><span>${order.paymentMethod}</span></div>
+                <div class="meta-row"><span>Shipping Method</span><span>${order.shippingMethod}</span></div>
+              </div>
+
+              <table class="table" role="presentation">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th class="right">Qty</th>
+                    <th class="right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${order.items
+                    .map(
+                      (item) => `
+                    <tr>
+                      <td>${item.name}</td>
+                      <td>${item.category || "General"}</td>
+                      <td class="right">${item.quantity}</td>
+                      <td class="right">$${(item.price * item.quantity).toLocaleString()}</td>
+                    </tr>
+                  `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+
+              <div class="meta" style="margin-top: 14px;">
+                <div class="meta-row"><span>Order Total</span><span>$${order.total.toLocaleString()}</span></div>
+              </div>
+
+              <div class="cta">
+                <a href="https://app.nidotech.com/orders">Review in Procurement Workspace</a>
+              </div>
+            </div>
+            <div class="footer">
+              © 2026 Nido Tech. All rights reserved. This is a system-generated operational notification.
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    plainText: `
+New Client Order Received - ${order.id}
+
+Order ${order.id} was submitted and is awaiting procurement review.
+
+Order Date: ${new Date(order.orderDate).toLocaleString()}
+Client: ${order.shippingInfo.fullName}
+Client Email: ${order.shippingInfo.email}
+Organization: ${order.shippingInfo.companyName || "Client Organization"}
+Payment Method: ${order.paymentMethod}
+Shipping Method: ${order.shippingMethod}
+
+Items:
+${order.items
+  .map(
+    (item) =>
+      `- ${item.name} (${item.category || "General"}) x${item.quantity} = $${(item.price * item.quantity).toLocaleString()}`,
+  )
+  .join("\n")}
+
+Total: $${order.total.toLocaleString()}
+
+Open Procurement Workspace to review this order.
+    `.trim(),
+  }),
 };
 
 /**

@@ -54,7 +54,9 @@ export default function UserInvitationPage() {
     useEnhancedAuth();
 
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteEmployeeId, setInviteEmployeeId] = useState("");
   const [inviteRole, setInviteRole] = useState<RoleTemplateKey>("employee");
   const [inviteUserType, setInviteUserType] =
     useState<UserType>("Internal User");
@@ -74,8 +76,11 @@ export default function UserInvitationPage() {
   );
 
   const handleSendInvite = async () => {
-    if (!inviteEmail) {
-      toast({ title: "Error", description: "Email required" });
+    if (!inviteName || !inviteEmail || !inviteEmployeeId) {
+      toast({
+        title: "Error",
+        description: "User name, email, and employee ID are required",
+      });
       return;
     }
 
@@ -101,11 +106,36 @@ export default function UserInvitationPage() {
         description: `Invitation sent to ${inviteEmail}`,
       });
       setShowInviteDialog(false);
+      setInviteName("");
       setInviteEmail("");
+      setInviteEmployeeId("");
       setInviteRole("employee");
       setInviteUserType("Internal User");
       setInviteDept("");
+    } else {
+      toast({
+        title: "Invitation blocked",
+        description:
+          "Invite could not be sent. The user may already exist or was invited in the last 24 hours.",
+        variant: "destructive",
+      });
     }
+  };
+
+  const handleInviteNameChange = (value: string) => {
+    setInviteName(value);
+    const matched = users.find(
+      (u) =>
+        u.fullName.toLowerCase() === value.toLowerCase() ||
+        u.email.toLowerCase() === value.toLowerCase(),
+    );
+    if (!matched) return;
+
+    setInviteEmail(matched.email);
+    setInviteEmployeeId(matched.username.toUpperCase());
+    setInviteUserType(matched.userType);
+    setInviteRole(matched.roleTemplate);
+    setInviteDept(matched.department || "");
   };
 
   const handleResendInvite = async (invitationId: string) => {
@@ -227,13 +257,38 @@ export default function UserInvitationPage() {
 
               <div className="space-y-4">
                 <div>
-                  <Label>Email Address *</Label>
+                  <Label>User Name *</Label>
                   <Input
-                    type="email"
-                    placeholder="user@example.com"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="Enter user name"
+                    value={inviteName}
+                    onChange={(e) => handleInviteNameChange(e.target.value)}
+                    list="invite-user-list"
                   />
+                  <datalist id="invite-user-list">
+                    {users.map((u) => (
+                      <option key={u.id} value={u.fullName} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Email Address *</Label>
+                    <Input
+                      type="email"
+                      placeholder="user@example.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Employee ID *</Label>
+                    <Input
+                      placeholder="EMP-0005"
+                      value={inviteEmployeeId}
+                      onChange={(e) => setInviteEmployeeId(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

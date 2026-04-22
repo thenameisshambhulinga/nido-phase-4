@@ -34,6 +34,7 @@ import {
   nextSequentialCode,
   normalizeOrderCode,
 } from "@/lib/documentNumbering";
+import { emailTemplates, sendEmail } from "@/lib/emailService";
 
 interface ShippingInfo {
   fullName: string;
@@ -55,10 +56,13 @@ interface PaymentInfo {
   purchaseOrderNumber: string;
 }
 
+const isValidEmail = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { items, subtotal, clearCart, totalItems } = useCart();
-  const { user } = useAuth();
+  const { user, isOwner, hasPermission } = useAuth();
   const { orders, addAuditEntry, setOrders } = useData();
 
   const [shippingMethod, setShippingMethod] = useState<"standard" | "express">(
@@ -70,6 +74,8 @@ export default function CheckoutPage() {
   const [saveCard, setSaveCard] = useState(true);
   const [showCVV, setShowCVV] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [sendOwnerNotification, setSendOwnerNotification] = useState(false);
+  const [ownerNotificationEmail, setOwnerNotificationEmail] = useState("");
 
   // Shipping Info State
   const [shipping, setShipping] = useState<ShippingInfo>({
@@ -97,6 +103,8 @@ export default function CheckoutPage() {
   const shippingCost = shippingMethod === "express" ? 75 : 25;
   const tax = subtotal * 0.1;
   const total = subtotal + tax + shippingCost;
+  const canConfigureOwnerNotification =
+    isOwner || hasPermission("procure", "approve");
 
   const handleShippingChange = (field: keyof ShippingInfo, value: string) => {
     setShipping((prev) => ({ ...prev, [field]: value }));
@@ -167,6 +175,15 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async () => {
     if (!validateShipping() || !validatePayment()) return;
+
+    if (
+      canConfigureOwnerNotification &&
+      sendOwnerNotification &&
+      !isValidEmail(ownerNotificationEmail)
+    ) {
+      toast.error("Please enter a valid notification email");
+      return;
+    }
 
     setIsProcessing(true);
 
@@ -268,9 +285,41 @@ export default function CheckoutPage() {
           },
         ],
         attachments: [],
+        ownerNotificationEmail:
+          canConfigureOwnerNotification && sendOwnerNotification
+            ? ownerNotificationEmail.trim()
+            : "",
       };
 
       setOrders((prev) => [procureOrder, ...prev]);
+
+      if (
+        canConfigureOwnerNotification &&
+        sendOwnerNotification &&
+        ownerNotificationEmail.trim()
+      ) {
+        await sendEmail(
+          ownerNotificationEmail.trim(),
+          emailTemplates.orderReceivedForOwner({
+            id: orderID,
+            orderDate: todayIso,
+            shippingInfo: {
+              email: shipping.email,
+              fullName: shipping.fullName,
+              companyName: shipping.companyName,
+            },
+            items: items.map((item) => ({
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+              category: item.category,
+            })),
+            total,
+            paymentMethod,
+            shippingMethod,
+          }),
+        );
+      }
 
       // Add audit entry
       addAuditEntry({
@@ -337,28 +386,32 @@ export default function CheckoutPage() {
   return (
     <div className="space-y-6 pb-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Checkout</h1>
-          <p className="text-muted-foreground mt-1">
-            Complete your purchase securely
-          </p>
+      <div className="relative overflow-hidden rounded-3xl border border-blue-200/60 bg-gradient-to-br from-slate-100 via-blue-50 to-cyan-100 p-5 md:p-6">
+        <div className="pointer-events-none absolute -right-12 -top-10 h-40 w-40 rounded-full bg-blue-300/30 blur-2xl" />
+        <div className="pointer-events-none absolute -left-8 bottom-0 h-28 w-28 rounded-full bg-cyan-300/40 blur-2xl" />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Checkout</h1>
+            <p className="text-muted-foreground mt-1">
+              Complete your purchase securely
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/shop/cart")}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to Cart
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/shop/cart")}
-          className="gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Cart
-        </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Main Checkout Form */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6 lg:col-span-8">
           {/* Shipping Information */}
-          <Card className="border-border/50">
+          <Card className="border-border/50 bg-white/95 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Truck className="h-5 w-5" /> Shipping Information
@@ -488,8 +541,62 @@ export default function CheckoutPage() {
             </CardContent>
           </Card>
 
+          {canConfigureOwnerNotification && (
+            <Card className="border-blue-200/60 bg-gradient-to-br from-white via-blue-50/30 to-cyan-50/40 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">
+                  Optional Owner Notification
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-white/70 p-3">
+                  <Checkbox
+                    id="owner-notification"
+                    checked={sendOwnerNotification}
+                    onCheckedChange={(checked) =>
+                      setSendOwnerNotification(Boolean(checked))
+                    }
+                  />
+                  <div>
+                    <Label
+                      htmlFor="owner-notification"
+                      className="cursor-pointer font-medium"
+                    >
+                      Send order-received notification email
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Available only to owner or authorized internal procurement
+                      users.
+                    </p>
+                  </div>
+                </div>
+
+                {sendOwnerNotification && (
+                  <div>
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Notification Email
+                    </Label>
+                    <Input
+                      type="email"
+                      value={ownerNotificationEmail}
+                      onChange={(e) =>
+                        setOwnerNotificationEmail(e.target.value)
+                      }
+                      placeholder="owner.ops@company.com"
+                      className="mt-1"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      The selected email will receive a premium "order received"
+                      mail after successful placement.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Shipping Method */}
-          <Card className="border-border/50">
+          <Card className="border-border/50 bg-white/95 shadow-sm">
             <CardHeader>
               <CardTitle>Shipping Method</CardTitle>
             </CardHeader>
@@ -564,7 +671,7 @@ export default function CheckoutPage() {
           </Card>
 
           {/* Payment Information */}
-          <Card className="border-border/50">
+          <Card className="border-border/50 bg-white/95 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" /> Payment Information
@@ -875,8 +982,8 @@ export default function CheckoutPage() {
         </div>
 
         {/* Order Summary Sidebar */}
-        <div>
-          <Card className="border-border/50 sticky top-6">
+        <div className="lg:col-span-4">
+          <Card className="sticky top-6 border-border/50 bg-white/95 shadow-sm">
             <CardHeader>
               <CardTitle>Order Summary</CardTitle>
             </CardHeader>
@@ -886,24 +993,40 @@ export default function CheckoutPage() {
                 {items.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between text-sm"
+                    className="rounded-xl border bg-slate-50/70 p-2.5 text-sm"
                   >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="text-lg">{item.emoji}</span>
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">
-                          {item.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          ×{item.quantity}
-                        </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className="text-lg">{item.emoji}</span>
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground truncate">
+                            {item.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            ×{item.quantity}
+                          </p>
+                        </div>
                       </div>
+                      <p className="font-medium text-foreground whitespace-nowrap ml-2">
+                        ${(item.price * item.quantity).toLocaleString()}
+                      </p>
                     </div>
-                    <p className="font-medium text-foreground whitespace-nowrap ml-2">
-                      ${(item.price * item.quantity).toLocaleString()}
-                    </p>
                   </div>
                 ))}
+              </div>
+
+              <div className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 p-3 text-xs">
+                <p className="font-semibold text-slate-800">Shipping Preview</p>
+                <p className="mt-1 text-slate-600">
+                  {shipping.fullName || "Recipient"} •{" "}
+                  {shipping.phone || "Phone"}
+                </p>
+                <p className="mt-0.5 text-slate-600">
+                  {shipping.address || "Address"}, {shipping.city || "City"}
+                </p>
+                <p className="mt-0.5 text-slate-600">
+                  {shipping.state || "State"} {shipping.zipCode || "ZIP"}
+                </p>
               </div>
 
               <Separator />
