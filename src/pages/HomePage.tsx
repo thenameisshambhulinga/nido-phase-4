@@ -52,25 +52,6 @@ const categories = [
   { name: "Logistics Equipment", count: 89, icon: Package, emoji: "📦" },
 ];
 
-const featuredProducts = [
-  {
-    name: "Ergonomic Office Chair",
-    rating: 4.8,
-    reviews: 128,
-    price: 299,
-    emoji: "🪑",
-  },
-  { name: "Wireless Mouse", rating: 4.6, reviews: 128, price: 49, emoji: "🖱️" },
-  {
-    name: "Desk Organizer Set",
-    rating: 4.9,
-    reviews: 128,
-    price: 35,
-    emoji: "📋",
-  },
-  { name: "LED Desk Lamp", rating: 4.7, reviews: 128, price: 79, emoji: "💡" },
-];
-
 const stats = [
   {
     value: "2000+",
@@ -108,7 +89,8 @@ function AnimatedSection({
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { searchAll } = useData();
+  const { searchAll, masterCatalogItems, isCoreDataLoading, coreDataError } =
+    useData();
   const [homeSearch, setHomeSearch] = useState("");
   const [debouncedHomeSearch, setDebouncedHomeSearch] = useState("");
 
@@ -120,6 +102,19 @@ export default function HomePage() {
   }, [homeSearch]);
 
   const quickResults = searchAll(debouncedHomeSearch).slice(0, 6);
+  const featuredProducts = masterCatalogItems.slice(0, 4).map((item) => ({
+    name: item.name,
+    rating: item.performanceRating
+      ? Math.min(5, item.performanceRating / 20)
+      : 4.8,
+    reviews: Math.max(0, item.initialStock),
+    price: item.discountPrice ?? item.price ?? 0,
+    emoji: item.category.toLowerCase().includes("hardware")
+      ? "💻"
+      : item.category.toLowerCase().includes("stationery")
+        ? "📄"
+        : "📦",
+  }));
 
   return (
     <div className="min-h-screen bg-background overflow-y-auto">
@@ -319,48 +314,65 @@ export default function HomePage() {
             <p className="text-muted-foreground text-sm sm:text-base">
               Hand-picked items for your business needs
             </p>
+            {isCoreDataLoading ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Loading products...
+              </p>
+            ) : coreDataError ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                {coreDataError}
+              </p>
+            ) : null}
           </div>
         </AnimatedSection>
         <div className="max-w-6xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {featuredProducts.map((p, i) => (
-            <AnimatedSection key={p.name} delay={i * 80}>
-              <Card className="bg-card border border-border hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="h-32 sm:h-44 bg-secondary/60 flex items-center justify-center text-5xl sm:text-6xl rounded-t-lg group-hover:bg-secondary/80 transition-colors">
-                    <span className="group-hover:scale-110 transition-transform duration-300">
-                      {p.emoji}
-                    </span>
-                  </div>
-                  <div className="p-4 sm:p-5">
-                    <p className="font-semibold text-foreground mb-2 text-sm sm:text-base line-clamp-1">
-                      {p.name}
-                    </p>
-                    <div className="flex items-center gap-1 mb-3">
-                      <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-warning text-warning" />
-                      <span className="text-xs sm:text-sm font-medium text-foreground">
-                        {p.rating}
-                      </span>
-                      <span className="text-[10px] sm:text-xs text-muted-foreground">
-                        ({p.reviews})
+          {featuredProducts.length > 0 ? (
+            featuredProducts.map((p, i) => (
+              <AnimatedSection key={p.name} delay={i * 80}>
+                <Card className="bg-card border border-border hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="h-32 sm:h-44 bg-secondary/60 flex items-center justify-center text-5xl sm:text-6xl rounded-t-lg group-hover:bg-secondary/80 transition-colors">
+                      <span className="group-hover:scale-110 transition-transform duration-300">
+                        {p.emoji}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg sm:text-xl font-bold text-primary">
-                        ₹{p.price}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1 border-border hover:bg-primary hover:text-primary-foreground hover:border-primary active:scale-95 transition-all"
-                      >
-                        <ShoppingCart className="h-3.5 w-3.5" />
-                      </Button>
+                    <div className="p-4 sm:p-5">
+                      <p className="font-semibold text-foreground mb-2 text-sm sm:text-base line-clamp-1">
+                        {p.name}
+                      </p>
+                      <div className="flex items-center gap-1 mb-3">
+                        <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-warning text-warning" />
+                        <span className="text-xs sm:text-sm font-medium text-foreground">
+                          {p.rating}
+                        </span>
+                        <span className="text-[10px] sm:text-xs text-muted-foreground">
+                          ({p.reviews})
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg sm:text-xl font-bold text-primary">
+                          ₹{p.price}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 border-border hover:bg-primary hover:text-primary-foreground hover:border-primary active:scale-95 transition-all"
+                        >
+                          <ShoppingCart className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </AnimatedSection>
-          ))}
+                  </CardContent>
+                </Card>
+              </AnimatedSection>
+            ))
+          ) : (
+            <Card className="col-span-full border-dashed">
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                No products
+              </CardContent>
+            </Card>
+          )}
         </div>
       </section>
 

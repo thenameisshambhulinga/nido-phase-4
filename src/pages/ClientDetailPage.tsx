@@ -805,27 +805,9 @@ export default function ClientDetailPage() {
       (sum, value) => sum + value,
       0,
     );
-    const fallback = totalSpend || 1;
 
     if (total === 0) {
-      return [
-        {
-          name: "Hardware",
-          value: Math.round(fallback * 0.45),
-          color: "#4169e1",
-        },
-        {
-          name: "Software",
-          value: Math.round(fallback * 0.3),
-          color: "#4aa8f0",
-        },
-        {
-          name: "Service",
-          value: Math.round(fallback * 0.15),
-          color: "#9f7aea",
-        },
-        { name: "Other", value: Math.round(fallback * 0.1), color: "#7a8498" },
-      ];
+      return [];
     }
 
     return [
@@ -852,17 +834,7 @@ export default function ClientDetailPage() {
       }));
   }, [clientOrders]);
 
-  const overviewSpendBars =
-    monthlySpendSeries.length > 0
-      ? monthlySpendSeries
-      : [
-          { month: "01", amount: 22000 },
-          { month: "02", amount: 31000 },
-          { month: "03", amount: 42000 },
-          { month: "04", amount: 56000 },
-          { month: "05", amount: 64000 },
-          { month: "06", amount: 78000 },
-        ];
+  const overviewSpendBars = monthlySpendSeries;
 
   const overviewSpendPeak = Math.max(
     ...overviewSpendBars.map((entry) => entry.amount),
@@ -2029,30 +2001,36 @@ export default function ClientDetailPage() {
                       <p className="text-xs text-muted-foreground">
                         Total Spend
                       </p>
-                      <div className="mt-4 h-36 rounded-xl bg-gradient-to-b from-blue-50 to-white border border-gray-100 p-3 flex items-end gap-2">
-                        {overviewSpendBars.map((entry) => {
-                          const height = Math.max(
-                            12,
-                            Math.round(
-                              (entry.amount / overviewSpendPeak) * 100,
-                            ),
-                          );
-                          return (
-                            <div
-                              key={entry.month}
-                              className="flex-1 flex flex-col items-center gap-1"
-                            >
+                      {overviewSpendBars.length > 0 ? (
+                        <div className="mt-4 h-36 rounded-xl bg-gradient-to-b from-blue-50 to-white border border-gray-100 p-3 flex items-end gap-2">
+                          {overviewSpendBars.map((entry) => {
+                            const height = Math.max(
+                              12,
+                              Math.round(
+                                (entry.amount / overviewSpendPeak) * 100,
+                              ),
+                            );
+                            return (
                               <div
-                                className="w-full rounded-t-md bg-blue-500/80"
-                                style={{ height: `${height}%` }}
-                              />
-                              <span className="text-[10px] text-muted-foreground">
-                                {entry.month}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                                key={entry.month}
+                                className="flex-1 flex flex-col items-center gap-1"
+                              >
+                                <div
+                                  className="w-full rounded-t-md bg-blue-500/80"
+                                  style={{ height: `${height}%` }}
+                                />
+                                <span className="text-[10px] text-muted-foreground">
+                                  {entry.month}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="mt-4 h-36 rounded-xl border border-dashed border-gray-200 flex items-center justify-center text-sm text-muted-foreground">
+                          No data available
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -2063,43 +2041,49 @@ export default function ClientDetailPage() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex items-center gap-4">
-                        <div
-                          className="h-24 w-24 rounded-full relative"
-                          style={{ background: donutGradient }}
-                        >
-                          <div className="absolute inset-5 rounded-full bg-white" />
+                      {spendCategories.length > 0 ? (
+                        <div className="flex items-center gap-4">
+                          <div
+                            className="h-24 w-24 rounded-full relative"
+                            style={{ background: donutGradient }}
+                          >
+                            <div className="absolute inset-5 rounded-full bg-white" />
+                          </div>
+                          <div className="space-y-2 text-xs w-full">
+                            {spendCategories.map((entry) => {
+                              const total =
+                                spendCategories.reduce(
+                                  (sum, item) => sum + item.value,
+                                  0,
+                                ) || 1;
+                              const percent = Math.round(
+                                (entry.value / total) * 100,
+                              );
+                              return (
+                                <div
+                                  key={entry.name}
+                                  className="flex items-center justify-between"
+                                >
+                                  <span className="flex items-center gap-2 text-muted-foreground">
+                                    <span
+                                      className="h-2.5 w-2.5 rounded-full"
+                                      style={{ backgroundColor: entry.color }}
+                                    />
+                                    {entry.name}
+                                  </span>
+                                  <span className="font-medium text-foreground">
+                                    {percent}%
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="space-y-2 text-xs w-full">
-                          {spendCategories.map((entry) => {
-                            const total =
-                              spendCategories.reduce(
-                                (sum, item) => sum + item.value,
-                                0,
-                              ) || 1;
-                            const percent = Math.round(
-                              (entry.value / total) * 100,
-                            );
-                            return (
-                              <div
-                                key={entry.name}
-                                className="flex items-center justify-between"
-                              >
-                                <span className="flex items-center gap-2 text-muted-foreground">
-                                  <span
-                                    className="h-2.5 w-2.5 rounded-full"
-                                    style={{ backgroundColor: entry.color }}
-                                  />
-                                  {entry.name}
-                                </span>
-                                <span className="font-medium text-foreground">
-                                  {percent}%
-                                </span>
-                              </div>
-                            );
-                          })}
+                      ) : (
+                        <div className="h-24 rounded-xl border border-dashed border-gray-200 flex items-center justify-center text-sm text-muted-foreground">
+                          No data available
                         </div>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>

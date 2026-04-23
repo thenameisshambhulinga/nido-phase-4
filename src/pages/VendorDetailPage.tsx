@@ -97,6 +97,17 @@ type VendorCatalogItem = {
   status: "In Stock" | "Low Stock" | "Out of Stock";
 };
 
+type VendorAnalytics = {
+  totalSpend: number;
+  totalOrders: number;
+  monthlySpend: Array<{ month?: string; value?: number }>;
+  statusBreakdown: {
+    pending?: number;
+    processing?: number;
+    completed?: number;
+  };
+};
+
 function AnimatedCounter({
   value,
   prefix = "",
@@ -145,8 +156,50 @@ export default function VendorDetailPage() {
   const [catalogLookupSearch, setCatalogLookupSearch] = useState("");
   const [selectedMasterProductId, setSelectedMasterProductId] = useState("");
   const [purchasePrice, setPurchasePrice] = useState(0);
+  const [vendorAnalytics, setVendorAnalytics] =
+    useState<VendorAnalytics | null>(null);
 
   const vendor = vendors.find((v) => v.id === id);
+
+  useEffect(() => {
+    if (!id) {
+      setVendorAnalytics(null);
+      return;
+    }
+
+    const fetchVendorAnalytics = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/vendors/${id}/analytics`,
+        );
+
+        if (!response.ok) {
+          setVendorAnalytics(null);
+          return;
+        }
+
+        const raw = await response.json();
+        const data = raw?.data || raw;
+
+        setVendorAnalytics({
+          totalSpend: Number(data?.totalSpend || 0),
+          totalOrders: Number(data?.totalOrders || 0),
+          monthlySpend: Array.isArray(data?.monthlySpend)
+            ? data.monthlySpend
+            : [],
+          statusBreakdown: {
+            pending: Number(data?.statusBreakdown?.pending || 0),
+            processing: Number(data?.statusBreakdown?.processing || 0),
+            completed: Number(data?.statusBreakdown?.completed || 0),
+          },
+        });
+      } catch {
+        setVendorAnalytics(null);
+      }
+    };
+
+    fetchVendorAnalytics();
+  }, [id]);
   const selectedMasterProduct = useMemo(
     () =>
       masterCatalogItems.find((item) => item.id === selectedMasterProductId) ||
@@ -283,60 +336,61 @@ export default function VendorDetailPage() {
     [vendorOrders],
   );
 
+  const hasAnalyticsData = (vendorAnalytics?.totalOrders || 0) > 0;
+
   // Procurement status pie
   const procureStatusData = useMemo(() => {
-    if (!vendor) return [];
-    const pending = vendorOrders.filter((o) => o.status === "Pending").length;
-    const processing = vendorOrders.filter((o) =>
-      ["Processing", "Approved", "Shipped"].includes(o.status),
-    ).length;
-    const completed = vendorOrders.filter(
-      (o) => o.status === "Delivered",
-    ).length;
+    const pending = Number(vendorAnalytics?.statusBreakdown?.pending || 0);
+    const processing = Number(
+      vendorAnalytics?.statusBreakdown?.processing || 0,
+    );
+    const completed = Number(vendorAnalytics?.statusBreakdown?.completed || 0);
+
     return [
-      { name: "Pending", value: pending || 1 },
-      { name: "Processing", value: processing || 1 },
-      { name: "Completed", value: completed || 1 },
-    ].filter((d) => d.value > 0);
-  }, [vendorOrders]);
+      { name: "Pending", value: pending },
+      { name: "Processing", value: processing },
+      { name: "Completed", value: completed },
+    ];
+  }, [vendorAnalytics]);
 
   // Spend analysis pie
   const spendData = useMemo(() => {
-    const paid = vendorOrders
-      .filter((o) => o.status === "Delivered")
-      .reduce((s, o) => s + o.totalAmount, 0);
-    const pending = totalSpend - paid;
+    const analyticsTotalSpend = Number(vendorAnalytics?.totalSpend || 0);
+    const pendingCount = Number(vendorAnalytics?.statusBreakdown?.pending || 0);
+    const processingCount = Number(
+      vendorAnalytics?.statusBreakdown?.processing || 0,
+    );
+    const completedCount = Number(
+      vendorAnalytics?.statusBreakdown?.completed || 0,
+    );
+    const totalCount = pendingCount + processingCount + completedCount;
+    const paid =
+      totalCount > 0 ? (analyticsTotalSpend * completedCount) / totalCount : 0;
+    const pending = Math.max(0, analyticsTotalSpend - paid);
+
     return [
-      { name: "Paid", value: paid || 1 },
-      { name: "Pending Due", value: pending > 0 ? pending : 1 },
+      { name: "Paid", value: Number(paid || 0) },
+      { name: "Pending Due", value: Number(pending || 0) },
     ];
-  }, [vendorOrders, totalSpend]);
+  }, [vendorAnalytics]);
 
   // Monthly spend bar chart
   const monthlySpend = useMemo(() => {
-    const months: { month: string; spend: number }[] = [];
-    for (let i = 7; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const month = d.toLocaleString("en-US", { month: "short" });
-      const yr = d.getFullYear();
-      const total = vendorOrders
-        .filter((o) => {
-          const od = new Date(o.orderDate);
-          return od.getMonth() === d.getMonth() && od.getFullYear() === yr;
-        })
-        .reduce((s, o) => s + o.totalAmount, 0);
-      months.push({ month, spend: total });
+    const source = Array.isArray(vendorAnalytics?.monthlySpend)
+      ? vendorAnalytics?.monthlySpend
+      : [];
+
+    if (!source?.length) {
+      return [{ name: "No Data", value: 0, month: "No Data", spend: 0 }];
     }
-    // Add some sample data if all zeros
-    if (months.every((m) => m.spend === 0)) {
-      return months.map((m, i) => ({
-        ...m,
-        spend: Math.round(Math.random() * 50000 + 10000),
-      }));
-    }
-    return months;
-  }, [vendorOrders]);
+
+    return source.map((entry) => ({
+      name: String(entry?.month || ""),
+      value: Number(entry?.value || 0),
+      month: String(entry?.month || ""),
+      spend: Number(entry?.value || 0),
+    }));
+  }, [vendorAnalytics]);
 
   if (!vendor)
     return (
@@ -628,30 +682,38 @@ export default function VendorDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={monthlySpend}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="hsl(var(--border))"
-                      />
-                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                      <YAxis
-                        tick={{ fontSize: 11 }}
-                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`}
-                      />
-                      <Tooltip
-                        formatter={(v: number) => [
-                          `$${v.toLocaleString()}`,
-                          "Spend",
-                        ]}
-                      />
-                      <Bar
-                        dataKey="spend"
-                        fill="hsl(213, 55%, 35%)"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {hasAnalyticsData ? (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={monthlySpend}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="hsl(var(--border))"
+                        />
+                        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                        <YAxis
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) =>
+                            `$${(Number(v || 0) / 1000).toFixed(0)}K`
+                          }
+                        />
+                        <Tooltip
+                          formatter={(v: number) => [
+                            `$${Number(v || 0).toLocaleString()}`,
+                            "Spend",
+                          ]}
+                        />
+                        <Bar
+                          dataKey="spend"
+                          fill="hsl(213, 55%, 35%)"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[250px] flex items-center justify-center text-sm text-muted-foreground">
+                      No analytics available
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -750,39 +812,49 @@ export default function VendorDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie
-                        data={procureStatusData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={3}
-                        dataKey="value"
-                        label={({ name, value }) => `${name}: ${value}`}
-                        onClick={(_, i) => {
-                          const status = procureStatusData[i]?.name;
-                          if (status) {
-                            setActiveTab("orders");
-                            toast({ title: `Filtered: ${status}` });
-                          }
-                        }}
-                        style={{ cursor: "pointer" }}
-                      >
-                        {procureStatusData.map((_, i) => (
-                          <Cell
-                            key={i}
-                            fill={CHART_COLORS[i % CHART_COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <p className="text-xs text-muted-foreground text-center">
-                    Click a slice to filter orders
-                  </p>
+                  {hasAnalyticsData ? (
+                    <>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <PieChart>
+                          <Pie
+                            data={procureStatusData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={3}
+                            dataKey="value"
+                            label={({ name, value }) =>
+                              `${name}: ${Number(value || 0)}`
+                            }
+                            onClick={(_, i) => {
+                              const status = procureStatusData?.[i]?.name;
+                              if (status) {
+                                setActiveTab("orders");
+                                toast({ title: `Filtered: ${status}` });
+                              }
+                            }}
+                            style={{ cursor: "pointer" }}
+                          >
+                            {procureStatusData?.map((_, i) => (
+                              <Cell
+                                key={i}
+                                fill={CHART_COLORS[i % CHART_COLORS.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <p className="text-xs text-muted-foreground text-center">
+                        Click a slice to filter orders
+                      </p>
+                    </>
+                  ) : (
+                    <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">
+                      No analytics available
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -793,33 +865,41 @@ export default function VendorDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie
-                        data={spendData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={3}
-                        dataKey="value"
-                        label={({ name, value }) =>
-                          `${name}: $${value.toLocaleString()}`
-                        }
-                        style={{ cursor: "pointer" }}
-                      >
-                        {spendData.map((_, i) => (
-                          <Cell
-                            key={i}
-                            fill={CHART_COLORS[i % CHART_COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(v: number) => `$${v.toLocaleString()}`}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {hasAnalyticsData ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={spendData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={80}
+                          paddingAngle={3}
+                          dataKey="value"
+                          label={({ name, value }) =>
+                            `${name}: $${Number(value || 0).toLocaleString()}`
+                          }
+                          style={{ cursor: "pointer" }}
+                        >
+                          {spendData?.map((_, i) => (
+                            <Cell
+                              key={i}
+                              fill={CHART_COLORS[i % CHART_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(v: number) =>
+                            `$${Number(v || 0).toLocaleString()}`
+                          }
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">
+                      No analytics available
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

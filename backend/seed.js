@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import fs from "fs";
+import { readFile } from "fs/promises";
 import path from "path";
 import dotenv from "dotenv";
 import Client from "./models/Client.js";
@@ -18,21 +18,15 @@ async function seedDatabase() {
     await mongoose.connect(MONGODB_URI);
     console.log("✅ Connected to MongoDB");
 
-    // Clear existing data
-    await Client.deleteMany({});
-    await Vendor.deleteMany({});
-    await Product.deleteMany({});
-    console.log("🗑️  Cleared existing data");
-
     // Read JSON files
     const clientsData = JSON.parse(
-      fs.readFileSync(path.join(dataDir, "clients.json"), "utf8"),
+      await readFile(path.join(dataDir, "clients.json"), "utf8"),
     );
     const vendorsData = JSON.parse(
-      fs.readFileSync(path.join(dataDir, "vendors.json"), "utf8"),
+      await readFile(path.join(dataDir, "vendors.json"), "utf8"),
     );
     const productsData = JSON.parse(
-      fs.readFileSync(path.join(dataDir, "products.json"), "utf8"),
+      await readFile(path.join(dataDir, "products.json"), "utf8"),
     );
 
     console.log(`📋 Read ${clientsData.length} clients`);
@@ -61,47 +55,39 @@ async function seedDatabase() {
       return rest;
     });
 
-    // Insert data
-    try {
+    // Seed only empty collections
+    const [clientCountBefore, vendorCountBefore, productCountBefore] =
+      await Promise.all([
+        Client.countDocuments(),
+        Vendor.countDocuments(),
+        Product.countDocuments(),
+      ]);
+
+    if (clientCountBefore === 0) {
       const clientResult = await Client.insertMany(uniqueClients);
       console.log(`✅ Inserted ${clientResult.length} clients`);
-    } catch (e) {
-      console.log(`⚠️  Client insert: ${e.message}`);
-      for (const client of uniqueClients) {
-        try {
-          await Client.create(client);
-        } catch (err) {
-          // silent
-        }
-      }
+    } else {
+      console.log(
+        `ℹ️  Skipped clients seeding (existing: ${clientCountBefore})`,
+      );
     }
 
-    try {
+    if (vendorCountBefore === 0) {
       const vendorResult = await Vendor.insertMany(uniqueVendors);
       console.log(`✅ Inserted ${vendorResult.length} vendors`);
-    } catch (e) {
-      console.log(`⚠️  Vendor insert: ${e.message}`);
-      for (const vendor of uniqueVendors) {
-        try {
-          await Vendor.create(vendor);
-        } catch (err) {
-          // silent
-        }
-      }
+    } else {
+      console.log(
+        `ℹ️  Skipped vendors seeding (existing: ${vendorCountBefore})`,
+      );
     }
 
-    try {
+    if (productCountBefore === 0) {
       const productResult = await Product.insertMany(uniqueProducts);
       console.log(`✅ Inserted ${productResult.length} products`);
-    } catch (e) {
-      console.log(`⚠️  Product insert: ${e.message}`);
-      for (const product of uniqueProducts) {
-        try {
-          await Product.create(product);
-        } catch (err) {
-          // silent
-        }
-      }
+    } else {
+      console.log(
+        `ℹ️  Skipped products seeding (existing: ${productCountBefore})`,
+      );
     }
 
     const clientCount = await Client.countDocuments();
@@ -112,9 +98,15 @@ async function seedDatabase() {
       `\n📊 Total in DB - Clients: ${clientCount}, Vendors: ${vendorCount}, Products: ${productCount}`,
     );
     console.log("\n🎉 Database seeding completed successfully!");
+    await mongoose.connection.close();
     process.exit(0);
   } catch (error) {
     console.error("❌ Error seeding database:", error.message);
+    try {
+      await mongoose.connection.close();
+    } catch {
+      // ignore close errors
+    }
     process.exit(1);
   }
 }

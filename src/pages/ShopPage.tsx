@@ -49,123 +49,6 @@ interface ShopProduct {
   status: "In Stock" | "Out of Stock";
 }
 
-const fallbackProducts: ShopProduct[] = [
-  {
-    id: 1,
-    sku: "LAP-1001",
-    name: "HP Envy Laptop",
-    category: "IT Hardware",
-    subCategory: "Laptops",
-    brand: "HP",
-    price: 80000,
-    emoji: "💻",
-    image:
-      "https://images.unsplash.com/photo-1588872657840-790ff3bde08c?w=900&h=600&fit=crop",
-    description:
-      "High-performance laptop for professionals and developers with enterprise reliability.",
-    specification: 'Intel i7, 16GB RAM, 512GB SSD, 15.6" Display',
-    warranty: "2 years standard + 1 year accidental damage",
-    primaryVendor: "HP Direct",
-    leadTime: "10 Days",
-    status: "In Stock",
-  },
-  {
-    id: 2,
-    sku: "SSD-2025",
-    name: "Sandisk 1TB SSD",
-    category: "IT Hardware",
-    subCategory: "Storage",
-    brand: "Sandisk",
-    price: 12000,
-    emoji: "💾",
-    image:
-      "https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?w=900&h=600&fit=crop",
-    description:
-      "Ultra-fast external SSD with secure, compact and business-friendly portable storage.",
-    specification: "1TB Capacity, 560MB/s Read, Compact design",
-    warranty: "5 years limited warranty",
-    primaryVendor: "Sandisk Global",
-    leadTime: "10 Days",
-    status: "In Stock",
-  },
-  {
-    id: 3,
-    sku: "MON-3210",
-    name: 'Dell 27" 4K Monitor',
-    category: "IT Hardware",
-    subCategory: "Monitors",
-    brand: "Dell",
-    price: 35000,
-    emoji: "🖥️",
-    image:
-      "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=900&h=600&fit=crop",
-    description:
-      "Professional 4K monitor with accurate color reproduction for teams and creators.",
-    specification: '27" 4K IPS, 99% Adobe RGB, HDR-compatible',
-    warranty: "3 years premium support",
-    primaryVendor: "Dell Enterprise",
-    leadTime: "1 Month",
-    status: "In Stock",
-  },
-  {
-    id: 4,
-    sku: "MOU-3301",
-    name: "Logitech Wireless Mouse",
-    category: "IT Hardware",
-    subCategory: "Peripherals",
-    brand: "Logitech",
-    price: 2500,
-    emoji: "🖱️",
-    image:
-      "https://images.unsplash.com/photo-1527815050871-3c149d23cb76?w=900&h=600&fit=crop",
-    description:
-      "Ergonomic wireless mouse with precision tracking and all-day office comfort.",
-    specification: "2.4GHz Wireless, 4 DPI Levels, 18-month battery",
-    warranty: "2 years limited warranty",
-    primaryVendor: "Logitech India",
-    leadTime: "7 Days",
-    status: "In Stock",
-  },
-  {
-    id: 5,
-    sku: "TAB-1110",
-    name: "Apple iPad Air",
-    category: "IT Hardware",
-    subCategory: "Tablets",
-    brand: "Apple",
-    price: 45000,
-    emoji: "📱",
-    image:
-      "https://images.unsplash.com/photo-1536231516926-6b648b868242?w=900&h=600&fit=crop",
-    description:
-      "Powerful iPad Air with M-series performance for mobility, review and approvals.",
-    specification: 'M1 Chip, 64GB Storage, 10.9" Liquid Retina Display',
-    warranty: "1 year limited warranty",
-    primaryVendor: "Apple B2B",
-    leadTime: "10 Days",
-    status: "In Stock",
-  },
-  {
-    id: 6,
-    sku: "KEY-5501",
-    name: "Mechanical Keyboard RGB",
-    category: "IT Hardware",
-    subCategory: "Peripherals",
-    brand: "Corsair",
-    price: 15000,
-    emoji: "⌨️",
-    image:
-      "https://images.unsplash.com/photo-1587829191301-11db59a44f6b?w=900&h=600&fit=crop",
-    description:
-      "Durable mechanical keyboard with premium key feel and fast office response.",
-    specification: "Mechanical Switches, RGB LED, Programmable Keys",
-    warranty: "2 years standard warranty",
-    primaryVendor: "Corsair Pro",
-    leadTime: "10 Days",
-    status: "In Stock",
-  },
-];
-
 const statusLabel = (status: string) =>
   status === "Out of Stock" ? "Out of Stock" : "In Stock";
 
@@ -337,7 +220,7 @@ function ProductOverview({
 export default function ShopPage() {
   const navigate = useNavigate();
   const { addToCart, totalItems } = useCart();
-  const { masterCatalogItems } = useData();
+  const { masterCatalogItems, isCoreDataLoading, coreDataError } = useData();
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
@@ -373,7 +256,7 @@ export default function ShopPage() {
         status: statusLabel(item.status) as "In Stock" | "Out of Stock",
       }));
 
-    return fromCatalog.length > 0 ? fromCatalog : fallbackProducts;
+    return fromCatalog;
   }, [masterCatalogItems]);
 
   const categories = useMemo(() => {
@@ -477,9 +360,15 @@ export default function ShopPage() {
           <Card className="border-dashed">
             <CardContent className="py-16 text-center">
               <ImageOff className="mx-auto mb-2 h-10 w-10 text-muted-foreground" />
-              <p className="text-base font-medium">No products found</p>
+              <p className="text-base font-medium">
+                {isCoreDataLoading
+                  ? "Loading products..."
+                  : "No products found"}
+              </p>
               <p className="text-sm text-muted-foreground">
-                Try adjusting search text or selecting a different category.
+                {coreDataError
+                  ? coreDataError
+                  : "No data available. Product inventory is loaded from the backend."}
               </p>
             </CardContent>
           </Card>

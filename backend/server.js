@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import clientRoutes from "./routes/clients.js";
 import vendorRoutes from "./routes/vendors.js";
 import productRoutes from "./routes/products.js";
+import orderRoutes from "./routes/orders.js";
 
 dotenv.config();
 
@@ -29,26 +30,44 @@ mongoose
   });
 
 // Routes
+app.use("/clients", clientRoutes);
+app.use("/vendors", vendorRoutes);
+app.use("/products", productRoutes);
+app.use("/orders", orderRoutes);
+
+// Backward-compatible API-prefixed mounts
 app.use("/api/clients", clientRoutes);
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/orders", orderRoutes);
 
 // Health check
+app.get("/health", (req, res) => {
+  res.json({
+    success: true,
+    data: { status: "ok", message: "Server is running" },
+  });
+});
+
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", message: "Server is running" });
+  res.json({
+    success: true,
+    data: { status: "ok", message: "Server is running" },
+  });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err);
   res.status(err.status || 500).json({
+    success: false,
     error: err.message || "Internal Server Error",
   });
 });
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ error: "Route not found" });
+  res.status(404).json({ success: false, error: "Route not found" });
 });
 
 app.listen(PORT, () => {

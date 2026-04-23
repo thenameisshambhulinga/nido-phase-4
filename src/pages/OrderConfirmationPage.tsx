@@ -75,41 +75,99 @@ export default function OrderConfirmationPage() {
     useState<TrackingStage>("confirmed");
 
   useEffect(() => {
-    // Get order from location state or localStorage
+    // Get order from location state or backend API
     if (location.state?.order) {
       setOrder(location.state.order);
     } else {
-      // Try to fetch from localStorage
-      const savedOrders = JSON.parse(
-        localStorage.getItem("nido_orders") || "[]",
-      );
-      const foundOrder = savedOrders.find((o: Order) => o.id === orderId);
-      if (foundOrder) {
-        setOrder(foundOrder);
-      }
+      if (!orderId) return;
+
+      const fetchOrder = async () => {
+        try {
+          const response = await fetch(
+            `http://localhost:5000/api/orders?orderNumber=${encodeURIComponent(orderId)}`,
+          );
+          if (!response.ok) return;
+          const payload = await response.json();
+          const orders = Array.isArray(payload) ? payload : payload?.data || [];
+          const backendOrder = orders[0];
+          if (!backendOrder) return;
+
+          const resolvedItems = Array.isArray(backendOrder.items)
+            ? backendOrder.items
+            : [];
+
+          const total = Number(backendOrder.totalAmount || 0);
+          const subtotal = resolvedItems.reduce(
+            (sum: number, item: any) =>
+              sum +
+              (Number(item.totalCost) ||
+                (Number(item.quantity) || 0) *
+                  (Number(item.pricePerItem) || 0)),
+            0,
+          );
+
+          const mappedOrder: Order = {
+            id: backendOrder.orderNumber || backendOrder._id || orderId,
+            clientId: backendOrder.clientId || "",
+            orderDate: backendOrder.orderDate || backendOrder.createdAt,
+            status: backendOrder.status || "pending",
+            requiredBy: backendOrder.requiredBy || backendOrder.updatedAt || "",
+            items: resolvedItems.map((item: any, index: number) => ({
+              id: item.productId || item.id || `item-${index}`,
+              name: item.name || "Item",
+              quantity: Number(item.quantity) || 0,
+              price: Number(item.pricePerItem || 0),
+              total:
+                Number(item.totalCost) ||
+                (Number(item.quantity) || 0) * (Number(item.pricePerItem) || 0),
+              emoji: "📦",
+              category: item.category || "General",
+            })),
+            shippingInfo: {
+              fullName: backendOrder.requestingUser || "",
+              companyName: backendOrder.organization || "",
+              address: backendOrder.shippingAddress || "",
+              city: "",
+              state: "",
+              zipCode: "",
+              phone: "",
+              email: "",
+            },
+            subtotal,
+            tax: Math.max(0, total - subtotal),
+            shippingCost: 0,
+            total,
+            paymentMethod: backendOrder.paymentMethod || "",
+            shippingMethod: backendOrder.deliveryMethod || "standard",
+          };
+
+          setOrder(mappedOrder);
+        } catch (error) {
+          console.error("Failed to load order:", error);
+        }
+      };
+
+      void fetchOrder();
     }
   }, [orderId, location.state]);
 
   useEffect(() => {
-    if (!orderId || !order) return;
-    const persisted = localStorage.getItem(`nido_tracking_${orderId}`);
-    if (persisted) {
-      setTrackingStage(persisted as TrackingStage);
+    if (!order) return;
+    const status = (order.status || "").toLowerCase();
+    if (status.includes("completed") || status.includes("delivered")) {
+      setTrackingStage("delivered");
       return;
     }
-
-    const elapsedHours =
-      (Date.now() - new Date(order.orderDate).getTime()) / 36e5;
-    if (elapsedHours > 72) setTrackingStage("delivered");
-    else if (elapsedHours > 24) setTrackingStage("shipped");
-    else if (elapsedHours > 4) setTrackingStage("processing");
-    else setTrackingStage("confirmed");
-  }, [order, orderId]);
-
-  useEffect(() => {
-    if (!orderId) return;
-    localStorage.setItem(`nido_tracking_${orderId}`, trackingStage);
-  }, [orderId, trackingStage]);
+    if (status.includes("shipped")) {
+      setTrackingStage("shipped");
+      return;
+    }
+    if (status.includes("processing") || status.includes("approved")) {
+      setTrackingStage("processing");
+      return;
+    }
+    setTrackingStage("confirmed");
+  }, [order]);
 
   const timeline = useMemo(
     () => [

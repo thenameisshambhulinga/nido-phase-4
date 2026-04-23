@@ -499,6 +499,8 @@ export interface SalesActivity {
 }
 
 interface DataContextType {
+  isCoreDataLoading: boolean;
+  coreDataError: string | null;
   orders: Order[];
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   vendors: Vendor[];
@@ -2665,14 +2667,16 @@ const computeSalesTotals = (
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [orders, setOrders] = usePersistedState("nido_orders", DEFAULT_ORDERS);
+  const [isCoreDataLoading, setIsCoreDataLoading] = useState(true);
+  const [coreDataError, setCoreDataError] = useState<string | null>(null);
+  const [orders, setOrders] = usePersistedState("nido_orders", [] as Order[]);
   const [vendors, setVendors] = usePersistedState(
     "nido_vendors",
-    DEFAULT_VENDORS,
+    [] as Vendor[],
   );
   const [clients, setClients] = usePersistedState(
     "nido_clients",
-    DEFAULT_CLIENTS,
+    [] as Client[],
   );
   const [locations, setLocations] = usePersistedState(
     "nido_locations",
@@ -2717,11 +2721,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   );
   const [masterCatalogItems, setMasterCatalogItems] = usePersistedState(
     "nido_master_catalog",
-    DEFAULT_MASTER_CATALOG,
+    [] as MasterCatalogItem[],
   );
   const [clientCatalogItems, setClientCatalogItems] = usePersistedState(
     "nido_client_catalog",
-    DEFAULT_CLIENT_CATALOG,
+    {} as Record<string, ClientCatalogItem[]>,
   );
   const [serviceTierPolicies, setServiceTierPolicies] = usePersistedState(
     "nido_service_tier_policies",
@@ -2763,6 +2767,132 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     "nido_sales_activities",
     DEFAULT_SALES_ACTIVITIES,
   );
+
+  const API_BASE = "http://localhost:5000/api";
+
+  const toFrontendOrderStatus = (status?: string) => {
+    const normalized = (status || "").toLowerCase();
+    if (normalized === "pending") return "New";
+    if (normalized === "processing") return "Processing";
+    if (normalized === "completed") return "Completed";
+    if (normalized === "rejected") return "Rejected";
+    return status || "New";
+  };
+
+  const toApiOrderStatus = (status?: string) => {
+    const normalized = (status || "").toLowerCase();
+    if (normalized === "new" || normalized === "pending") return "pending";
+    if (normalized === "processing" || normalized === "approved") {
+      return "processing";
+    }
+    if (normalized === "completed" || normalized === "delivered") {
+      return "completed";
+    }
+    if (normalized === "rejected" || normalized === "cancelled") {
+      return "rejected";
+    }
+    return "pending";
+  };
+
+  const mapProductToCatalogItem = (
+    product: any,
+    index = 0,
+  ): MasterCatalogItem => {
+    const quantity = Number(product.quantity) || 0;
+    const status =
+      quantity <= 0 ? "Out of Stock" : quantity < 5 ? "Low Stock" : "In Stock";
+
+    return {
+      id: product._id || product.id || `prd-${Date.now()}-${index}`,
+      productCode: product.sku || product.serialNumber || `PRD-${index + 1}`,
+      name: product.productName || product.name || "Unnamed Product",
+      category: product.category || "General",
+      subCategory: product.subCategory || "General",
+      brand: product.brand || product.vendorName || "",
+      productType: product.productType || "Product",
+      physicalType: product.physicalType || "Physical",
+      price: Number(product.price) || 0,
+      discountPrice:
+        product.discountPrice !== undefined
+          ? Number(product.discountPrice)
+          : undefined,
+      status,
+      image: product.image,
+      description: product.description,
+      initialStock: quantity,
+      minStockThreshold: Number(product.minStockThreshold) || 0,
+      tags: Array.isArray(product.tags) ? product.tags : [],
+      specification: product.specification,
+      warranty: product.warranty,
+      hsnCode: product.hsnCode,
+      dimensionL: product.dimensionL,
+      dimensionW: product.dimensionW,
+      dimensionH: product.dimensionH,
+      dimUnit: product.dimUnit,
+      weight: product.weight,
+      weightUnit: product.weightUnit,
+      customsDeclaration: product.customsDeclaration,
+      primaryVendor: product.primaryVendor || product.vendorName,
+      vendorSku: product.vendorSku,
+      leadTime: product.leadTime,
+      vendorContact: product.vendorContact,
+      vendorEmail: product.vendorEmail,
+      vendorPhone: product.vendorPhone,
+      vendorPhone2: product.vendorPhone2,
+      trackPerformance: Boolean(product.trackPerformance),
+      performanceRating: Number(product.performanceRating) || 0,
+    };
+  };
+
+  const mapApiOrderToFrontend = (order: any): Order => {
+    const orderDateValue =
+      order.orderDate || order.createdAt || new Date().toISOString();
+    const normalizedDate = new Date(orderDateValue).toISOString();
+    return {
+      id: order._id || order.id || `ord-${Date.now()}`,
+      orderNumber: order.orderNumber || `ORD-${Date.now()}`,
+      orderDate: normalizedDate,
+      organization: order.organization || "Client Order",
+      requestingUser: order.requestingUser || "Client User",
+      approvingUser: order.approvingUser || "",
+      status: toFrontendOrderStatus(order.status),
+      assignedUser: order.assignedUser || "",
+      items: Array.isArray(order.items)
+        ? order.items.map((item: any, idx: number) => {
+            const quantity = Number(item.quantity) || 0;
+            const pricePerItem =
+              Number(item.pricePerItem ?? item.price ?? 0) || 0;
+            return {
+              id: item.productId || item.id || `itm-${idx}`,
+              name: item.name || "Item",
+              description: item.description || "",
+              sku: item.sku || "",
+              quantity,
+              pricePerItem,
+              totalCost:
+                Number(item.totalCost ?? item.total) || quantity * pricePerItem,
+              image: item.image,
+            };
+          })
+        : [],
+      billingAddress: order.billingAddress || "",
+      shippingAddress: order.shippingAddress || "",
+      paymentMethod: order.paymentMethod || "",
+      deliveryMethod: order.deliveryMethod || "",
+      trackingNumber: order.trackingNumber || "",
+      slaStartTime: order.slaStartTime || normalizedDate,
+      slaStatus: order.slaStatus || "within_sla",
+      assignedAnalyst: order.assignedAnalyst || "Procurement Analyst",
+      analystTeam: order.analystTeam || "Operations",
+      totalAmount: Number(order.totalAmount ?? order.total) || 0,
+      comments: order.comments || "",
+      commentHistory: Array.isArray(order.commentHistory)
+        ? order.commentHistory
+        : [],
+      attachments: Array.isArray(order.attachments) ? order.attachments : [],
+      serviceType: order.serviceType,
+    };
+  };
 
   const primaryOrgId = organizations[0]?.id || "org-nido";
   const activeSettings =
@@ -2855,16 +2985,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   }, [setInvoices, setSalesOrders, setSalesQuotes]);
 
-  // Fetch clients and vendors from backend
+  // Fetch clients, vendors, products, and orders from backend
   useEffect(() => {
     const fetchData = async () => {
+      setIsCoreDataLoading(true);
+      setCoreDataError(null);
       try {
         // Fetch clients from backend
         const clientsResponse = await fetch(
           "http://localhost:5000/api/clients",
         );
         if (clientsResponse.ok) {
-          const clientsData = await clientsResponse.json();
+          const clientsPayload = await clientsResponse.json();
+          const clientsData = Array.isArray(clientsPayload)
+            ? clientsPayload
+            : clientsPayload?.data || [];
           const transformedClients: Client[] = clientsData.map(
             (client: any) => ({
               id: client._id || client.id || `cli-${Date.now()}`,
@@ -2889,7 +3024,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
               paymentTerms: "NET 30",
               phone: client.phone,
               address: client.address,
-              status: "active",
+              status: client.status === "inactive" ? "inactive" : "active",
               contractStart:
                 client.contractStart || new Date().toISOString().split("T")[0],
               contractEnd:
@@ -2908,7 +3043,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           "http://localhost:5000/api/vendors",
         );
         if (vendorsResponse.ok) {
-          const vendorsData = await vendorsResponse.json();
+          const vendorsPayload = await vendorsResponse.json();
+          const vendorsData = Array.isArray(vendorsPayload)
+            ? vendorsPayload
+            : vendorsPayload?.data || [];
           const transformedVendors: Vendor[] = vendorsData.map(
             (vendor: any) => ({
               id: vendor._id || vendor.id || `ven-${Date.now()}`,
@@ -2918,7 +3056,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
               contactEmail: vendor.email,
               contactPhone: vendor.phone,
               address: vendor.address || "",
-              status: "active",
+              status:
+                vendor.status === "inactive"
+                  ? "inactive"
+                  : vendor.status === "pending"
+                    ? "pending"
+                    : "active",
               rating: vendor.rating || 0,
               totalOrders: 0,
               totalSpend: 0,
@@ -2928,14 +3071,48 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           );
           setVendors(transformedVendors);
         }
+
+        const productsResponse = await fetch(`${API_BASE}/products`);
+        if (productsResponse.ok) {
+          const productsPayload = await productsResponse.json();
+          console.log("[products] GET /api/products response", productsPayload);
+          const productsData = Array.isArray(productsPayload)
+            ? productsPayload
+            : Array.isArray(productsPayload?.data)
+              ? productsPayload.data
+              : [];
+          const transformedProducts = productsData.map(
+            (product: any, index: number) =>
+              mapProductToCatalogItem(product, index),
+          );
+          setMasterCatalogItems(transformedProducts);
+        }
+
+        const ordersResponse = await fetch(`${API_BASE}/orders`);
+        if (ordersResponse.ok) {
+          const ordersPayload = await ordersResponse.json();
+          const ordersData = Array.isArray(ordersPayload)
+            ? ordersPayload
+            : ordersPayload?.data || [];
+          const transformedOrders: Order[] = ordersData.map((order: any) =>
+            mapApiOrderToFrontend(order),
+          );
+          setOrders(transformedOrders);
+        }
       } catch (error) {
         console.error("Error fetching data from backend:", error);
-        // Continue with default data if backend is not available
+        setCoreDataError("Failed to load core business data from backend.");
+        setClients([]);
+        setVendors([]);
+        setMasterCatalogItems([]);
+        setOrders([]);
+      } finally {
+        setIsCoreDataLoading(false);
       }
     };
 
     fetchData();
-  }, [setClients, setVendors]);
+  }, [API_BASE, setClients, setMasterCatalogItems, setOrders, setVendors]);
 
   const makeCrud = <T extends { id: string }>(
     setter: React.Dispatch<React.SetStateAction<T[]>>,
@@ -2950,7 +3127,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       setter((prev) => prev.filter((item) => item.id !== id)),
   });
 
-  const orderCrud = makeCrud(setOrders);
   const vendorCrud = makeCrud(setVendors);
 
   const clientCrud = makeCrud(setClients);
@@ -2960,6 +3136,130 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const categoryCrud = makeCrud(setVendorCategories);
   const roleCrud = makeCrud(setRoles);
   const userRoleCrud = makeCrud(setUserRoles);
+
+  const addOrder = useCallback(
+    (order: Partial<Order>) => {
+      const items = (order.items || []).map((item) => ({
+        productId: item.id,
+        name: item.name,
+        description: item.description,
+        sku: item.sku,
+        category: undefined,
+        quantity: Number(item.quantity) || 0,
+        pricePerItem: Number(item.pricePerItem) || 0,
+        totalCost: Number(item.totalCost) || 0,
+      }));
+
+      const payload = {
+        orderNumber:
+          order.orderNumber ||
+          nextSequentialCode(
+            configuredPrefix("poPrefix", "ORD"),
+            orders.map((entry) => entry.orderNumber),
+            8,
+          ),
+        clientId:
+          (order as Partial<Order> & { clientId?: string }).clientId ||
+          "shop-client",
+        vendorId: "",
+        organization: order.organization || "Client Order",
+        requestingUser: order.requestingUser || "Client User",
+        approvingUser: order.approvingUser || "",
+        status: toApiOrderStatus(order.status),
+        assignedUser: order.assignedUser || "",
+        assignedAnalyst: order.assignedAnalyst || "Procurement Analyst",
+        analystTeam: order.analystTeam || "Operations",
+        orderDate: order.orderDate || new Date().toISOString(),
+        items,
+        totalAmount:
+          Number(order.totalAmount) ||
+          items.reduce((sum, item) => sum + Number(item.totalCost || 0), 0),
+        paymentMethod: order.paymentMethod || "",
+        deliveryMethod: order.deliveryMethod || "",
+        billingAddress: order.billingAddress || "",
+        shippingAddress: order.shippingAddress || "",
+        trackingNumber: order.trackingNumber || "",
+        comments: order.comments || "",
+        commentHistory: order.commentHistory || [],
+        attachments: order.attachments || [],
+      };
+
+      void (async () => {
+        try {
+          const response = await fetch(`${API_BASE}/orders`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to create order (${response.status})`);
+          }
+          const responsePayload = await response.json();
+          const created = mapApiOrderToFrontend(
+            responsePayload?.data || responsePayload,
+          );
+          setOrders((prev) => [created, ...prev]);
+        } catch (error) {
+          console.error("Order creation failed:", error);
+        }
+      })();
+    },
+    [API_BASE, configuredPrefix, orders, setOrders],
+  );
+
+  const updateOrder = useCallback(
+    (id: string, data: Partial<Order>) => {
+      setOrders((prev) =>
+        prev.map((entry) => (entry.id === id ? { ...entry, ...data } : entry)),
+      );
+
+      const payload: Record<string, unknown> = {
+        ...data,
+      };
+      if (data.status) {
+        payload.status = toApiOrderStatus(data.status);
+      }
+
+      void (async () => {
+        try {
+          const response = await fetch(`${API_BASE}/orders/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to update order (${response.status})`);
+          }
+          const responsePayload = await response.json();
+          const updated = mapApiOrderToFrontend(
+            responsePayload?.data || responsePayload,
+          );
+          setOrders((prev) =>
+            prev.map((entry) => (entry.id === id ? updated : entry)),
+          );
+        } catch (error) {
+          console.error("Order update failed:", error);
+        }
+      })();
+    },
+    [API_BASE, setOrders],
+  );
+
+  const deleteOrder = useCallback(
+    (id: string) => {
+      setOrders((prev) => prev.filter((entry) => entry.id !== id));
+      void (async () => {
+        try {
+          await fetch(`${API_BASE}/orders/${id}`, {
+            method: "DELETE",
+          });
+        } catch (error) {
+          console.error("Order delete failed:", error);
+        }
+      })();
+    },
+    [API_BASE, setOrders],
+  );
 
   const addVendor = useCallback(
     (vendor: Partial<Vendor>) => {
@@ -3676,22 +3976,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           masterCatalogItems.map((entry) => entry.productCode),
           5,
         );
-      const newItem: MasterCatalogItem = {
-        id: `mc-${Date.now()}`,
-        productCode,
-        name: item.name || "Unnamed Item",
-        category: item.category || "IT Hardware",
+
+      const payload = {
+        productName: item.name || "Unnamed Item",
+        sku: productCode,
+        serialNumber: item.vendorSku || "",
+        category: item.category || "General",
         subCategory: item.subCategory || "",
         brand: item.brand || "",
         productType: item.productType || "Product",
         physicalType: item.physicalType || "Physical",
-        price: item.price ?? 0,
-        discountPrice: item.discountPrice,
-        status: item.status || "In Stock",
+        price: Number(item.price) || 0,
+        discountPrice:
+          item.discountPrice !== undefined
+            ? Number(item.discountPrice)
+            : undefined,
+        quantity: Number(item.initialStock) || 0,
+        minStockThreshold: Number(item.minStockThreshold) || 0,
+        status: item.status === "Out of Stock" ? "inactive" : "active",
         image: item.image,
         description: item.description,
-        initialStock: item.initialStock ?? 0,
-        minStockThreshold: item.minStockThreshold ?? 0,
         tags: item.tags || [],
         specification: item.specification,
         warranty: item.warranty,
@@ -3704,6 +4008,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         weightUnit: item.weightUnit,
         customsDeclaration: item.customsDeclaration,
         primaryVendor: item.primaryVendor,
+        vendorName: item.primaryVendor || "",
         vendorSku: item.vendorSku,
         leadTime: item.leadTime,
         vendorContact: item.vendorContact,
@@ -3711,11 +4016,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         vendorPhone: item.vendorPhone,
         vendorPhone2: item.vendorPhone2,
         trackPerformance: item.trackPerformance,
-        performanceRating: item.performanceRating,
+        performanceRating: Number(item.performanceRating) || 0,
       };
-      setMasterCatalogItems((prev) => [...prev, newItem]);
+
+      void (async () => {
+        try {
+          const response = await fetch(`${API_BASE}/products`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to create product (${response.status})`);
+          }
+          const responsePayload = await response.json();
+          const created = mapProductToCatalogItem(
+            responsePayload?.data || responsePayload,
+          );
+          setMasterCatalogItems((prev) => [created, ...prev]);
+        } catch (error) {
+          console.error("Product creation failed:", error);
+        }
+      })();
     },
-    [configuredPrefix, masterCatalogItems, setMasterCatalogItems],
+    [API_BASE, configuredPrefix, masterCatalogItems, setMasterCatalogItems],
   );
 
   const updateMasterCatalogItem = useCallback(
@@ -3723,8 +4047,73 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       setMasterCatalogItems((prev) =>
         prev.map((item) => (item.id === id ? { ...item, ...data } : item)),
       );
+
+      const payload = {
+        productName: data.name,
+        sku: data.productCode,
+        serialNumber: data.vendorSku,
+        category: data.category,
+        subCategory: data.subCategory,
+        brand: data.brand,
+        productType: data.productType,
+        physicalType: data.physicalType,
+        price: data.price,
+        discountPrice: data.discountPrice,
+        quantity: data.initialStock,
+        minStockThreshold: data.minStockThreshold,
+        status:
+          data.status === "Out of Stock"
+            ? "inactive"
+            : data.status
+              ? "active"
+              : undefined,
+        image: data.image,
+        description: data.description,
+        tags: data.tags,
+        specification: data.specification,
+        warranty: data.warranty,
+        hsnCode: data.hsnCode,
+        dimensionL: data.dimensionL,
+        dimensionW: data.dimensionW,
+        dimensionH: data.dimensionH,
+        dimUnit: data.dimUnit,
+        weight: data.weight,
+        weightUnit: data.weightUnit,
+        customsDeclaration: data.customsDeclaration,
+        primaryVendor: data.primaryVendor,
+        vendorName: data.primaryVendor,
+        vendorContact: data.vendorContact,
+        vendorEmail: data.vendorEmail,
+        vendorPhone: data.vendorPhone,
+        vendorPhone2: data.vendorPhone2,
+        leadTime: data.leadTime,
+        trackPerformance: data.trackPerformance,
+        performanceRating: data.performanceRating,
+      };
+
+      void (async () => {
+        try {
+          const response = await fetch(`${API_BASE}/products/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to update product (${response.status})`);
+          }
+          const responsePayload = await response.json();
+          const updated = mapProductToCatalogItem(
+            responsePayload?.data || responsePayload,
+          );
+          setMasterCatalogItems((prev) =>
+            prev.map((item) => (item.id === id ? updated : item)),
+          );
+        } catch (error) {
+          console.error("Product update failed:", error);
+        }
+      })();
     },
-    [setMasterCatalogItems],
+    [API_BASE, setMasterCatalogItems],
   );
 
   const deleteMasterCatalogItem = useCallback(
@@ -3739,8 +4128,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         });
         return next;
       });
+
+      void (async () => {
+        try {
+          await fetch(`${API_BASE}/products/${id}`, {
+            method: "DELETE",
+          });
+        } catch (error) {
+          console.error("Product delete failed:", error);
+        }
+      })();
     },
-    [setClientCatalogItems, setMasterCatalogItems],
+    [API_BASE, setClientCatalogItems, setMasterCatalogItems],
   );
 
   const getClientCatalog = useCallback(
@@ -4827,6 +5226,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   return (
     <DataContext.Provider
       value={{
+        isCoreDataLoading,
+        coreDataError,
         orders,
         setOrders,
         vendors,
@@ -4855,10 +5256,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         salesActivities,
 
         roles,
-        addOrder: orderCrud.add,
-        updateOrder: orderCrud.update,
+        addOrder,
+        updateOrder,
         bulkUpdateOrders,
-        deleteOrder: orderCrud.delete,
+        deleteOrder,
         addVendor,
         updateVendor: vendorCrud.update,
         deleteVendor: vendorCrud.delete,

@@ -63,7 +63,7 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const { items, subtotal, clearCart, totalItems } = useCart();
   const { user, isOwner, hasPermission } = useAuth();
-  const { orders, addAuditEntry, setOrders } = useData();
+  const { orders, addAuditEntry } = useData();
 
   const [shippingMethod, setShippingMethod] = useState<"standard" | "express">(
     "standard",
@@ -191,17 +191,9 @@ export default function CheckoutPage() {
       // Simulate payment processing
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // Generate a continuous sequential order ID across shop + procure datasets.
-      const previousOrders = safeReadJson<Array<{ id?: string }>>(
-        "nido_orders",
-        [],
-      );
       const orderID = nextSequentialCode(
         "ORD",
-        [
-          ...previousOrders.map((entry) => normalizeOrderCode(entry.id)),
-          ...orders.map((entry) => normalizeOrderCode(entry.orderNumber)),
-        ],
+        orders.map((entry) => normalizeOrderCode(entry.orderNumber)),
         8,
       );
       const todayIso = new Date().toISOString();
@@ -234,26 +226,23 @@ export default function CheckoutPage() {
         shippingMethod,
       };
 
-      localStorage.setItem(
-        "nido_orders",
-        JSON.stringify([confirmationOrder, ...previousOrders]),
-      );
-
       const procureOrder = {
-        id: `ord-${Date.now()}`,
         orderNumber: orderID,
-        orderDate: new Date().toISOString().split("T")[0],
+        clientId: user?.id || "shop-client",
+        vendorId: "",
+        orderDate: new Date().toISOString(),
         organization:
           shipping.companyName || user?.organization || "Client Order",
         requestingUser: shipping.fullName || user?.name || "Client User",
         approvingUser: user?.name || "System Owner",
-        status: "New",
+        status: "pending",
         assignedUser: "Procurement Desk",
         items: items.map((i) => ({
-          id: i.id.toString(),
+          productId: i.id.toString(),
           name: i.name,
           description: `${i.category} item from shop checkout`,
           sku: `SHOP-${i.id}`,
+          category: i.category,
           quantity: i.quantity,
           pricePerItem: i.price,
           totalCost: i.price * i.quantity,
@@ -269,8 +258,6 @@ export default function CheckoutPage() {
         deliveryMethod:
           shippingMethod === "express" ? "Express Air" : "Standard Ground",
         trackingNumber: "",
-        slaStartTime: todayIso,
-        slaStatus: "within_sla" as const,
         assignedAnalyst: "Procurement Analyst",
         analystTeam: "IT Procurement",
         totalAmount: total,
@@ -291,7 +278,24 @@ export default function CheckoutPage() {
             : "",
       };
 
-      setOrders((prev) => [procureOrder, ...prev]);
+      const createOrderResponse = await fetch(
+        "http://localhost:5000/api/orders",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(procureOrder),
+        },
+      );
+
+      if (!createOrderResponse.ok) {
+        throw new Error(
+          `Failed to create order (${createOrderResponse.status})`,
+        );
+      }
+
+      const createOrderPayload = await createOrderResponse.json();
+      const createdOrder = createOrderPayload?.data || createOrderPayload;
+      confirmationOrder.id = createdOrder.orderNumber || orderID;
 
       if (
         canConfigureOwnerNotification &&

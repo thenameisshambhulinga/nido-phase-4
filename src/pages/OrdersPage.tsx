@@ -26,7 +26,6 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { emailTemplates, sendEmail } from "@/lib/emailService";
 import { normalizeOrderCode } from "@/lib/documentNumbering";
-import { safeReadJson } from "@/lib/storage";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import {
   Upload,
@@ -43,8 +42,13 @@ import {
 } from "lucide-react";
 
 export default function OrdersPage() {
-  const VENDOR_ASSIGNMENT_STORAGE_KEY = "nido_order_vendor_assignments_v1";
-  const { orders, updateOrder, addAuditEntry } = useData();
+  const {
+    orders,
+    updateOrder,
+    addAuditEntry,
+    isCoreDataLoading,
+    coreDataError,
+  } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -254,18 +258,6 @@ export default function OrdersPage() {
       ],
     });
 
-    const allAssignments = safeReadJson<Record<string, Record<string, string>>>(
-      VENDOR_ASSIGNMENT_STORAGE_KEY,
-      {},
-    );
-    if (allAssignments[orderId]) {
-      delete allAssignments[orderId];
-      localStorage.setItem(
-        VENDOR_ASSIGNMENT_STORAGE_KEY,
-        JSON.stringify(allAssignments),
-      );
-    }
-
     await notifyClient("rejected", order, reason);
     addAuditEntry({
       module: "Procure",
@@ -313,16 +305,6 @@ export default function OrdersPage() {
 
         if (bulkAction === "cancel") {
           updateOrder(id, { status: "Rejected" });
-          const allAssignments = safeReadJson<
-            Record<string, Record<string, string>>
-          >(VENDOR_ASSIGNMENT_STORAGE_KEY, {});
-          if (allAssignments[id]) {
-            delete allAssignments[id];
-            localStorage.setItem(
-              VENDOR_ASSIGNMENT_STORAGE_KEY,
-              JSON.stringify(allAssignments),
-            );
-          }
           return;
         }
 
@@ -478,6 +460,15 @@ export default function OrdersPage() {
             <CardTitle className="text-lg">Procurement Queue</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {isCoreDataLoading && (
+              <p className="text-sm text-muted-foreground">
+                Loading orders from backend...
+              </p>
+            )}
+            {!isCoreDataLoading && coreDataError && (
+              <p className="text-sm text-destructive">{coreDataError}</p>
+            )}
+
             <div className="grid gap-3 xl:grid-cols-[1fr_190px_190px_220px_auto_auto]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -683,7 +674,7 @@ export default function OrdersPage() {
                               setConfirmState({
                                 open: true,
                                 title: "Reject Order",
-                                description: `Reject ${order.orderNumber}? This action removes vendor assignments for the order.`,
+                                description: `Reject ${order.orderNumber}?`,
                                 confirmLabel: "Reject",
                                 tone: "destructive",
                                 onConfirm: () => void handleReject(order.id),

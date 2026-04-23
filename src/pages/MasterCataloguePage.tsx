@@ -1,6 +1,7 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -373,119 +374,15 @@ const buildCategorySpecifications = (item: CatalogItem): [string, string][] => {
   ];
 };
 
-const initialItems: CatalogItem[] = [
-  {
-    id: "1",
-    name: "HP Envy Laptop",
-    productCode: "LAP-1001",
-    sku: "LAP-1001",
-    category: "IT Hardware",
-    subCategory: "Laptops",
-    brand: "HP",
-    productType: "Product",
-    physicalType: "Physical",
-    price: 80000,
-    status: "In Stock",
-    tags: ["CoreEssentials"],
-    initialStock: 50,
-    minStockThreshold: 5,
-  },
-  {
-    id: "2",
-    name: "Sandisk 1TB SSD",
-    productCode: "SSD-2025",
-    sku: "SSD-2025",
-    category: "IT Hardware",
-    subCategory: "Storage",
-    brand: "Sandisk",
-    productType: "Product",
-    physicalType: "Physical",
-    price: 12000,
-    status: "Low Stock",
-    tags: ["High-End"],
-    initialStock: 12,
-    minStockThreshold: 5,
-  },
-  {
-    id: "3",
-    name: "Logitech Wireless Mouse",
-    productCode: "MOU-3301",
-    sku: "MOU-3301",
-    category: "IT Hardware",
-    subCategory: "Peripherals",
-    brand: "Logitech",
-    productType: "Product",
-    physicalType: "Physical",
-    price: 1000,
-    status: "In Stock",
-    tags: [],
-    initialStock: 200,
-    minStockThreshold: 20,
-  },
-  {
-    id: "4",
-    name: "Apple iPad Air",
-    productCode: "TAB-1110",
-    sku: "TAB-1110",
-    category: "IT Hardware",
-    subCategory: "Laptops",
-    brand: "Apple",
-    productType: "Product",
-    physicalType: "Physical",
-    price: 450,
-    status: "Low Stock",
-    tags: ["New Arrival"],
-    initialStock: 8,
-    minStockThreshold: 3,
-  },
-  {
-    id: "5",
-    name: "Epson Workforce Printer",
-    productCode: "PRN-3215",
-    sku: "PRN-3215",
-    category: "Stationery",
-    subCategory: "Paper",
-    brand: "Epson",
-    productType: "Product",
-    physicalType: "Physical",
-    price: 62000,
-    status: "Out of Stock",
-    tags: [],
-    initialStock: 0,
-    minStockThreshold: 2,
-  },
-];
+const initialItems: CatalogItem[] = [];
 
-const auditLogs = [
-  {
-    event: "New Item Added",
-    detail: "Apple MacBook Air M3",
-    user: "Annit Kumar",
-    date: "26 Mar 2024 11:55 PM",
-    status: "Approved",
-  },
-  {
-    event: "Price Changed",
-    detail: "Sandisk 1TB SSD",
-    user: "Sakelti Gupta",
-    date: "25 Mar 2024 2:50 PM",
-    status: "Approved",
-  },
-  {
-    event: "Deleted Item",
-    detail: "Formation Uptop",
-    user: "Rehul Verma",
-    date: "16 Mar 2023 3:35 PM",
-    status: "Approved",
-  },
-  {
-    event: "Bulk Update",
-    detail: "CSV Catalog Accounts",
-    user: "Sakelti Gupta",
-    date: "07 Mar 2023 2:50 PM",
-    status: "Approved",
-  },
-];
+const auditLogs: Array<{
+  event: string;
+  detail: string;
+  user: string;
+  date: string;
+  status: string;
+}> = [];
 
 const emptyItem: Omit<CatalogItem, "id"> = {
   name: "",
@@ -527,6 +424,14 @@ const emptyItem: Omit<CatalogItem, "id"> = {
 export default function MasterCataloguePage() {
   const navigate = useNavigate();
   const { user, isOwner } = useAuth();
+  const {
+    masterCatalogItems,
+    addMasterCatalogItem,
+    updateMasterCatalogItem,
+    deleteMasterCatalogItem,
+    isCoreDataLoading,
+    coreDataError,
+  } = useData();
   const [items, setItems] = useState<CatalogItem[]>(initialItems);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -573,6 +478,16 @@ export default function MasterCataloguePage() {
 
   const bulkFileRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const mappedItems: CatalogItem[] = masterCatalogItems.map((item) => ({
+      ...item,
+      sku: item.productCode,
+      tags: item.tags || [],
+      specAttributes: [],
+    }));
+    setItems(mappedItems);
+  }, [masterCatalogItems]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -709,11 +624,19 @@ export default function MasterCataloguePage() {
     };
 
     if (editingItem) {
+      updateMasterCatalogItem(editingItem.id, {
+        ...newItem,
+        productCode: productCode || sku,
+      });
       setItems((prev) =>
         prev.map((i) => (i.id === editingItem.id ? newItem : i)),
       );
       toast.success("Item updated successfully");
     } else {
+      addMasterCatalogItem({
+        ...newItem,
+        productCode: productCode || sku,
+      });
       setItems((prev) => [...prev, newItem]);
       toast.success("Item added successfully");
     }
@@ -770,6 +693,12 @@ export default function MasterCataloguePage() {
           }
         }
         if (nextItems.length > 0) {
+          nextItems.forEach((item) => {
+            addMasterCatalogItem({
+              ...item,
+              productCode: item.productCode || item.sku,
+            });
+          });
           setItems((prev) => [...prev, ...nextItems]);
         }
         toast.success(`${added} item(s) imported successfully`);
@@ -927,6 +856,14 @@ export default function MasterCataloguePage() {
               Manage and register all products/services available for client
               contracts and downstream client-specific mapping.
             </p>
+            {isCoreDataLoading && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Loading catalog from backend...
+              </p>
+            )}
+            {!isCoreDataLoading && coreDataError && (
+              <p className="text-xs text-destructive mt-1">{coreDataError}</p>
+            )}
           </div>
           <Button className="gap-1.5" onClick={() => setBulkImportOpen(true)}>
             <Plus size={14} /> Bulk Import
@@ -1144,6 +1081,7 @@ export default function MasterCataloguePage() {
                           className="h-7 w-7"
                           onClick={(e) => {
                             e.stopPropagation();
+                            deleteMasterCatalogItem(item.id);
                             setItems((prev) =>
                               prev.filter((i) => i.id !== item.id),
                             );
