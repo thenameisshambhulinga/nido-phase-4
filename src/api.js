@@ -1,4 +1,7 @@
-const BASE_URL = "/api";
+const BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://nido-backend-iztc.onrender.com/api";
 
 const handleResponse = async (res) => {
   const data = await res.json();
