@@ -3073,14 +3073,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (clientsResult.status === "fulfilled") {
           const mapped = clientsResult.value.map(mapApiClientToFrontend);
-          if (mapped.length > 0) setClients(mapped);
+          setClients(mapped);
         } else {
           errors.push(`clients: ${clientsResult.reason?.message || "failed"}`);
         }
 
         if (vendorsResult.status === "fulfilled") {
           const mapped = vendorsResult.value.map(mapApiVendorToFrontend);
-          if (mapped.length > 0) setVendors(mapped);
+          setVendors(mapped);
         } else {
           errors.push(`vendors: ${vendorsResult.reason?.message || "failed"}`);
         }
@@ -3090,7 +3090,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
             (product: any, index: number) =>
               mapProductToCatalogItem(product, index),
           );
-          if (mapped.length > 0) setMasterCatalogItems(mapped);
+          setMasterCatalogItems(mapped);
         } else {
           errors.push(
             `products: ${productsResult.reason?.message || "failed"}`,
@@ -3099,14 +3099,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (ordersResult.status === "fulfilled") {
           const mapped = ordersResult.value.map(mapApiOrderToFrontend);
-          if (mapped.length > 0) setOrders(mapped);
+          setOrders(mapped);
         } else {
           errors.push(`orders: ${ordersResult.reason?.message || "failed"}`);
         }
 
         if (invoicesResult.status === "fulfilled") {
           const mapped = invoicesResult.value.map(mapApiInvoiceToFrontend);
-          if (mapped.length > 0) setInvoices(mapped);
+          setInvoices(mapped);
         } else {
           errors.push(
             `invoices: ${invoicesResult.reason?.message || "failed"}`,
