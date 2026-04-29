@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -50,10 +50,11 @@ import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import { downloadVendorTemplate } from "@/lib/templateUtils";
 import type { BulkUploadResult } from "@/lib/templateUtils";
 import { nextSequentialCode } from "@/lib/documentNumbering";
+import { API } from "../api.js";
+import type { Vendor } from "@/contexts/DataContext";
 
 export default function VendorsPage() {
   const {
-    vendors,
     addVendor,
     updateVendor,
     deleteVendor,
@@ -62,6 +63,9 @@ export default function VendorsPage() {
   } = useData();
   const { isOwner, user } = useAuth();
   const navigate = useNavigate();
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const vendorCodePrefix =
     Object.values(generalSettings)[0]?.vendorCodePrefix?.trim() || "VND";
   const generateVendorCode = () =>
@@ -87,6 +91,61 @@ export default function VendorsPage() {
     description: "",
   });
 
+  useEffect(() => {
+    const fetchVendors = async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const response = await API.getVendors();
+        const normalized = (Array.isArray(response) ? response : []).map(
+          (vendor: any) => ({
+            id: vendor._id || vendor.id || `ven-${Date.now()}`,
+            vendorId:
+              vendor.vendorId || vendor.vendorCode || vendor._id || vendor.id,
+            vendorCode: vendor.vendorCode || "",
+            name:
+              vendor.companyName ||
+              vendor.vendorName ||
+              vendor.name ||
+              "Unnamed Vendor",
+            category: vendor.category || "General",
+            contactEmail:
+              vendor.email || vendor.contactEmail || vendor.contact || "",
+            contactPhone: vendor.phone || vendor.contactPhone || "",
+            address: vendor.address || "",
+            status:
+              vendor.status === "inactive"
+                ? "inactive"
+                : vendor.status === "suspended"
+                  ? "pending"
+                  : "active",
+            rating: Number(vendor.rating) || 0,
+            totalOrders: Number(vendor.totalOrders) || 0,
+            totalSpend: Number(vendor.totalSpend) || 0,
+            joinDate: vendor.createdAt
+              ? new Date(vendor.createdAt).toISOString().split("T")[0]
+              : new Date().toISOString().split("T")[0],
+          }),
+        );
+        setVendors(normalized);
+      } catch (error) {
+        console.error("Failed to fetch vendors from API:", error);
+        setLoadError(
+          error instanceof Error ? error.message : "Failed to load vendors",
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void fetchVendors();
+  }, []);
+
+  useEffect(() => {
+    if (showCreate || showEdit) return;
+    setForm((prev) => ({ ...prev, vendorCode: generateVendorCode() }));
+  }, [showCreate, showEdit, vendors, vendorCodePrefix]);
+
   const filtered = vendors.filter((v) => {
     const matchSearch =
       v.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -95,15 +154,56 @@ export default function VendorsPage() {
     return matchSearch && matchStatus;
   });
 
-  const handleCreate = () => {
-    addVendor({
-      ...form,
-      status: "pending",
-      rating: 0,
-      totalOrders: 0,
-      totalSpend: 0,
-      joinDate: new Date().toISOString().split("T")[0],
-    });
+  const refreshVendors = async () => {
+    try {
+      const response = await API.getVendors();
+      const normalized = (Array.isArray(response) ? response : []).map(
+        (vendor: any) => ({
+          id: vendor._id || vendor.id || `ven-${Date.now()}`,
+          vendorId:
+            vendor.vendorId || vendor.vendorCode || vendor._id || vendor.id,
+          vendorCode: vendor.vendorCode || "",
+          name:
+            vendor.companyName ||
+            vendor.vendorName ||
+            vendor.name ||
+            "Unnamed Vendor",
+          category: vendor.category || "General",
+          contactEmail:
+            vendor.email || vendor.contactEmail || vendor.contact || "",
+          contactPhone: vendor.phone || vendor.contactPhone || "",
+          address: vendor.address || "",
+          status:
+            vendor.status === "inactive"
+              ? "inactive"
+              : vendor.status === "suspended"
+                ? "pending"
+                : "active",
+          rating: Number(vendor.rating) || 0,
+          totalOrders: Number(vendor.totalOrders) || 0,
+          totalSpend: Number(vendor.totalSpend) || 0,
+          joinDate: vendor.createdAt
+            ? new Date(vendor.createdAt).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+        }),
+      );
+      setVendors(normalized);
+    } catch (error) {
+      console.error("Failed to refresh vendors:", error);
+    }
+  };
+
+  const handleCreate = async () => {
+    await Promise.resolve(
+      addVendor({
+        ...form,
+        status: "pending",
+        rating: 0,
+        totalOrders: 0,
+        totalSpend: 0,
+        joinDate: new Date().toISOString().split("T")[0],
+      }),
+    );
     addAuditEntry({
       user: user?.name || "System",
       action: "Vendor Created",
@@ -112,6 +212,7 @@ export default function VendorsPage() {
       ipAddress: "192.168.1.1",
       status: "success",
     });
+    await refreshVendors();
     setShowCreate(false);
     setForm({
       name: "",
@@ -142,15 +243,17 @@ export default function VendorsPage() {
     setShowEdit(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editId) return;
-    updateVendor(editId, {
-      name: form.name,
-      category: form.category,
-      contactEmail: form.contactEmail,
-      contactPhone: form.contactPhone,
-      address: form.address,
-    });
+    await Promise.resolve(
+      updateVendor(editId, {
+        name: form.name,
+        category: form.category,
+        contactEmail: form.contactEmail,
+        contactPhone: form.contactPhone,
+        address: form.address,
+      }),
+    );
     addAuditEntry({
       user: user?.name || "System",
       action: "Vendor Updated",
@@ -159,6 +262,7 @@ export default function VendorsPage() {
       ipAddress: "192.168.1.1",
       status: "success",
     });
+    await refreshVendors();
     setShowEdit(false);
     setEditId(null);
     setForm({
@@ -173,8 +277,8 @@ export default function VendorsPage() {
     toast({ title: "Vendor Updated" });
   };
 
-  const handleDelete = (v: (typeof vendors)[0]) => {
-    deleteVendor(v.id);
+  const handleDelete = async (v: (typeof vendors)[number]) => {
+    await Promise.resolve(deleteVendor(v.id));
     addAuditEntry({
       user: user?.name || "System",
       action: "Vendor Deleted",
@@ -183,30 +287,33 @@ export default function VendorsPage() {
       ipAddress: "192.168.1.1",
       status: "success",
     });
+    await refreshVendors();
     toast({ title: "Vendor Deleted" });
   };
 
-  const handleBulkSuccess = (results: BulkUploadResult) => {
+  const handleBulkSuccess = async (results: BulkUploadResult) => {
     for (const rec of results.records) {
-      addVendor({
-        name: rec.company_name,
-        category: rec.category || "IT Hardware",
-        contactEmail: rec.email,
-        contactPhone: rec.phone,
-        address: [
-          rec.billing_address,
-          rec.billing_city,
-          rec.billing_state,
-          rec.billing_pincode,
-        ]
-          .filter(Boolean)
-          .join(", "),
-        status: "pending",
-        rating: 0,
-        totalOrders: 0,
-        totalSpend: 0,
-        joinDate: new Date().toISOString().split("T")[0],
-      });
+      await Promise.resolve(
+        addVendor({
+          name: rec.company_name,
+          category: rec.category || "IT Hardware",
+          contactEmail: rec.email,
+          contactPhone: rec.phone,
+          address: [
+            rec.billing_address,
+            rec.billing_city,
+            rec.billing_state,
+            rec.billing_pincode,
+          ]
+            .filter(Boolean)
+            .join(", "),
+          status: "pending",
+          rating: 0,
+          totalOrders: 0,
+          totalSpend: 0,
+          joinDate: new Date().toISOString().split("T")[0],
+        }),
+      );
     }
     addAuditEntry({
       user: user?.name || "System",
@@ -216,6 +323,7 @@ export default function VendorsPage() {
       ipAddress: "192.168.1.1",
       status: "success",
     });
+    await refreshVendors();
     toast({
       title: "Bulk Import Complete",
       description: `${results.created} created, ${results.skipped} skipped`,
@@ -442,81 +550,100 @@ export default function VendorsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((v) => (
-                  <TableRow
-                    key={v.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/vendors/${v.id}`)}
-                  >
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {v.vendorId || v.vendorCode || v.id}
-                    </TableCell>
-                    <TableCell className="font-medium text-primary">
-                      {v.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {v.category}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {v.contactEmail}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-3 w-3 fill-warning text-warning" />
-                        {v.rating}
-                      </div>
-                    </TableCell>
-                    <TableCell>{v.totalOrders}</TableCell>
-                    <TableCell className="font-medium">
-                      ${v.totalSpend.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          v.status === "active"
-                            ? "bg-success text-success-foreground"
-                            : v.status === "pending"
-                              ? "bg-warning text-warning-foreground"
-                              : ""
-                        }
-                      >
-                        {v.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div
-                        className="flex gap-1"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => navigate(`/vendors/${v.id}`)}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => handleEdit(v)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => setDeleteTargetId(v.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                {loading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={9}
+                      className="text-center py-8 text-muted-foreground"
+                    >
+                      Loading vendors from MongoDB...
                     </TableCell>
                   </TableRow>
-                ))}
-                {filtered.length === 0 && (
+                ) : loadError ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={9}
+                      className="text-center py-8 text-destructive"
+                    >
+                      {loadError}
+                    </TableCell>
+                  </TableRow>
+                ) : filtered.length > 0 ? (
+                  filtered.map((v) => (
+                    <TableRow
+                      key={v.id}
+                      className="cursor-pointer"
+                      onClick={() => navigate(`/vendors/${v.id}`)}
+                    >
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {v.vendorId || v.vendorCode || v.id}
+                      </TableCell>
+                      <TableCell className="font-medium text-primary">
+                        {v.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {v.category}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {v.contactEmail}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-warning text-warning" />
+                          {v.rating}
+                        </div>
+                      </TableCell>
+                      <TableCell>{v.totalOrders}</TableCell>
+                      <TableCell className="font-medium">
+                        ${v.totalSpend.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            v.status === "active"
+                              ? "bg-success text-success-foreground"
+                              : v.status === "pending"
+                                ? "bg-warning text-warning-foreground"
+                                : ""
+                          }
+                        >
+                          {v.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div
+                          className="flex gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => navigate(`/vendors/${v.id}`)}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleEdit(v)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setDeleteTargetId(v.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
                   <TableRow>
                     <TableCell
                       colSpan={9}

@@ -1,48 +1,21 @@
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "/api";
 
 const handleResponse = async (res) => {
   const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || "API Error");
-  }
+  if (!res.ok) throw new Error(data.error || "API Error");
   return data.data;
 };
 
 export const API = {
   // CLIENTS
-  getClients: async () => handleResponse(await fetch(`${BASE_URL}/clients`)),
-
-  createClient: async (payload) =>
-    handleResponse(
-      await fetch(`${BASE_URL}/clients`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }),
-    ),
-
-  updateClient: async (id, payload) =>
-    handleResponse(
-      await fetch(`${BASE_URL}/clients/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }),
-    ),
-
-  deleteClient: async (id) =>
-    handleResponse(
-      await fetch(`${BASE_URL}/clients/${id}`, {
-        method: "DELETE",
-      }),
-    ),
+  getClients: () => fetch(`${BASE_URL}/clients`).then(handleResponse),
 
   // VENDORS
-  getVendors: async () => handleResponse(await fetch(`${BASE_URL}/vendors`)),
+  getVendors: () => fetch(`${BASE_URL}/vendors`).then(handleResponse),
 
   // PRODUCTS
-  getProducts: async () => handleResponse(await fetch(`${BASE_URL}/products`)),
+  getProducts: () => fetch(`${BASE_URL}/products`).then(handleResponse),
 
   // ORDERS
-  getOrders: async () => handleResponse(await fetch(`${BASE_URL}/orders`)),
+  getOrders: () => fetch(`${BASE_URL}/orders`).then(handleResponse),
 };

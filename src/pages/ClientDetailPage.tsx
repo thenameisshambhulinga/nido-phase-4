@@ -2309,81 +2309,107 @@ export default function ClientDetailPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {clientUsers.map((clientUser) => (
-                          <TableRow
-                            key={clientUser.id}
-                            className="border-b border-gray-100 hover:bg-gray-50/80 transition-colors cursor-pointer"
-                            onClick={() =>
-                              navigate(
-                                `/clients/${client.id}/users/${clientUser.id}`,
-                              )
-                            }
-                          >
-                            <TableCell className="px-4 py-4">
-                              <div className="flex items-center gap-3">
-                                <div
-                                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-sm ${getAvatarColor(
-                                    clientUser.name || clientUser.email || "--",
-                                  )}`}
-                                >
-                                  {getInitials(
-                                    clientUser.name || clientUser.email || "--",
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="font-semibold text-sm text-foreground truncate">
-                                    {clientUser.name}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {clientUser.jobTitle || ""}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-4 text-sm text-muted-foreground">
-                              {clientUser.email}
-                            </TableCell>
-                            <TableCell className="px-4 py-4 text-sm">
-                              {client.name}
-                            </TableCell>
-                            <TableCell className="px-4 py-4 text-sm">
-                              {clientUser.role}
-                            </TableCell>
-                            <TableCell className="px-4 py-4 text-sm">
-                              {clientUser.jobTitle || "-"}
-                            </TableCell>
-                            <TableCell className="px-4 py-4 text-sm">
-                              {clientUser.department || "-"}
-                            </TableCell>
-                            <TableCell className="px-4 py-4 text-sm">
-                              {clientUser.status}
-                            </TableCell>
-                            <TableCell
-                              className="px-4 py-4 text-right"
-                              onClick={(e) => e.stopPropagation()}
+                        {clientUsers.length > 0 ? (
+                          clientUsers.map((clientUser) => (
+                            <TableRow
+                              key={clientUser.id}
+                              className="border-b border-gray-100 hover:bg-gray-50/80 transition-colors cursor-pointer"
+                              onClick={() =>
+                                navigate(
+                                  `/clients/${client.id}/users/${clientUser.id}`,
+                                )
+                              }
                             >
-                              <div className="flex items-center justify-end gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openUserDialog(clientUser.id)}
+                              <TableCell className="px-4 py-4 align-middle">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-sm ${getAvatarColor(
+                                      clientUser.name ||
+                                        clientUser.email ||
+                                        "--",
+                                    )}`}
+                                  >
+                                    {getInitials(
+                                      clientUser.name ||
+                                        clientUser.email ||
+                                        "--",
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-sm text-foreground truncate">
+                                      {clientUser.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {clientUser.jobTitle || "No title set"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="px-4 py-4 text-sm text-muted-foreground align-middle">
+                                {clientUser.email}
+                              </TableCell>
+                              <TableCell className="px-4 py-4 text-sm align-middle">
+                                {client.name}
+                              </TableCell>
+                              <TableCell className="px-4 py-4 text-sm align-middle">
+                                {clientUser.role}
+                              </TableCell>
+                              <TableCell className="px-4 py-4 text-sm align-middle">
+                                {clientUser.jobTitle || "-"}
+                              </TableCell>
+                              <TableCell className="px-4 py-4 text-sm align-middle">
+                                {clientUser.department || "-"}
+                              </TableCell>
+                              <TableCell className="px-4 py-4 align-middle">
+                                <Badge
+                                  className={cn(
+                                    "rounded-full px-2.5 py-0.5 text-[11px] font-medium capitalize",
+                                    clientUser.status === "active"
+                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                      : "bg-gray-100 text-gray-600 border border-gray-200",
+                                  )}
                                 >
-                                  Edit
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    deleteUser(clientUser.id);
-                                    toast({ title: "User deleted" });
-                                  }}
-                                >
-                                  Delete
-                                </Button>
-                              </div>
+                                  {clientUser.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell
+                                className="px-4 py-4 text-right align-middle"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                      openUserDialog(clientUser.id)
+                                    }
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      deleteUser(clientUser.id);
+                                      toast({ title: "User deleted" });
+                                    }}
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell
+                              colSpan={8}
+                              className="px-4 py-12 text-center text-sm text-muted-foreground"
+                            >
+                              No users have been added for this client yet.
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )}
                       </TableBody>
                     </Table>
                   </div>
