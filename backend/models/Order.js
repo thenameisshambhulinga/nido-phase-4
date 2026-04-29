@@ -7,6 +7,8 @@ const orderItemSchema = new mongoose.Schema(
     description: { type: String, trim: true },
     sku: { type: String, trim: true },
     category: { type: String, trim: true },
+    vendorId: { type: String, trim: true, default: "" },
+    vendorName: { type: String, trim: true, default: "" },
     quantity: { type: Number, required: true, min: 1 },
     pricePerItem: { type: Number, required: true, min: 0 },
     totalCost: { type: Number, required: true, min: 0 },
@@ -28,6 +30,11 @@ const orderSchema = new mongoose.Schema(
       trim: true,
     },
     vendorId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    vendorName: {
       type: String,
       trim: true,
       default: "",
@@ -64,7 +71,14 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "processing", "completed", "rejected"],
+      enum: [
+        "pending",
+        "assigned",
+        "processing",
+        "completed",
+        "rejected",
+        "cancelled",
+      ],
       default: "pending",
       index: true,
     },
@@ -122,6 +136,25 @@ const orderSchema = new mongoose.Schema(
     attachments: {
       type: [String],
       default: [],
+    },
+    ownerNotificationEmail: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    invoiceId: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    invoiceNumber: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    completedAt: {
+      type: Date,
+      default: null,
     },
   },
   {

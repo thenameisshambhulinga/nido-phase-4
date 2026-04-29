@@ -37,11 +37,15 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
+import NidoRolesPanel from "@/components/configuration/NidoRolesPanel";
 import {
   ArrowLeft,
   Clock3,
   Building2,
   Calendar,
+  ChevronsLeft,
+  ChevronsRight,
   Download,
   Mail,
   MapPin,
@@ -184,6 +188,35 @@ function defaultRolePermissions() {
   }, {});
 }
 
+// Helpers matching ClientsPage avatar style
+const getInitials = (name: string) =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+const getAvatarColor = (name: string) => {
+  const colors = [
+    "bg-blue-200 text-blue-900",
+    "bg-cyan-200 text-cyan-900",
+    "bg-teal-200 text-teal-900",
+    "bg-purple-200 text-purple-900",
+    "bg-pink-200 text-pink-900",
+    "bg-orange-200 text-orange-900",
+    "bg-amber-200 text-amber-900",
+    "bg-indigo-200 text-indigo-900",
+    "bg-green-200 text-green-900",
+    "bg-rose-200 text-rose-900",
+    "bg-fuchsia-200 text-fuchsia-900",
+    "bg-sky-200 text-sky-900",
+  ];
+  const hash = name.charCodeAt(0) + name.charCodeAt(name.length - 1);
+  return colors[hash % colors.length];
+};
+
 export default function ClientDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -228,6 +261,7 @@ export default function ClientDetailPage() {
     useAuth();
 
   const [activeTab, setActiveTab] = useState("overview");
+  const [showProfileCard, setShowProfileCard] = useState(true);
   const [configFocus, setConfigFocus] = useState<
     "pricing" | "discount" | "tax" | "sla"
   >("pricing");
@@ -722,13 +756,7 @@ export default function ClientDetailPage() {
     );
   }
 
-  const initials = client.name
-    .split(" ")
-    .filter(Boolean)
-    .map((s) => s[0])
-    .join("")
-    .slice(0, 3)
-    .toUpperCase();
+  const initials = getInitials(client.name || "--");
 
   const daysRemaining = Math.max(
     0,
@@ -1797,6 +1825,19 @@ export default function ClientDetailPage() {
               variant="outline"
               size="sm"
               className="gap-2"
+              onClick={() => setShowProfileCard((prev) => !prev)}
+            >
+              {showProfileCard ? (
+                <ChevronsLeft className="h-4 w-4" />
+              ) : (
+                <ChevronsRight className="h-4 w-4" />
+              )}
+              {showProfileCard ? "Hide Profile" : "Show Profile"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
               onClick={() => setShowMail(true)}
             >
               <Mail className="h-4 w-4" /> Quick Mail
@@ -1812,94 +1853,138 @@ export default function ClientDetailPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <Card className="lg:col-span-3 lg:max-w-[320px] rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-white">
-            <div className="h-24 bg-gradient-to-br from-blue-600 to-blue-400" />
-            <CardContent className="pt-0 -mt-10 text-center space-y-4">
-              <div className="mx-auto h-20 w-20 rounded-full border-4 border-white bg-blue-100 text-blue-700 shadow-sm flex items-center justify-center text-2xl font-semibold">
-                {initials}
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">{client.name}</h3>
-                <p className="text-xs text-muted-foreground">
-                  Premium Client • Since 2024
-                </p>
-              </div>
-              <div className="space-y-2.5 text-sm text-left">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Building2 className="h-4 w-4 shrink-0" />
-                  <span className="font-medium text-foreground">
-                    {client.name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Mail className="h-4 w-4 shrink-0" />
-                  <span className="text-xs break-all">{client.email}</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Phone className="h-4 w-4 shrink-0" />
-                  <span className="text-xs">{client.phone}</span>
-                </div>
-                <div className="flex items-start gap-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span className="text-xs">{client.address}</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="h-4 w-4 shrink-0" />
-                  <span className="text-xs">
-                    {client.contractStart} - {client.contractEnd}
-                  </span>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <Button className="gap-2" onClick={() => setShowMail(true)}>
-                  <Mail className="h-4 w-4" /> Email
-                </Button>
-                <Button
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => window.open(`tel:${client.phone}`)}
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-6 transition-all duration-300 ease-in-out",
+            showProfileCard ? "lg:grid-cols-12" : "lg:grid-cols-1",
+          )}
+        >
+          {showProfileCard && (
+            <Card className="lg:col-span-3 lg:max-w-[320px] rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-white relative transition-all duration-300">
+              <button
+                type="button"
+                onClick={() => setShowProfileCard(false)}
+                className="absolute top-2 right-2 z-10 h-7 w-7 rounded-full bg-white/90 backdrop-blur-sm border border-gray-200 shadow-sm flex items-center justify-center hover:bg-white hover:shadow-md transition-all"
+                title="Hide profile card"
+              >
+                <ChevronsLeft className="h-3.5 w-3.5 text-gray-600" />
+              </button>
+              <div className="h-20 bg-gradient-to-br from-blue-600 to-blue-400" />
+              <CardContent className="pt-0 -mt-8 text-center space-y-3">
+                <div
+                  className={`mx-auto h-16 w-16 rounded-full border-4 border-white ${getAvatarColor(
+                    client.name,
+                  )} shadow-sm flex items-center justify-center text-xl font-semibold`}
                 >
-                  <Phone className="h-4 w-4" /> Call
-                </Button>
-              </div>
-              <div className="pt-2 border-t space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">
-                    Contract Progress
-                  </span>
-                  <span className="font-medium">{daysRemaining} days left</span>
+                  {initials}
                 </div>
-                <Progress value={contractProgress} className="h-2" />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>
-                    Total Orders:{" "}
-                    <strong className="text-foreground">
-                      {client.totalOrders}
-                    </strong>
-                  </span>
-                  <span>
-                    Spend:{" "}
-                    <strong className="text-foreground">
-                      ${totalSpend.toLocaleString()}
-                    </strong>
-                  </span>
+                <div>
+                  <h3 className="font-semibold text-lg">{client.name}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {client.clientCode || client.clientId || ""}
+                  </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="space-y-2 text-sm text-left">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Building2 className="h-4 w-4 shrink-0" />
+                    <span className="font-medium text-foreground">
+                      {client.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Mail className="h-4 w-4 shrink-0" />
+                    <span className="text-xs break-all">{client.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Phone className="h-4 w-4 shrink-0" />
+                    <span className="text-xs">{client.phone}</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-muted-foreground">
+                    <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span className="text-xs">{client.address}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="h-4 w-4 shrink-0" />
+                    <span className="text-xs">
+                      {client.contractStart} - {client.contractEnd}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setShowMail(true)}
+                  >
+                    <Mail className="h-4 w-4" /> Email
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => window.open(`tel:${client.phone}`)}
+                  >
+                    <Phone className="h-4 w-4" /> Call
+                  </Button>
+                </div>
+                <div className="pt-2 border-t space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      Contract Progress
+                    </span>
+                    <span className="font-medium">
+                      {daysRemaining} days left
+                    </span>
+                  </div>
+                  <Progress value={contractProgress} className="h-2" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>
+                      Total Orders:{" "}
+                      <strong className="text-foreground">
+                        {client.totalOrders}
+                      </strong>
+                    </span>
+                    <span>
+                      Spend:{" "}
+                      <strong className="text-foreground">
+                        ${totalSpend.toLocaleString()}
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          <div className="lg:col-span-9">
+          <div
+            className={cn(
+              "transition-all duration-300",
+              showProfileCard ? "lg:col-span-9" : "w-full",
+            )}
+          >
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="flex flex-wrap h-auto">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="roles">Roles</TabsTrigger>
-                <TabsTrigger value="users">Users</TabsTrigger>
-                <TabsTrigger value="orders">Order Details</TabsTrigger>
-                <TabsTrigger value="service">Service History</TabsTrigger>
-                <TabsTrigger value="catalog">Catalog Items</TabsTrigger>
-                <TabsTrigger value="config">Configuration</TabsTrigger>
-              </TabsList>
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                {!showProfileCard && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 rounded-full border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 hover:border-primary/50 shadow-sm"
+                    onClick={() => setShowProfileCard(true)}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                    Reveal Profile
+                  </Button>
+                )}
+                <TabsList className="flex h-auto flex-1 flex-wrap rounded-2xl border border-gray-100 bg-white p-1 shadow-sm">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="roles">Roles</TabsTrigger>
+                  <TabsTrigger value="users">Users</TabsTrigger>
+                  <TabsTrigger value="orders">Order Details</TabsTrigger>
+                  <TabsTrigger value="service">Service History</TabsTrigger>
+                  <TabsTrigger value="catalog">Catalog Items</TabsTrigger>
+                  <TabsTrigger value="config">Configuration</TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="overview" className="space-y-6 mt-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2170,142 +2255,138 @@ export default function ClientDetailPage() {
               </TabsContent>
 
               <TabsContent value="roles" className="space-y-3 mt-4">
-                <div className="flex justify-end">
-                  <Button className="gap-2" onClick={() => openRoleDialog()}>
-                    <Plus className="h-4 w-4" /> Add Role
-                  </Button>
-                </div>
-                <Card>
-                  <CardContent className="pt-4">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead className="text-center">
-                            No. of Users
-                          </TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {roles.map((role) => (
-                          <TableRow key={role.id}>
-                            <TableCell>{role.name}</TableCell>
-                            <TableCell>{role.description}</TableCell>
-                            <TableCell className="text-center font-semibold">
-                              {
-                                clientUsers.filter(
-                                  (clientUser) =>
-                                    clientUser.status !== "inactive" &&
-                                    clientUser.status !== "suspended" &&
-                                    clientUser.role
-                                      .replace(/[_-]/g, " ")
-                                      .toLowerCase()
-                                      .trim() ===
-                                      role.name.toLowerCase().trim(),
-                                ).length
-                              }
-                            </TableCell>
-                            <TableCell>{role.status}</TableCell>
-                            <TableCell className="flex gap-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openRoleDialog(role.id)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  deleteRole(role.id);
-                                  toast({ title: "Role deleted" });
-                                }}
-                              >
-                                Delete
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                <Card className="rounded-2xl border border-gray-100 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Role Workspace</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Client-scoped role management for {client.name}. Only
+                      Client User roles are shown and can be created here.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <NidoRolesPanel organization={client.name} />
                   </CardContent>
                 </Card>
               </TabsContent>
 
               <TabsContent value="users" className="space-y-3 mt-4">
                 <div className="flex justify-end">
-                  <Button className="gap-2" onClick={() => openUserDialog()}>
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => openUserDialog()}
+                  >
                     <Plus className="h-4 w-4" /> Add User
                   </Button>
                 </div>
-                <Card>
-                  <CardContent className="pt-4">
+                <Card className="border-0 shadow-sm rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Organization</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Job Title</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Action</TableHead>
+                      <TableHeader className="bg-gray-50">
+                        <TableRow className="border-b border-gray-200">
+                          <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                            Name
+                          </TableHead>
+                          <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                            Email
+                          </TableHead>
+                          <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                            Organization
+                          </TableHead>
+                          <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                            Role
+                          </TableHead>
+                          <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                            Job Title
+                          </TableHead>
+                          <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                            Department
+                          </TableHead>
+                          <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                            Status
+                          </TableHead>
+                          <TableHead className="px-4 py-4"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {clientUsers.map((clientUser) => (
                           <TableRow
                             key={clientUser.id}
-                            className="cursor-pointer"
+                            className="border-b border-gray-100 hover:bg-gray-50/80 transition-colors cursor-pointer"
                             onClick={() =>
                               navigate(
                                 `/clients/${client.id}/users/${clientUser.id}`,
                               )
                             }
                           >
-                            <TableCell className="font-medium text-primary">
-                              {clientUser.name}
+                            <TableCell className="px-4 py-4">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-sm ${getAvatarColor(
+                                    clientUser.name || clientUser.email || "--",
+                                  )}`}
+                                >
+                                  {getInitials(
+                                    clientUser.name || clientUser.email || "--",
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-sm text-foreground truncate">
+                                    {clientUser.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {clientUser.jobTitle || ""}
+                                  </p>
+                                </div>
+                              </div>
                             </TableCell>
-                            <TableCell>{clientUser.email}</TableCell>
-                            <TableCell>{client.name}</TableCell>
-                            <TableCell>{clientUser.role}</TableCell>
-                            <TableCell>{clientUser.jobTitle || "-"}</TableCell>
-                            <TableCell>
+                            <TableCell className="px-4 py-4 text-sm text-muted-foreground">
+                              {clientUser.email}
+                            </TableCell>
+                            <TableCell className="px-4 py-4 text-sm">
+                              {client.name}
+                            </TableCell>
+                            <TableCell className="px-4 py-4 text-sm">
+                              {clientUser.role}
+                            </TableCell>
+                            <TableCell className="px-4 py-4 text-sm">
+                              {clientUser.jobTitle || "-"}
+                            </TableCell>
+                            <TableCell className="px-4 py-4 text-sm">
                               {clientUser.department || "-"}
                             </TableCell>
-                            <TableCell>{clientUser.status}</TableCell>
+                            <TableCell className="px-4 py-4 text-sm">
+                              {clientUser.status}
+                            </TableCell>
                             <TableCell
-                              className="flex gap-1"
-                              onClick={(event) => event.stopPropagation()}
+                              className="px-4 py-4 text-right"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openUserDialog(clientUser.id)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  deleteUser(clientUser.id);
-                                  toast({ title: "User deleted" });
-                                }}
-                              >
-                                Delete
-                              </Button>
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openUserDialog(clientUser.id)}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    deleteUser(clientUser.id);
+                                    toast({ title: "User deleted" });
+                                  }}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                  </CardContent>
+                  </div>
                 </Card>
               </TabsContent>
 
@@ -2333,7 +2414,7 @@ export default function ClientDetailPage() {
                   </div>
                 </div>
 
-                <Card>
+                <Card className="rounded-2xl shadow-sm">
                   <CardContent className="pt-4">
                     <Table>
                       <TableHeader>
@@ -2390,7 +2471,7 @@ export default function ClientDetailPage() {
               </TabsContent>
 
               <TabsContent value="service" className="space-y-3 mt-4">
-                <Card>
+                <Card className="rounded-2xl shadow-sm">
                   <CardHeader>
                     <CardTitle>Service History</CardTitle>
                   </CardHeader>
@@ -2446,7 +2527,7 @@ export default function ClientDetailPage() {
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <Card>
+                  <Card className="rounded-2xl shadow-sm">
                     <CardContent className="pt-3 pb-3">
                       <p className="text-xs text-muted-foreground">
                         Total Items
@@ -2456,7 +2537,7 @@ export default function ClientDetailPage() {
                       </p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="rounded-2xl shadow-sm">
                     <CardContent className="pt-3 pb-3">
                       <p className="text-xs text-muted-foreground">In Stock</p>
                       <p className="text-xl font-semibold text-success">
@@ -2464,7 +2545,7 @@ export default function ClientDetailPage() {
                       </p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="rounded-2xl shadow-sm">
                     <CardContent className="pt-3 pb-3">
                       <p className="text-xs text-muted-foreground">Low Stock</p>
                       <p className="text-xl font-semibold text-warning">
@@ -2472,7 +2553,7 @@ export default function ClientDetailPage() {
                       </p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="rounded-2xl shadow-sm">
                     <CardContent className="pt-3 pb-3">
                       <p className="text-xs text-muted-foreground">
                         Out of Stock
@@ -2578,7 +2659,7 @@ export default function ClientDetailPage() {
                   </div>
                 </div>
 
-                <Card>
+                <Card className="rounded-2xl shadow-sm">
                   <CardContent className="pt-4">
                     <Table>
                       <TableHeader>
@@ -2718,7 +2799,7 @@ export default function ClientDetailPage() {
                 </Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
+                  <Card className="rounded-2xl shadow-sm">
                     <CardHeader>
                       <CardTitle className="text-base">
                         Import / Export Products
@@ -2805,7 +2886,7 @@ export default function ClientDetailPage() {
                     </CardContent>
                   </Card>
 
-                  <Card>
+                  <Card className="rounded-2xl shadow-sm">
                     <CardHeader>
                       <CardTitle className="text-base">
                         Approval & Audit Logs
@@ -2865,7 +2946,7 @@ export default function ClientDetailPage() {
               </TabsContent>
 
               <TabsContent value="config" className="space-y-4 mt-4">
-                <Card className="border-primary/20 bg-gradient-to-br from-white via-blue-50/40 to-cyan-50/70">
+                <Card className="border-primary/20 bg-gradient-to-br from-white via-blue-50/40 to-cyan-50/70 rounded-2xl shadow-sm">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Settings2 className="h-4 w-4 text-primary" />
@@ -2938,7 +3019,7 @@ export default function ClientDetailPage() {
                 )}
 
                 {(configFocus === "pricing" || configFocus === "discount") && (
-                  <Card>
+                  <Card className="rounded-2xl shadow-sm">
                     <CardHeader>
                       <CardTitle>Pricing & Discount</CardTitle>
                     </CardHeader>
@@ -2962,7 +3043,7 @@ export default function ClientDetailPage() {
                       </div>
 
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <Card className="lg:col-span-2">
+                        <Card className="lg:col-span-2 rounded-2xl shadow-sm">
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base">
                               Pricing Rules
@@ -3009,7 +3090,7 @@ export default function ClientDetailPage() {
                           </CardContent>
                         </Card>
 
-                        <Card>
+                        <Card className="rounded-2xl shadow-sm">
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base">
                               Discount Computation
@@ -3073,7 +3154,7 @@ export default function ClientDetailPage() {
                       </div>
 
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        <Card className="lg:col-span-2">
+                        <Card className="lg:col-span-2 rounded-2xl shadow-sm">
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base">
                               Discount Rules
@@ -3118,7 +3199,7 @@ export default function ClientDetailPage() {
                           </CardContent>
                         </Card>
 
-                        <Card>
+                        <Card className="rounded-2xl shadow-sm">
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base">
                               Coupon Codes
@@ -3265,7 +3346,7 @@ export default function ClientDetailPage() {
                 )}
 
                 {configFocus === "tax" && (
-                  <Card>
+                  <Card className="rounded-2xl shadow-sm">
                     <CardHeader>
                       <CardTitle>Tax Settings</CardTitle>
                     </CardHeader>
@@ -3281,7 +3362,7 @@ export default function ClientDetailPage() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <Card>
+                        <Card className="rounded-2xl shadow-sm">
                           <CardContent className="pt-4">
                             <p className="text-xs text-muted-foreground">
                               Tax Compliance
@@ -3295,7 +3376,7 @@ export default function ClientDetailPage() {
                             </p>
                           </CardContent>
                         </Card>
-                        <Card>
+                        <Card className="rounded-2xl shadow-sm">
                           <CardContent className="pt-4">
                             <p className="text-xs text-muted-foreground">
                               Tax Categories
@@ -3306,7 +3387,7 @@ export default function ClientDetailPage() {
                             </p>
                           </CardContent>
                         </Card>
-                        <Card>
+                        <Card className="rounded-2xl shadow-sm">
                           <CardContent className="pt-4">
                             <p className="text-xs text-muted-foreground">
                               Active Tax Rules
@@ -3429,7 +3510,7 @@ export default function ClientDetailPage() {
                 )}
 
                 {configFocus === "sla" && (
-                  <Card>
+                  <Card className="rounded-2xl shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Clock3 className="h-4 w-4 text-primary" />

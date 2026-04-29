@@ -6,6 +6,7 @@ import React, {
   useEffect,
 } from "react";
 import { safeReadJson } from "@/lib/storage";
+import { apiBaseUrl, apiRequest } from "@/lib/api";
 import {
   nextSequentialCode,
   resolveSequentialCode,
@@ -21,6 +22,7 @@ import type {
 
 export interface Order {
   id: string;
+  clientId?: string;
   orderNumber: string;
   orderDate: string;
   organization: string;
@@ -28,6 +30,8 @@ export interface Order {
   approvingUser: string;
   status: string;
   assignedUser?: string;
+  vendorId?: string;
+  vendorName?: string;
   items: OrderItem[];
   billingAddress: string;
   shippingAddress: string;
@@ -43,6 +47,8 @@ export interface Order {
   commentHistory: Comment[];
   attachments: string[];
   serviceType?: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
 }
 
 export interface OrderItem {
@@ -54,6 +60,8 @@ export interface OrderItem {
   pricePerItem: number;
   totalCost: number;
   image?: string;
+  vendorId?: string;
+  vendorName?: string;
 }
 
 export interface Comment {
@@ -66,6 +74,7 @@ export interface Comment {
 
 export interface Vendor {
   id: string;
+  vendorId?: string;
   vendorCode?: string;
   name: string;
   category: string;
@@ -81,6 +90,7 @@ export interface Vendor {
 
 export interface Client {
   id: string;
+  clientId?: string;
   name: string;
   companyName?: string;
   clientCode?: string;
@@ -92,7 +102,7 @@ export interface Client {
   gst?: string;
   pan?: string;
   industryType?: string;
-  businessType?: "Registered" | "Unregistered" | "Consumer";
+  businessType?: string;
   locationDetails?: {
     address: string;
     city: string;
@@ -191,6 +201,7 @@ export interface Role {
 
 export interface MasterCatalogItem {
   id: string;
+  masterProductId?: string;
   productCode: string;
   name: string;
   category: string;
@@ -449,6 +460,7 @@ export interface SalesOrder {
 
 export interface Invoice {
   id: string;
+  orderId?: string;
   invoiceNumber: string;
   referenceQuoteId?: string;
   referenceSalesOrderId?: string;
@@ -483,6 +495,8 @@ export interface Invoice {
   attachments?: string[];
   attachCustomerStatement?: boolean;
   attachInvoicePdf?: boolean;
+  autoReminder?: boolean;
+  lastReminderSent?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -530,6 +544,11 @@ interface DataContextType {
   salesActivities: SalesActivity[];
   addOrder: (order: Partial<Order>) => void;
   updateOrder: (id: string, data: Partial<Order>) => void;
+  assignOrderVendor: (
+    id: string,
+    vendorId: string,
+    options?: { itemId?: string; vendorName?: string },
+  ) => void;
   bulkUpdateOrders: (ids: string[], data: Partial<Order>) => void;
   deleteOrder: (id: string) => void;
   addVendor: (vendor: Partial<Vendor>) => void;
@@ -696,6 +715,7 @@ interface DataContextType {
     },
   ) => Invoice;
   updateInvoice: (id: string, data: Partial<Invoice>) => void;
+  deleteInvoice: (id: string) => void;
   convertQuoteToSalesOrder: (
     quoteId: string,
     actor?: string,
@@ -941,98 +961,39 @@ const DEFAULT_ORDERS: Order[] = [
     attachments: [],
   },
 ];
-const DEFAULT_MASTER_CATALOG: MasterCatalogItem[] = [
-  {
-    id: "mc-1",
-    productCode: "LAP-1001",
-    name: "HP Envy Laptop",
-    category: "IT Hardware",
-    subCategory: "Laptops",
-    brand: "HP",
-    productType: "Product",
-    physicalType: "Physical",
-    price: 80000,
-    status: "In Stock",
-    initialStock: 50,
-    minStockThreshold: 5,
-  },
-  {
-    id: "mc-2",
-    productCode: "SSD-2025",
-    name: "Sandisk 1TB SSD",
-    category: "IT Hardware",
-    subCategory: "Storage",
-    brand: "Sandisk",
-    productType: "Product",
-    physicalType: "Physical",
-    price: 12000,
-    status: "Low Stock",
-    initialStock: 12,
-    minStockThreshold: 5,
-  },
-  {
-    id: "mc-3",
-    productCode: "MOU-3301",
-    name: "Logitech Wireless Mouse",
-    category: "IT Hardware",
-    subCategory: "Peripherals",
-    brand: "Logitech",
-    productType: "Product",
-    physicalType: "Physical",
-    price: 1000,
-    status: "In Stock",
-    initialStock: 200,
-    minStockThreshold: 20,
-  },
-  {
-    id: "mc-4",
-    productCode: "TAB-1110",
-    name: "Apple iPad Air",
-    category: "IT Hardware",
-    subCategory: "Laptops",
-    brand: "Apple",
-    productType: "Product",
-    physicalType: "Physical",
-    price: 450,
-    status: "Low Stock",
-    initialStock: 8,
-    minStockThreshold: 3,
-  },
-  {
-    id: "mc-5",
-    productCode: "PRN-3215",
-    name: "Epson Workforce Printer",
-    category: "Stationery",
-    subCategory: "Paper",
-    brand: "Epson",
-    productType: "Product",
-    physicalType: "Physical",
-    price: 62000,
-    status: "Out of Stock",
-    initialStock: 0,
-    minStockThreshold: 2,
-  },
-];
+const DEFAULT_MASTER_CATALOG: MasterCatalogItem[] = [];
 
-const DEFAULT_CLIENT_CATALOG: Record<string, ClientCatalogItem[]> = {
-  cl1: [
-    {
-      ...DEFAULT_MASTER_CATALOG[0],
-      clientId: "cl1",
-      masterProductId: DEFAULT_MASTER_CATALOG[0].id,
-      stock: 50,
-      minStock: 5,
-    },
-    {
-      ...DEFAULT_MASTER_CATALOG[2],
-      clientId: "cl1",
-      masterProductId: DEFAULT_MASTER_CATALOG[2].id,
-      stock: 200,
-      minStock: 20,
-    },
-  ],
-  cl2: [],
-  cl3: [],
+const DEFAULT_CLIENT_CATALOG: Record<string, ClientCatalogItem[]> = {};
+
+const normalizeStringList = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || "").trim()).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(/[\n,]/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
+const normalizeAssetPath = (value: unknown) => {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+
+  const trimmed = value.trim();
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("/")
+  ) {
+    return trimmed;
+  }
+
+  return `/${trimmed.replace(/^\/+/, "")}`;
 };
 
 const DEFAULT_PRICING_RULES: PricingRule[] = [
@@ -2516,61 +2477,6 @@ const DEFAULT_SALES_ORDERS: SalesOrder[] = [
   },
 ];
 
-const DEFAULT_INVOICES: Invoice[] = [
-  {
-    id: "inv-1",
-    invoiceNumber: "INV-00064",
-    referenceQuoteId: "sq-1",
-    referenceSalesOrderId: "so-1",
-    customerName: "Nido Technologies",
-    customerId: "cl1",
-    vendorOrClient: "Nido Technologies",
-    type: "client",
-    invoiceDate: "2026-04-02",
-    issueDate: "2026-04-02",
-    dueDate: "2026-04-02",
-    paymentTerms: "Due on Receipt",
-    billingAddress:
-      "Nido Technologies, 41/1 2nd Floor 10th Cross, Wilson Garden, Bengaluru",
-    shippingAddress:
-      "Nido Technologies, 41/1 2nd Floor 10th Cross, Wilson Garden, Bengaluru",
-    placeOfSupply: "Karnataka (29)",
-    emailRecipients: ["pavannido@gmail.com"],
-    items: [
-      {
-        id: "invli-1",
-        itemName: "3D Design Model",
-        description: "3D model mould designs for handle",
-        hsnSac: "9983",
-        quantity: 1,
-        rate: 400,
-        discount: 0,
-        taxRate: 18,
-        amount: 400,
-      },
-    ],
-    subtotal: 400,
-    cgst: 36,
-    sgst: 36,
-    adjustment: 0,
-    shippingCharges: 0,
-    total: 472,
-    amountPaid: 0,
-    balanceDue: 472,
-    status: "SENT",
-    paymentStatus: "UNPAID",
-    notes:
-      "BANK NAME:- IDFC\nA/c Payee Name: Nido Technologies\nBank A/C No.: 10028186411",
-    termsAndConditions:
-      "Payment of 50% post approval of quote, 30% against trial component and 20% before delivery.",
-    bankDetails:
-      "BANK NAME:- IDFC\nA/c Payee Name: Nido Technologies\nBank IFSC Code: IDFB0080154",
-    createdBy: "System Owner",
-    createdAt: "2026-04-02T09:00:00.000Z",
-    updatedAt: "2026-04-02T09:00:00.000Z",
-  },
-];
-
 const DEFAULT_SALES_ACTIVITIES: SalesActivity[] = [
   {
     id: "sa-1",
@@ -2669,14 +2575,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [isCoreDataLoading, setIsCoreDataLoading] = useState(true);
   const [coreDataError, setCoreDataError] = useState<string | null>(null);
-  const [orders, setOrders] = usePersistedState("nido_orders", [] as Order[]);
+  const [orders, setOrders] = usePersistedState(
+    "nido_orders_v2",
+    DEFAULT_ORDERS,
+  );
   const [vendors, setVendors] = usePersistedState(
-    "nido_vendors",
-    [] as Vendor[],
+    "nido_vendors_v2",
+    DEFAULT_VENDORS,
   );
   const [clients, setClients] = usePersistedState(
-    "nido_clients",
-    [] as Client[],
+    "nido_clients_v2",
+    DEFAULT_CLIENTS,
   );
   const [locations, setLocations] = usePersistedState(
     "nido_locations",
@@ -2761,27 +2670,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   );
   const [invoices, setInvoices] = usePersistedState(
     "nido_invoices",
-    DEFAULT_INVOICES,
+    [] as Invoice[],
   );
   const [salesActivities, setSalesActivities] = usePersistedState(
     "nido_sales_activities",
     DEFAULT_SALES_ACTIVITIES,
   );
 
-  const API_BASE = "http://localhost:5000/api";
+  const API_BASE = apiBaseUrl;
 
   const toFrontendOrderStatus = (status?: string) => {
     const normalized = (status || "").toLowerCase();
     if (normalized === "pending") return "New";
+    if (normalized === "assigned") return "Assigned";
     if (normalized === "processing") return "Processing";
     if (normalized === "completed") return "Completed";
     if (normalized === "rejected") return "Rejected";
+    if (normalized === "cancelled") return "Cancelled";
     return status || "New";
   };
 
   const toApiOrderStatus = (status?: string) => {
     const normalized = (status || "").toLowerCase();
     if (normalized === "new" || normalized === "pending") return "pending";
+    if (normalized === "assigned") return "assigned";
     if (normalized === "processing" || normalized === "approved") {
       return "processing";
     }
@@ -2789,7 +2701,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       return "completed";
     }
     if (normalized === "rejected" || normalized === "cancelled") {
-      return "rejected";
+      return normalized === "cancelled" ? "cancelled" : "rejected";
     }
     return "pending";
   };
@@ -2799,16 +2711,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     index = 0,
   ): MasterCatalogItem => {
     const quantity = Number(product.quantity) || 0;
+    const minStockThreshold = Number(product.minStockThreshold) || 0;
     const status =
-      quantity <= 0 ? "Out of Stock" : quantity < 5 ? "Low Stock" : "In Stock";
+      quantity <= 0
+        ? "Out of Stock"
+        : minStockThreshold > 0 && quantity <= minStockThreshold
+          ? "Low Stock"
+          : "In Stock";
 
     return {
       id: product._id || product.id || `prd-${Date.now()}-${index}`,
-      productCode: product.sku || product.serialNumber || `PRD-${index + 1}`,
+      masterProductId:
+        product.masterProductId || product.productId || product.id || "",
+      productCode:
+        product.productCode ||
+        product.sku ||
+        product.serialNumber ||
+        `PRD-${index + 1}`,
       name: product.productName || product.name || "Unnamed Product",
       category: product.category || "General",
       subCategory: product.subCategory || "General",
-      brand: product.brand || product.vendorName || "",
+      brand: product.brand || product.vendorName || product.primaryVendor || "",
       productType: product.productType || "Product",
       physicalType: product.physicalType || "Physical",
       price: Number(product.price) || 0,
@@ -2817,15 +2740,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           ? Number(product.discountPrice)
           : undefined,
       status,
-      image: product.image,
+      image: normalizeAssetPath(product.image),
       description: product.description,
       initialStock: quantity,
-      minStockThreshold: Number(product.minStockThreshold) || 0,
-      tags: Array.isArray(product.tags) ? product.tags : [],
+      minStockThreshold,
+      tags: normalizeStringList(product.tags),
       specification: product.specification,
       warranty: product.warranty,
       hsnCode: product.hsnCode,
-      dimensionL: product.dimensionL,
+      dimensionL: product.dimensionL || product.dimensions,
       dimensionW: product.dimensionW,
       dimensionH: product.dimensionH,
       dimUnit: product.dimUnit,
@@ -2833,7 +2756,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       weightUnit: product.weightUnit,
       customsDeclaration: product.customsDeclaration,
       primaryVendor: product.primaryVendor || product.vendorName,
-      vendorSku: product.vendorSku,
+      vendorSku: product.vendorSku || product.sku,
       leadTime: product.leadTime,
       vendorContact: product.vendorContact,
       vendorEmail: product.vendorEmail,
@@ -2844,12 +2767,80 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   };
 
+  const mapApiClientToFrontend = (client: any): Client => ({
+    id: client._id || client.id || `cli-${Date.now()}`,
+    clientId: client.clientId || client.clientCode || client._id || client.id,
+    name: client.companyName || client.name || "Unnamed Client",
+    companyName: client.companyName || client.name || "",
+    clientCode: client.clientCode,
+    contactPerson: client.contactPerson || client.name || "N/A",
+    contactEmployeeId: client.contactEmployeeId,
+    contactNumber: client.contactNumber || client.phone || "",
+    jobTitle: client.jobTitle,
+    email: client.email || "",
+    gst: client.gst,
+    pan: client.pan,
+    industryType: client.industry || client.industryType || "",
+    businessType: client.businessType || "",
+    locationDetails: {
+      address: client.address || client.locationDetails?.address || "",
+      city: client.city || client.locationDetails?.city || "",
+      state: client.state || client.locationDetails?.state || "",
+      country: client.country || client.locationDetails?.country || "India",
+      currency: client.currency || client.locationDetails?.currency || "INR",
+      zipCode: client.zipCode || client.locationDetails?.zipCode || "",
+      timeZone:
+        client.timeZone || client.locationDetails?.timeZone || "Asia/Kolkata",
+    },
+    contractType: client.contractType || "Annual",
+    pricingTier: client.pricingTier,
+    paymentTerms: client.paymentTerms || "NET 30",
+    companyLogo: client.companyLogo,
+    contractDocuments: Array.isArray(client.contractDocuments)
+      ? client.contractDocuments
+      : [],
+    notes: client.notes,
+    phone: client.phone || "",
+    address: client.address || "",
+    status: client.status === "inactive" ? "inactive" : "active",
+    contractStart:
+      client.contractStart || new Date().toISOString().split("T")[0],
+    contractEnd:
+      client.contractEnd ||
+      new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0],
+    totalOrders: Number(client.totalOrders) || 0,
+  });
+
+  const mapApiVendorToFrontend = (vendor: any): Vendor => ({
+    id: vendor._id || vendor.id || `ven-${Date.now()}`,
+    vendorId: vendor.vendorId || vendor.vendorCode || vendor._id || vendor.id,
+    name: vendor.vendorName || vendor.name || "Unnamed Vendor",
+    vendorCode: vendor.vendorCode,
+    category: vendor.category || "General",
+    contactEmail: vendor.email || vendor.contactEmail || "",
+    contactPhone: vendor.phone || vendor.contactPhone || "",
+    address: vendor.address || "",
+    status:
+      vendor.status === "inactive"
+        ? "inactive"
+        : vendor.status === "pending"
+          ? "pending"
+          : "active",
+    rating: Number(vendor.rating) || 0,
+    totalOrders: Number(vendor.totalOrders) || 0,
+    totalSpend: Number(vendor.totalSpend) || 0,
+    joinDate: vendor.createdAt || new Date().toISOString().split("T")[0],
+  });
+
   const mapApiOrderToFrontend = (order: any): Order => {
     const orderDateValue =
       order.orderDate || order.createdAt || new Date().toISOString();
     const normalizedDate = new Date(orderDateValue).toISOString();
     return {
       id: order._id || order.id || `ord-${Date.now()}`,
+      clientId: order.clientId || "",
       orderNumber: order.orderNumber || `ORD-${Date.now()}`,
       orderDate: normalizedDate,
       organization: order.organization || "Client Order",
@@ -2857,6 +2848,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       approvingUser: order.approvingUser || "",
       status: toFrontendOrderStatus(order.status),
       assignedUser: order.assignedUser || "",
+      vendorId: order.vendorId || "",
+      vendorName: order.vendorName || "",
       items: Array.isArray(order.items)
         ? order.items.map((item: any, idx: number) => {
             const quantity = Number(item.quantity) || 0;
@@ -2872,6 +2865,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
               totalCost:
                 Number(item.totalCost ?? item.total) || quantity * pricePerItem,
               image: item.image,
+              vendorId: item.vendorId || "",
+              vendorName: item.vendorName || "",
             };
           })
         : [],
@@ -2891,8 +2886,76 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         : [],
       attachments: Array.isArray(order.attachments) ? order.attachments : [],
       serviceType: order.serviceType,
+      invoiceId: order.invoiceId || "",
+      invoiceNumber: order.invoiceNumber || "",
     };
   };
+
+  const mapInvoiceItemToSalesItem = (
+    item: any,
+    index: number,
+  ): SalesLineItem => ({
+    id: item.id || `inv-item-${index}`,
+    itemName: item.description || item.name || "Line item",
+    description: item.description || "",
+    hsnSac: item.hsnSac || "",
+    quantity: Number(item.quantity) || 0,
+    rate: Number(item.unitPrice ?? item.rate) || 0,
+    discount: Number(item.discount) || 0,
+    taxRate: Number(item.taxRate) || 0,
+    amount:
+      Number(item.total) ||
+      (Number(item.quantity) || 0) * (Number(item.unitPrice ?? item.rate) || 0),
+  });
+
+  const mapApiInvoiceToFrontend = (invoice: any): Invoice => ({
+    id: invoice._id || invoice.id || `inv-${Date.now()}`,
+    orderId: invoice.orderId || "",
+    invoiceNumber: invoice.invoiceNumber || `INV-${Date.now()}`,
+    referenceQuoteId: invoice.referenceQuoteId,
+    referenceSalesOrderId: invoice.referenceSalesOrderId,
+    customerName: invoice.customerName,
+    customerId: invoice.customerId,
+    vendorOrClient: invoice.vendorOrClient || invoice.customerName || "",
+    type: invoice.type === "vendor" ? "vendor" : "client",
+    customerGst: invoice.customerGst,
+    customerBusinessType: invoice.customerBusinessType,
+    invoiceDate: invoice.invoiceDate || invoice.issueDate || "",
+    issueDate: invoice.issueDate || invoice.invoiceDate || "",
+    dueDate: invoice.dueDate || "",
+    paymentTerms: invoice.paymentTerms || "",
+    billingAddress: invoice.billingAddress || "",
+    shippingAddress: invoice.shippingAddress || "",
+    placeOfSupply: invoice.placeOfSupply || "",
+    emailRecipients: Array.isArray(invoice.emailRecipients)
+      ? invoice.emailRecipients
+      : [],
+    items: Array.isArray(invoice.items)
+      ? invoice.items.map(mapInvoiceItemToSalesItem)
+      : [],
+    subtotal: Number(invoice.subtotal) || 0,
+    cgst: Number(invoice.cgst) || 0,
+    sgst: Number(invoice.sgst) || 0,
+    adjustment: Number(invoice.adjustment) || 0,
+    shippingCharges: Number(invoice.shippingCharges) || 0,
+    total: Number(invoice.total ?? invoice.totalAmount) || 0,
+    amountPaid: Number(invoice.amountPaid) || 0,
+    balanceDue: Number(invoice.balanceDue) || 0,
+    status: invoice.status || "DRAFT",
+    paymentStatus: invoice.paymentStatus || "UNPAID",
+    notes: invoice.notes || "",
+    termsAndConditions: invoice.termsAndConditions || "",
+    bankDetails: invoice.bankDetails || "",
+    attachments: Array.isArray(invoice.attachments) ? invoice.attachments : [],
+    attachCustomerStatement: Boolean(invoice.attachCustomerStatement),
+    attachInvoicePdf: Boolean(invoice.attachInvoicePdf),
+    autoReminder:
+      invoice.autoReminder === undefined ? true : Boolean(invoice.autoReminder),
+    lastReminderSent: invoice.lastReminderSent,
+    createdBy: invoice.createdBy || "System",
+    createdAt: invoice.createdAt || new Date().toISOString(),
+    updatedAt: invoice.updatedAt || new Date().toISOString(),
+  });
 
   const primaryOrgId = organizations[0]?.id || "org-nido";
   const activeSettings =
@@ -2991,128 +3054,91 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsCoreDataLoading(true);
       setCoreDataError(null);
       try {
-        // Fetch clients from backend
-        const clientsResponse = await fetch(
-          "http://localhost:5000/api/clients",
-        );
-        if (clientsResponse.ok) {
-          const clientsPayload = await clientsResponse.json();
-          const clientsData = Array.isArray(clientsPayload)
-            ? clientsPayload
-            : clientsPayload?.data || [];
-          const transformedClients: Client[] = clientsData.map(
-            (client: any) => ({
-              id: client._id || client.id || `cli-${Date.now()}`,
-              name: client.companyName || client.name,
-              companyName: client.companyName,
-              clientCode: client.clientCode,
-              contactPerson: client.contactPerson || "N/A",
-              contactNumber: client.phone,
-              email: client.email,
-              industryType: client.industry,
-              businessType: client.businessType || "Registered",
-              locationDetails: {
-                address: client.address || "",
-                city: client.city || "",
-                state: client.state || "",
-                country: "India",
-                currency: "INR",
-                zipCode: "",
-                timeZone: "Asia/Kolkata",
-              },
-              contractType: client.contractType || "Annual",
-              paymentTerms: "NET 30",
-              phone: client.phone,
-              address: client.address,
-              status: client.status === "inactive" ? "inactive" : "active",
-              contractStart:
-                client.contractStart || new Date().toISOString().split("T")[0],
-              contractEnd:
-                client.contractEnd ||
-                new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-                  .toISOString()
-                  .split("T")[0],
-              totalOrders: client.totalOrders || 0,
-            }),
-          );
-          setClients(transformedClients);
+        const results = await Promise.allSettled([
+          apiRequest<any[]>("/clients"),
+          apiRequest<any[]>("/vendors"),
+          apiRequest<any[]>("/products"),
+          apiRequest<any[]>("/orders"),
+          apiRequest<any[]>("/invoices"),
+        ]);
+
+        const [
+          clientsResult,
+          vendorsResult,
+          productsResult,
+          ordersResult,
+          invoicesResult,
+        ] = results;
+        const errors: string[] = [];
+
+        if (clientsResult.status === "fulfilled") {
+          const mapped = clientsResult.value.map(mapApiClientToFrontend);
+          if (mapped.length > 0) setClients(mapped);
+        } else {
+          errors.push(`clients: ${clientsResult.reason?.message || "failed"}`);
         }
 
-        // Fetch vendors from backend
-        const vendorsResponse = await fetch(
-          "http://localhost:5000/api/vendors",
-        );
-        if (vendorsResponse.ok) {
-          const vendorsPayload = await vendorsResponse.json();
-          const vendorsData = Array.isArray(vendorsPayload)
-            ? vendorsPayload
-            : vendorsPayload?.data || [];
-          const transformedVendors: Vendor[] = vendorsData.map(
-            (vendor: any) => ({
-              id: vendor._id || vendor.id || `ven-${Date.now()}`,
-              name: vendor.vendorName || vendor.name,
-              vendorCode: vendor.vendorCode,
-              category: vendor.category,
-              contactEmail: vendor.email,
-              contactPhone: vendor.phone,
-              address: vendor.address || "",
-              status:
-                vendor.status === "inactive"
-                  ? "inactive"
-                  : vendor.status === "pending"
-                    ? "pending"
-                    : "active",
-              rating: vendor.rating || 0,
-              totalOrders: 0,
-              totalSpend: 0,
-              joinDate:
-                vendor.createdAt || new Date().toISOString().split("T")[0],
-            }),
-          );
-          setVendors(transformedVendors);
+        if (vendorsResult.status === "fulfilled") {
+          const mapped = vendorsResult.value.map(mapApiVendorToFrontend);
+          if (mapped.length > 0) setVendors(mapped);
+        } else {
+          errors.push(`vendors: ${vendorsResult.reason?.message || "failed"}`);
         }
 
-        const productsResponse = await fetch(`${API_BASE}/products`);
-        if (productsResponse.ok) {
-          const productsPayload = await productsResponse.json();
-          console.log("[products] GET /api/products response", productsPayload);
-          const productsData = Array.isArray(productsPayload)
-            ? productsPayload
-            : Array.isArray(productsPayload?.data)
-              ? productsPayload.data
-              : [];
-          const transformedProducts = productsData.map(
+        if (productsResult.status === "fulfilled") {
+          const mapped = productsResult.value.map(
             (product: any, index: number) =>
               mapProductToCatalogItem(product, index),
           );
-          setMasterCatalogItems(transformedProducts);
+          if (mapped.length > 0) setMasterCatalogItems(mapped);
+        } else {
+          errors.push(
+            `products: ${productsResult.reason?.message || "failed"}`,
+          );
         }
 
-        const ordersResponse = await fetch(`${API_BASE}/orders`);
-        if (ordersResponse.ok) {
-          const ordersPayload = await ordersResponse.json();
-          const ordersData = Array.isArray(ordersPayload)
-            ? ordersPayload
-            : ordersPayload?.data || [];
-          const transformedOrders: Order[] = ordersData.map((order: any) =>
-            mapApiOrderToFrontend(order),
+        if (ordersResult.status === "fulfilled") {
+          const mapped = ordersResult.value.map(mapApiOrderToFrontend);
+          if (mapped.length > 0) setOrders(mapped);
+        } else {
+          errors.push(`orders: ${ordersResult.reason?.message || "failed"}`);
+        }
+
+        if (invoicesResult.status === "fulfilled") {
+          const mapped = invoicesResult.value.map(mapApiInvoiceToFrontend);
+          if (mapped.length > 0) setInvoices(mapped);
+        } else {
+          errors.push(
+            `invoices: ${invoicesResult.reason?.message || "failed"}`,
           );
-          setOrders(transformedOrders);
+        }
+
+        if (errors.length > 0) {
+          setCoreDataError(
+            `Some data could not be refreshed: ${errors.join(" | ")}`,
+          );
         }
       } catch (error) {
         console.error("Error fetching data from backend:", error);
-        setCoreDataError("Failed to load core business data from backend.");
-        setClients([]);
-        setVendors([]);
-        setMasterCatalogItems([]);
-        setOrders([]);
+        setCoreDataError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load core business data from backend.",
+        );
       } finally {
         setIsCoreDataLoading(false);
       }
     };
 
     fetchData();
-  }, [API_BASE, setClients, setMasterCatalogItems, setOrders, setVendors]);
+  }, [
+    API_BASE,
+    setClients,
+    setInvoices,
+    setMasterCatalogItems,
+    setOrders,
+    setVendors,
+  ]);
 
   const makeCrud = <T extends { id: string }>(
     setter: React.Dispatch<React.SetStateAction<T[]>>,
@@ -3127,9 +3153,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       setter((prev) => prev.filter((item) => item.id !== id)),
   });
 
-  const vendorCrud = makeCrud(setVendors);
-
-  const clientCrud = makeCrud(setClients);
   const locationCrud = makeCrud(setLocations);
   const statusCrud = makeCrud(setOrderStatuses);
   const workflowCrud = makeCrud(setApprovalWorkflows);
@@ -3145,6 +3168,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         description: item.description,
         sku: item.sku,
         category: undefined,
+        vendorId: item.vendorId || "",
+        vendorName: item.vendorName || "",
         quantity: Number(item.quantity) || 0,
         pricePerItem: Number(item.pricePerItem) || 0,
         totalCost: Number(item.totalCost) || 0,
@@ -3161,7 +3186,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         clientId:
           (order as Partial<Order> & { clientId?: string }).clientId ||
           "shop-client",
-        vendorId: "",
+        vendorId: order.vendorId || "",
+        vendorName: order.vendorName || "",
         organization: order.organization || "Client Order",
         requestingUser: order.requestingUser || "Client User",
         approvingUser: order.approvingUser || "",
@@ -3186,17 +3212,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
       void (async () => {
         try {
-          const response = await fetch(`${API_BASE}/orders`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!response.ok) {
-            throw new Error(`Failed to create order (${response.status})`);
-          }
-          const responsePayload = await response.json();
           const created = mapApiOrderToFrontend(
-            responsePayload?.data || responsePayload,
+            await apiRequest("/orders", {
+              method: "POST",
+              body: payload,
+            }),
           );
           setOrders((prev) => [created, ...prev]);
         } catch (error) {
@@ -3204,7 +3224,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       })();
     },
-    [API_BASE, configuredPrefix, orders, setOrders],
+    [configuredPrefix, orders, setOrders],
   );
 
   const updateOrder = useCallback(
@@ -3216,33 +3236,120 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       const payload: Record<string, unknown> = {
         ...data,
       };
-      if (data.status) {
+      const payloadKeys = Object.keys(data);
+      const statusOnly =
+        !!data.status && payloadKeys.every((key) => key === "status");
+      const assignmentOnly =
+        typeof data.vendorId === "string" && data.vendorId.trim().length > 0;
+
+      if (statusOnly && data.status) {
         payload.status = toApiOrderStatus(data.status);
       }
 
       void (async () => {
         try {
-          const response = await fetch(`${API_BASE}/orders/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!response.ok) {
-            throw new Error(`Failed to update order (${response.status})`);
-          }
-          const responsePayload = await response.json();
+          const endpoint = statusOnly
+            ? `${API_BASE}/orders/${id}/status`
+            : assignmentOnly
+              ? `${API_BASE}/orders/${id}/assign-vendor`
+              : `${API_BASE}/orders/${id}`;
+          const method = statusOnly || assignmentOnly ? "PUT" : "PATCH";
           const updated = mapApiOrderToFrontend(
-            responsePayload?.data || responsePayload,
+            await apiRequest(endpoint.replace(API_BASE, ""), {
+              method,
+              body: statusOnly ? { status: payload.status } : payload,
+            }),
           );
           setOrders((prev) =>
             prev.map((entry) => (entry.id === id ? updated : entry)),
           );
+          if (updated.invoiceId) {
+            try {
+              const relatedInvoices = await apiRequest<any[]>(
+                `/invoices?orderId=${encodeURIComponent(id)}`,
+              );
+              setInvoices((prev) => {
+                const mapped = relatedInvoices.map(mapApiInvoiceToFrontend);
+                const next = [...prev];
+                mapped.forEach((invoice) => {
+                  const existingIndex = next.findIndex(
+                    (entry) => entry.id === invoice.id,
+                  );
+                  if (existingIndex >= 0) next[existingIndex] = invoice;
+                  else next.unshift(invoice);
+                });
+                return next;
+              });
+            } catch (invoiceError) {
+              console.error(
+                "Invoice sync after order update failed:",
+                invoiceError,
+              );
+            }
+          }
         } catch (error) {
           console.error("Order update failed:", error);
         }
       })();
     },
-    [API_BASE, setOrders],
+    [setInvoices, setOrders],
+  );
+
+  const assignOrderVendor = useCallback(
+    (
+      id: string,
+      vendorId: string,
+      options?: { itemId?: string; vendorName?: string },
+    ) => {
+      setOrders((prev) =>
+        prev.map((entry) => {
+          if (entry.id !== id) return entry;
+          const nextItems = (entry.items || []).map((item) => {
+            if (options?.itemId && item.id !== options.itemId) return item;
+            if (!options?.itemId) {
+              return {
+                ...item,
+                vendorId,
+                vendorName: options?.vendorName || entry.vendorName || "",
+              };
+            }
+            return {
+              ...item,
+              vendorId,
+              vendorName: options?.vendorName || entry.vendorName || "",
+            };
+          });
+
+          return {
+            ...entry,
+            vendorId,
+            vendorName: options?.vendorName || entry.vendorName || "",
+            items: nextItems,
+          };
+        }),
+      );
+
+      void (async () => {
+        try {
+          const updated = mapApiOrderToFrontend(
+            await apiRequest(`/orders/${id}/assign-vendor`, {
+              method: "PUT",
+              body: {
+                vendorId,
+                vendorName: options?.vendorName || "",
+                itemId: options?.itemId || "",
+              },
+            }),
+          );
+          setOrders((prev) =>
+            prev.map((entry) => (entry.id === id ? updated : entry)),
+          );
+        } catch (error) {
+          console.error("Order vendor assignment failed:", error);
+        }
+      })();
+    },
+    [setOrders],
   );
 
   const deleteOrder = useCallback(
@@ -3250,7 +3357,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       setOrders((prev) => prev.filter((entry) => entry.id !== id));
       void (async () => {
         try {
-          await fetch(`${API_BASE}/orders/${id}`, {
+          await apiRequest(`/orders/${id}`, {
             method: "DELETE",
           });
         } catch (error) {
@@ -3258,7 +3365,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       })();
     },
-    [API_BASE, setOrders],
+    [setOrders],
   );
 
   const addVendor = useCallback(
@@ -3270,16 +3377,75 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           vendors.map((entry) => entry.vendorCode),
           5,
         );
-      setVendors((prev) => [
-        ...prev,
-        {
-          ...vendor,
-          id: vendor.id || `${Date.now()}`,
-          vendorCode,
-        } as Vendor,
-      ]);
+      void (async () => {
+        try {
+          const created = await apiRequest<any>("/vendors", {
+            method: "POST",
+            body: {
+              vendorCode,
+              vendorName: vendor.name || "Unnamed Vendor",
+              category: vendor.category || "General",
+              email: vendor.contactEmail || "",
+              phone: vendor.contactPhone || "",
+              address: vendor.address || "",
+              status: vendor.status || "active",
+              rating: Number(vendor.rating) || 0,
+            },
+          });
+          setVendors((prev) => [mapApiVendorToFrontend(created), ...prev]);
+        } catch (error) {
+          console.error("Vendor creation failed:", error);
+        }
+      })();
     },
     [configuredPrefix, setVendors, vendors],
+  );
+
+  const updateVendor = useCallback(
+    (id: string, data: Partial<Vendor>) => {
+      setVendors((prev) =>
+        prev.map((entry) => (entry.id === id ? { ...entry, ...data } : entry)),
+      );
+
+      void (async () => {
+        try {
+          const updated = await apiRequest<any>(`/vendors/${id}`, {
+            method: "PATCH",
+            body: {
+              vendorCode: data.vendorCode,
+              vendorName: data.name,
+              category: data.category,
+              email: data.contactEmail,
+              phone: data.contactPhone,
+              address: data.address,
+              status: data.status,
+              rating: data.rating,
+            },
+          });
+          const mapped = mapApiVendorToFrontend(updated);
+          setVendors((prev) =>
+            prev.map((entry) => (entry.id === id ? mapped : entry)),
+          );
+        } catch (error) {
+          console.error("Vendor update failed:", error);
+        }
+      })();
+    },
+    [setVendors],
+  );
+
+  const deleteVendor = useCallback(
+    (id: string) => {
+      setVendors((prev) => prev.filter((entry) => entry.id !== id));
+      void (async () => {
+        try {
+          await apiRequest(`/vendors/${id}`, { method: "DELETE" });
+        } catch (error) {
+          console.error("Vendor delete failed:", error);
+        }
+      })();
+    },
+    [setVendors],
   );
 
   const addClient = useCallback(
@@ -3291,16 +3457,116 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           clients.map((entry) => entry.clientCode),
           5,
         );
-      setClients((prev) => [
-        ...prev,
-        {
-          ...client,
-          id: client.id || `${Date.now()}`,
-          clientCode,
-        } as Client,
-      ]);
+      void (async () => {
+        try {
+          const created = await apiRequest<any>("/clients", {
+            method: "POST",
+            body: {
+              clientCode,
+              companyName:
+                client.companyName || client.name || "Unnamed Client",
+              name: client.name || client.companyName || "Unnamed Client",
+              contactPerson: client.contactPerson || "",
+              contactEmployeeId: client.contactEmployeeId || "",
+              email: client.email || "",
+              phone: client.phone || client.contactNumber || "",
+              contactNumber: client.contactNumber || client.phone || "",
+              address: client.address || "",
+              city: client.locationDetails?.city || "",
+              state: client.locationDetails?.state || "",
+              country: client.locationDetails?.country || "India",
+              zipCode: client.locationDetails?.zipCode || "",
+              currency: client.locationDetails?.currency || "INR",
+              timeZone: client.locationDetails?.timeZone || "Asia/Kolkata",
+              industry: client.industryType || "",
+              businessType: client.businessType || "",
+              contractType: client.contractType || "Annual",
+              jobTitle: client.jobTitle || "",
+              gst: client.gst || "",
+              pan: client.pan || "",
+              companyLogo: client.companyLogo || "",
+              notes: client.notes || "",
+              paymentTerms: client.paymentTerms || "NET 30",
+              status: client.status || "active",
+              contractStart: client.contractStart,
+              contractEnd: client.contractEnd,
+              totalOrders: Number(client.totalOrders) || 0,
+            },
+          });
+          setClients((prev) => [mapApiClientToFrontend(created), ...prev]);
+        } catch (error) {
+          console.error("Client creation failed:", error);
+        }
+      })();
     },
     [clients, configuredPrefix, setClients],
+  );
+
+  const updateClient = useCallback(
+    (id: string, data: Partial<Client>) => {
+      setClients((prev) =>
+        prev.map((entry) => (entry.id === id ? { ...entry, ...data } : entry)),
+      );
+
+      void (async () => {
+        try {
+          const updated = await apiRequest<any>(`/clients/${id}`, {
+            method: "PATCH",
+            body: {
+              clientCode: data.clientCode,
+              companyName: data.companyName || data.name,
+              name: data.name || data.companyName,
+              contactPerson: data.contactPerson,
+              contactEmployeeId: data.contactEmployeeId,
+              email: data.email,
+              phone: data.phone || data.contactNumber,
+              contactNumber: data.contactNumber || data.phone,
+              address: data.address || data.locationDetails?.address,
+              city: data.locationDetails?.city,
+              state: data.locationDetails?.state,
+              country: data.locationDetails?.country,
+              zipCode: data.locationDetails?.zipCode,
+              currency: data.locationDetails?.currency,
+              timeZone: data.locationDetails?.timeZone,
+              industry: data.industryType,
+              businessType: data.businessType,
+              contractType: data.contractType,
+              jobTitle: data.jobTitle,
+              gst: data.gst,
+              pan: data.pan,
+              companyLogo: data.companyLogo,
+              notes: data.notes,
+              paymentTerms: data.paymentTerms,
+              status: data.status,
+              contractStart: data.contractStart,
+              contractEnd: data.contractEnd,
+              totalOrders: data.totalOrders,
+            },
+          });
+          const mapped = mapApiClientToFrontend(updated);
+          setClients((prev) =>
+            prev.map((entry) => (entry.id === id ? mapped : entry)),
+          );
+        } catch (error) {
+          console.error("Client update failed:", error);
+        }
+      })();
+    },
+    [setClients],
+  );
+
+  const deleteClient = useCallback(
+    (id: string) => {
+      setClients((prev) => prev.filter((entry) => entry.id !== id));
+      void (async () => {
+        try {
+          await apiRequest(`/clients/${id}`, { method: "DELETE" });
+        } catch (error) {
+          console.error("Client delete failed:", error);
+        }
+      })();
+    },
+    [setClients],
   );
 
   const bulkUpdateOrders = useCallback(
@@ -3570,6 +3836,64 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       setInvoices((prev) => [nextInvoice, ...prev]);
+      void (async () => {
+        try {
+          const created = await apiRequest<any>("/invoices", {
+            method: "POST",
+            body: {
+              invoiceNumber,
+              orderId:
+                (invoice as typeof invoice & { orderId?: string }).orderId ||
+                "",
+              vendorOrClient:
+                invoice.vendorOrClient || invoice.customerName || "Unknown",
+              customerName: invoice.customerName || "",
+              customerId: invoice.customerId || "",
+              type: invoice.type || "client",
+              invoiceDate: invoice.invoiceDate || invoice.issueDate || "",
+              issueDate: invoice.issueDate || invoice.invoiceDate || "",
+              dueDate: invoice.dueDate,
+              paymentTerms: invoice.paymentTerms,
+              billingAddress: invoice.billingAddress,
+              shippingAddress: invoice.shippingAddress,
+              placeOfSupply: invoice.placeOfSupply,
+              emailRecipients: invoice.emailRecipients,
+              items: nextInvoice.items.map((item) => ({
+                description: item.description || item.itemName,
+                quantity: item.quantity,
+                unitPrice: item.rate,
+                total: item.amount,
+              })),
+              subtotal: nextInvoice.subtotal,
+              cgst: nextInvoice.cgst,
+              sgst: nextInvoice.sgst,
+              adjustment: nextInvoice.adjustment,
+              shippingCharges: nextInvoice.shippingCharges,
+              total: nextInvoice.total,
+              amountPaid: nextInvoice.amountPaid,
+              balanceDue: nextInvoice.balanceDue,
+              status: nextInvoice.status,
+              paymentStatus: nextInvoice.paymentStatus,
+              notes: nextInvoice.notes,
+              termsAndConditions: nextInvoice.termsAndConditions,
+              bankDetails: nextInvoice.bankDetails,
+              attachments: nextInvoice.attachments,
+              createdBy: nextInvoice.createdBy,
+            },
+          });
+          const mapped = mapApiInvoiceToFrontend(created);
+          setInvoices((prev) =>
+            prev.map((entry) =>
+              entry.id === nextInvoice.id ||
+              entry.invoiceNumber === mapped.invoiceNumber
+                ? mapped
+                : entry,
+            ),
+          );
+        } catch (error) {
+          console.error("Invoice creation failed:", error);
+        }
+      })();
       logSalesActivity({
         entityType: "invoice",
         entityId: nextInvoice.id,
@@ -3663,8 +3987,51 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         actor: data.createdBy || "System",
         message: `Invoice updated`,
       });
+
+      void (async () => {
+        try {
+          const current = invoices.find((entry) => entry.id === id);
+          const updated = await apiRequest<any>(`/invoices/${id}`, {
+            method: "PATCH",
+            body: {
+              ...data,
+              vendorOrClient: data.vendorOrClient || current?.vendorOrClient,
+              type: data.type || current?.type,
+              invoiceDate: data.invoiceDate || current?.invoiceDate,
+              issueDate: data.issueDate || current?.issueDate,
+              dueDate: data.dueDate || current?.dueDate,
+              items: (data.items || current?.items || []).map((item) => ({
+                description: item.description || item.itemName,
+                quantity: item.quantity,
+                unitPrice: item.rate,
+                total: item.amount,
+              })),
+            },
+          });
+          const mapped = mapApiInvoiceToFrontend(updated);
+          setInvoices((prev) =>
+            prev.map((entry) => (entry.id === id ? mapped : entry)),
+          );
+        } catch (error) {
+          console.error("Invoice update failed:", error);
+        }
+      })();
     },
-    [logSalesActivity, setInvoices],
+    [invoices, logSalesActivity, setInvoices],
+  );
+
+  const deleteInvoice = useCallback(
+    (id: string) => {
+      setInvoices((prev) => prev.filter((entry) => entry.id !== id));
+      void (async () => {
+        try {
+          await apiRequest(`/invoices/${id}`, { method: "DELETE" });
+        } catch (error) {
+          console.error("Invoice delete failed:", error);
+        }
+      })();
+    },
+    [setInvoices],
   );
 
   const convertQuoteToSalesOrder = useCallback(
@@ -3978,7 +4345,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         );
 
       const payload = {
+        masterProductId: item.masterProductId,
         productName: item.name || "Unnamed Item",
+        productCode,
         sku: productCode,
         serialNumber: item.vendorSku || "",
         category: item.category || "General",
@@ -4049,7 +4418,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       );
 
       const payload = {
+        masterProductId: data.masterProductId,
         productName: data.name,
+        productCode: data.productCode,
         sku: data.productCode,
         serialNumber: data.vendorSku,
         category: data.category,
@@ -5258,14 +5629,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         roles,
         addOrder,
         updateOrder,
+        assignOrderVendor,
         bulkUpdateOrders,
         deleteOrder,
         addVendor,
-        updateVendor: vendorCrud.update,
-        deleteVendor: vendorCrud.delete,
+        updateVendor,
+        deleteVendor,
         addClient,
-        updateClient: clientCrud.update,
-        deleteClient: clientCrud.delete,
+        updateClient,
+        deleteClient,
         addLocation: locationCrud.add,
         updateLocation: locationCrud.update,
         deleteLocation: locationCrud.delete,
@@ -5311,6 +5683,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         updateSalesOrder,
         createInvoice,
         updateInvoice,
+        deleteInvoice,
         convertQuoteToSalesOrder,
         convertQuoteToOrder,
         convertQuoteToInvoice,

@@ -22,33 +22,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { applyBrandTheme } from "@/lib/theme";
 import { Upload, Save, Eye, ArrowLeft } from "lucide-react";
-
-const hexToHsl = (hex: string): string | null => {
-  const normalized = hex.replace("#", "");
-  if (normalized.length !== 6) return null;
-  const r = parseInt(normalized.slice(0, 2), 16) / 255;
-  const g = parseInt(normalized.slice(2, 4), 16) / 255;
-  const b = parseInt(normalized.slice(4, 6), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const delta = max - min;
-  const l = (max + min) / 2;
-
-  if (delta === 0) {
-    return `0 0% ${Math.round(l * 100)}%`;
-  }
-
-  const s = delta / (1 - Math.abs(2 * l - 1));
-  let h = 0;
-  if (max === r) h = ((g - b) / delta) % 6;
-  else if (max === g) h = (b - r) / delta + 2;
-  else h = (r - g) / delta + 4;
-  h = Math.round(h * 60);
-  if (h < 0) h += 360;
-
-  return `${h} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-};
 
 export default function GeneralSettingsTab() {
   const navigate = useNavigate();
@@ -91,18 +66,11 @@ export default function GeneralSettingsTab() {
 
   const handlePrimaryColorChange = (value: string) => {
     updateGeneralSettings(selectedOrgId, { primaryColor: value });
-    const hsl = hexToHsl(value);
-    if (hsl) {
-      document.documentElement.style.setProperty("--primary", hsl);
-    }
+    applyBrandTheme(value);
   };
 
   useEffect(() => {
-    if (!settings.primaryColor) return;
-    const hsl = hexToHsl(settings.primaryColor);
-    if (hsl) {
-      document.documentElement.style.setProperty("--primary", hsl);
-    }
+    applyBrandTheme(settings.primaryColor);
   }, [settings.primaryColor]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -316,6 +284,44 @@ export default function GeneralSettingsTab() {
                     type="color"
                     className="w-20 h-10"
                   />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-xl border border-border p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Header
+                    </p>
+                    <div
+                      className="mt-3 h-10 rounded-lg border"
+                      style={{
+                        backgroundColor: "hsl(var(--header-background))",
+                        borderColor: "hsl(var(--header-border))",
+                      }}
+                    />
+                  </div>
+                  <div className="rounded-xl border border-border p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Sidebar
+                    </p>
+                    <div
+                      className="mt-3 h-10 rounded-lg border"
+                      style={{
+                        backgroundColor: "hsl(var(--sidebar-background))",
+                        borderColor: "hsl(var(--sidebar-border))",
+                      }}
+                    />
+                  </div>
+                  <div className="rounded-xl border border-border p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      CTA
+                    </p>
+                    <div
+                      className="mt-3 h-10 rounded-lg border"
+                      style={{
+                        backgroundColor: "hsl(var(--primary))",
+                        borderColor: "hsl(var(--ring))",
+                      }}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>

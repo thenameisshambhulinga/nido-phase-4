@@ -36,12 +36,16 @@ import {
 } from "@/components/ui/dialog";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { safeReadJson } from "@/lib/storage";
 import { normalizeOrderCode } from "@/lib/documentNumbering";
+import { cn } from "@/lib/utils";
+import { safeReadJson } from "@/lib/storage";
 import {
   ArrowLeft,
   BellRing,
+  Building2,
   Circle,
+  ClipboardList,
+  CreditCard,
   Download,
   Eye,
   Send,
@@ -50,8 +54,12 @@ import {
   MessageSquare,
   FileText,
   Image,
+  MapPin,
   Package,
+  Phone,
   Timer,
+  Truck,
+  UserCircle2,
   X,
   CheckCircle2,
   RefreshCw,
@@ -112,7 +120,6 @@ interface PurchaseOrderEntry {
 }
 
 const PURCHASE_ORDER_STORAGE_KEY = "nido_purchase_orders_v1";
-const VENDOR_ASSIGNMENT_STORAGE_KEY = "nido_order_vendor_assignments_v1";
 const PROCUREMENT_LOCKED_STATUSES = new Set(["rejected", "cancelled"]);
 
 const nextPoNumber = (entries: PurchaseOrderEntry[]) => {
@@ -220,18 +227,37 @@ const poItemMatchesOrderItem = (
   return false;
 };
 
+const formatTimelineDate = (value: string) =>
+  new Date(value).toLocaleString(undefined, {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
 export default function OrderDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { orders, vendors, updateOrder, addAuditEntry } = useData();
+  const {
+    orders,
+    vendors,
+    clients,
+    updateOrder,
+    assignOrderVendor,
+    addAuditEntry,
+    isCoreDataLoading,
+    coreDataError,
+  } = useData();
   const { user, isOwner } = useAuth();
   const order = orders.find((o) => o.id === id);
   const vendorContextId = searchParams.get("vendorId") || "";
   const vendorContext =
     vendors.find((vendor) => vendor.id === vendorContextId) || null;
   const isVendorScopedView = Boolean(vendorContext && vendorContextId);
+  const isProcurePath = location.pathname.startsWith("/procure/");
   const [newComment, setNewComment] = useState("");
   const [slaTime, setSlaTime] = useState("00:00:00");
   const [slaSetHours, setSlaSetHours] = useState("0");
@@ -338,25 +364,14 @@ export default function OrderDetailsPage() {
 
   useEffect(() => {
     if (!order) return;
-    const allAssignments = safeReadJson<Record<string, Record<string, string>>>(
-      VENDOR_ASSIGNMENT_STORAGE_KEY,
-      {},
+    const nextAssignments = Object.fromEntries(
+      (Array.isArray(order.items) ? order.items : []).map((item) => [
+        item.id,
+        item.vendorId || "",
+      ]),
     );
-    setVendorByItemId(allAssignments[order.id] || {});
+    setVendorByItemId(nextAssignments);
   }, [order]);
-
-  useEffect(() => {
-    if (!order) return;
-    const allAssignments = safeReadJson<Record<string, Record<string, string>>>(
-      VENDOR_ASSIGNMENT_STORAGE_KEY,
-      {},
-    );
-    allAssignments[order.id] = vendorByItemId;
-    localStorage.setItem(
-      VENDOR_ASSIGNMENT_STORAGE_KEY,
-      JSON.stringify(allAssignments),
-    );
-  }, [order, vendorByItemId]);
 
   useEffect(() => {
     if (location.hash !== "#sla-overall") return;
@@ -368,13 +383,47 @@ export default function OrderDetailsPage() {
     return () => window.clearTimeout(timeoutId);
   }, [location.hash, order?.id]);
 
+  if (isCoreDataLoading)
+    return (
+      <div className="p-6">
+        <p>Loading order details...</p>
+        <Button
+          className="mt-4"
+          onClick={() =>
+            navigate(
+              isVendorScopedView ? "/vendors/orders" : "/transactions/purchase",
+            )
+          }
+        >
+          Back
+        </Button>
+      </div>
+    );
+
   if (!order)
     return (
       <div className="p-6">
         <p>Order not found.</p>
-        <Button onClick={() => navigate("/orders")}>Back to Orders</Button>
+        <Button
+          onClick={() =>
+            navigate(
+              isVendorScopedView ? "/vendors/orders" : "/transactions/purchase",
+            )
+          }
+        >
+          Back to Orders
+        </Button>
       </div>
     );
+
+  const connectionWarning = coreDataError ? (
+    <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 flex items-center gap-2">
+      <RefreshCw className="h-4 w-4" />
+      <span>
+        Backend connection issue: {coreDataError}. Showing cached data.
+      </span>
+    </div>
+  ) : null;
 
   const orderItems = Array.isArray(order.items) ? order.items : [];
   const orderCommentHistory = Array.isArray(order.commentHistory)
@@ -383,6 +432,10 @@ export default function OrderDetailsPage() {
   const orderAttachments = Array.isArray(order.attachments)
     ? order.attachments
     : [];
+  const clientRecord =
+    clients.find((client) => client.id === order.clientId) ||
+    clients.find((client) => client.name === order.organization) ||
+    null;
   const vendorScopedItemIds = isVendorScopedView
     ? Object.entries(vendorByItemId)
         .filter(([, assignedVendorId]) => assignedVendorId === vendorContextId)
@@ -515,6 +568,20 @@ export default function OrderDetailsPage() {
     });
     return ids;
   }, [existingPurchaseOrders, scopedOrderItems]);
+
+  const allItemsAssigned =
+    scopedOrderItems.length > 0 &&
+    scopedOrderItems.every(
+      (item) =>
+        item.vendorId ||
+        vendorByItemId[item.id] ||
+        activePoItemIds.has(item.id),
+    );
+  const showSimplifiedView =
+    !isVendorScopedView &&
+    !allItemsAssigned &&
+    !isDelivered &&
+    !isProcurementLocked;
 
   const isItemProcurementLocked = (itemId: string) =>
     activePoItemIds.has(itemId);
@@ -831,6 +898,176 @@ export default function OrderDetailsPage() {
     return "bg-red-100 text-red-700 border-red-300";
   };
 
+  const requestorEmail =
+    clientRecord?.email ||
+    `${order.organization.toLowerCase().replace(/[^a-z0-9]+/g, ".")}@corpessentials.com`;
+  const requestorPhone =
+    clientRecord?.contactNumber ||
+    clientRecord?.phone ||
+    "+1 (408) 035-3779673";
+  const requestorLocation = clientRecord?.locationDetails
+    ? [
+        clientRecord.locationDetails.city,
+        clientRecord.locationDetails.state,
+        clientRecord.locationDetails.country,
+      ]
+        .filter(Boolean)
+        .join(", ")
+    : clientRecord?.address || order.shippingAddress;
+  const requestorWebsite = clientRecord
+    ? `www.${clientRecord.name.toLowerCase().replace(/[^a-z0-9]+/g, "")}.com`
+    : "www.corpessentials.com";
+
+  const purchaseOrdersForVendor = isVendorScopedView
+    ? existingPurchaseOrders.filter(
+        (entry) => entry.vendorName === vendorContext?.name,
+      )
+    : existingPurchaseOrders;
+  const primaryPurchaseOrder = purchaseOrdersForVendor[0] || null;
+
+  const orderActivityTimeline = useMemo(() => {
+    const baseTimeline = [
+      {
+        id: "activity-created",
+        title: "Order Created",
+        subtitle: `by ${order.requestingUser}`,
+        timestamp: new Date(
+          order.orderDate || order.slaStartTime,
+        ).toISOString(),
+      },
+      {
+        id: "activity-assigned",
+        title: isVendorScopedView ? "Sent to Vendor" : "Sent to Vendors",
+        subtitle: `by ${user?.name || "System"}`,
+        timestamp: order.slaStartTime,
+      },
+    ];
+
+    if (primaryPurchaseOrder) {
+      baseTimeline.push({
+        id: "activity-po",
+        title: isVendorScopedView ? "Vendor Confirmed" : "POs Generated",
+        subtitle: primaryPurchaseOrder.poNumber,
+        timestamp: order.slaStartTime,
+      });
+    }
+
+    if (order.status.toLowerCase() !== "pending") {
+      baseTimeline.push({
+        id: "activity-status",
+        title: order.status,
+        subtitle: "Latest master status",
+        timestamp: new Date(
+          new Date(order.slaStartTime).getTime() + 2 * 3600000,
+        ).toISOString(),
+      });
+    }
+
+    orderCommentHistory.slice(-4).forEach((comment) => {
+      baseTimeline.push({
+        id: comment.id,
+        title:
+          comment.type === "internal" ? "Internal update" : "Client update",
+        subtitle: `by ${comment.user}`,
+        timestamp: comment.timestamp,
+      });
+    });
+
+    return baseTimeline
+      .sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      )
+      .slice(-6)
+      .reverse();
+  }, [
+    isVendorScopedView,
+    order.orderDate,
+    order.requestingUser,
+    order.slaStartTime,
+    order.status,
+    orderCommentHistory,
+    primaryPurchaseOrder,
+    user?.name,
+  ]);
+
+  const masterStatusSteps = [
+    {
+      label: "Processing",
+      caption: new Date(order.slaStartTime).toLocaleDateString(),
+      state: "done",
+    },
+    {
+      label: scopedOrderItems.some((item) => item.vendorId)
+        ? "Partially Shipped"
+        : "Awaiting Vendor",
+      caption: scopedOrderItems.some((item) => item.vendorId)
+        ? "In Progress"
+        : "Pending",
+      state: scopedOrderItems.some((item) => item.vendorId)
+        ? "current"
+        : "pending",
+    },
+    {
+      label: "Partially Delivered",
+      caption:
+        order.status === "Delivered" || order.status === "Completed"
+          ? "Reached"
+          : "Pending",
+      state:
+        order.status === "Delivered" || order.status === "Completed"
+          ? "done"
+          : "pending",
+    },
+    {
+      label: "Delivered",
+      caption:
+        order.status === "Delivered" || order.status === "Completed"
+          ? "Completed"
+          : "Pending",
+      state:
+        order.status === "Delivered" || order.status === "Completed"
+          ? "done"
+          : "pending",
+    },
+  ];
+
+  const vendorStatusSteps = [
+    "Confirmed",
+    "Processing",
+    "Shipped",
+    "Out for Delivery",
+    "Delivered",
+    "Closed",
+  ].map((label, index) => {
+    const statusValue = String(order.status || "").toLowerCase();
+    const currentIndex =
+      statusValue === "processing"
+        ? 1
+        : statusValue === "shipped"
+          ? 2
+          : statusValue.includes("delivery")
+            ? 3
+            : statusValue === "delivered" || statusValue === "completed"
+              ? 4
+              : 1;
+    return {
+      label,
+      caption:
+        index < currentIndex
+          ? new Date(order.slaStartTime).toLocaleDateString()
+          : index === currentIndex
+            ? "In Progress"
+            : "Pending",
+      state:
+        index < currentIndex
+          ? "done"
+          : index === currentIndex
+            ? "current"
+            : "pending",
+    };
+  });
+
   return (
     <div>
       <Header title="Order History" />
@@ -849,185 +1086,524 @@ export default function OrderDetailsPage() {
           {isVendorScopedView ? "Back to Vendor Orders" : "Back to Orders"}
         </Button>
 
-        {/* Master Order Header */}
-        {isBulkOrder && (
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="p-4 flex items-center gap-4">
-              <Package className="h-6 w-6 text-primary" />
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                  Master Order
-                </p>
-                <p className="text-lg font-bold font-mono text-primary">
-                  {masterOrderId}
-                </p>
+        {connectionWarning}
+
+        {/* ⏱️ SLA Banner — Top of Page (Client View Only) */}
+        {!isVendorScopedView && (
+          <Card className="rounded-2xl border-blue-200 bg-gradient-to-r from-blue-50 via-white to-sky-50 shadow-sm overflow-hidden">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-blue-200 bg-white text-primary">
+                    <Timer className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Live SLA Timer
+                    </p>
+                    <p className="text-2xl font-mono font-bold text-primary">
+                      {slaTime}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge
+                        className={cn(
+                          order.slaStatus === "within_sla"
+                            ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                            : order.slaStatus === "at_risk"
+                              ? "bg-amber-100 text-amber-700 border-amber-300"
+                              : "bg-red-100 text-red-700 border-red-300",
+                        )}
+                        variant="outline"
+                      >
+                        {order.slaStatus.replace("_", " ")}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        Order #{formattedOrderNumber}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={order.status}
+                    onValueChange={handleStatusUpdate}
+                  >
+                    <SelectTrigger className="w-[160px] h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Processing">Processing</SelectItem>
+                      <SelectItem value="Shipped">Shipped</SelectItem>
+                      <SelectItem value="Delivered">Delivered</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                      <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {canSetSlaTimer && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => {
+                        updateOrder(order.id, {
+                          slaStartTime: new Date().toISOString(),
+                          slaStatus: "within_sla",
+                        });
+                        toast({ title: "SLA reset to now" });
+                      }}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" /> Reset SLA
+                    </Button>
+                  )}
+                </div>
               </div>
-              <Badge className="ml-auto">{orderItems.length} Sub-Orders</Badge>
             </CardContent>
           </Card>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Order Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Order Number</span>
-                <span className="font-medium">{formattedOrderNumber}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Order Date</span>
-                <span>{order.orderDate}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Status</span>
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                {isVendorScopedView ? "Vendor Purchase Order" : "Order Details"}{" "}
+                /
+                <span className="ml-1 font-semibold text-foreground">
+                  {isVendorScopedView
+                    ? primaryPurchaseOrder?.poNumber || formattedOrderNumber
+                    : formattedOrderNumber}
+                </span>
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
+                  {isVendorScopedView
+                    ? `Vendor Purchase Order / ${
+                        primaryPurchaseOrder?.poNumber || formattedOrderNumber
+                      }`
+                    : `Order Details / ${formattedOrderNumber}`}
+                </h1>
                 <Badge
-                  style={{
-                    backgroundColor: STATUS_COLORS[order.status],
-                    color: "white",
-                  }}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-sm",
+                    order.status === "Delivered" || order.status === "Completed"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : order.status === "Processing" ||
+                          order.status === "Approved"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-amber-100 text-amber-700",
+                  )}
                 >
                   {order.status}
                 </Badge>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Organization</span>
-                <span>{order.organization}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Requesting User</span>
-                <span>{order.requestingUser}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Approving User</span>
-                <span>{order.approvingUser}</span>
-              </div>
-            </CardContent>
-          </Card>
+              <p className="text-sm text-muted-foreground">
+                {isVendorScopedView
+                  ? `Master Order • ${formattedOrderNumber} • Vendor: ${
+                      vendorContext?.name ||
+                      primaryPurchaseOrder?.vendorName ||
+                      "Assigned Vendor"
+                    } • Created on ${order.orderDate}`
+                  : `Master Order • Created on ${order.orderDate} • Requested by ${order.requestingUser}`}
+              </p>
+            </div>
 
-          <Card
-            id="sla-overall"
-            className="border-blue-200/70 bg-gradient-to-br from-blue-50 via-white to-cyan-50 shadow-sm"
-          >
-            <CardHeader className="pb-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle className="text-sm">
-                  SLA Information (Overall)
-                </CardTitle>
-                <Badge
-                  variant="outline"
-                  className={
-                    order.slaStatus === "within_sla"
-                      ? "bg-emerald-100 text-emerald-700 border-emerald-300"
-                      : order.slaStatus === "at_risk"
-                        ? "bg-amber-100 text-amber-700 border-amber-300"
-                        : "bg-rose-100 text-rose-700 border-rose-300"
-                  }
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2">
+                <ClipboardList className="h-4 w-4" />
+                {isVendorScopedView ? "Print PO" : "Edit Order"}
+              </Button>
+              <Select onValueChange={handleStatusUpdate} value={order.status}>
+                <SelectTrigger className="w-[180px] bg-primary text-primary-foreground">
+                  <SelectValue placeholder="Update Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Processing">Processing</SelectItem>
+                  <SelectItem value="Shipped">Shipped</SelectItem>
+                  <SelectItem value="Delivered">Delivered</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                  <SelectItem value="Cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {isVendorScopedView ? (
+            <>
+              <div className="grid gap-4 xl:grid-cols-[repeat(4,minmax(0,1fr))_260px]">
+                <Card className="rounded-2xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">
+                      Vendor Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">
+                        {vendorContext?.name ||
+                          primaryPurchaseOrder?.vendorName ||
+                          "Assigned Vendor"}
+                      </span>
+                      <Button variant="outline" size="sm">
+                        View Vendor
+                      </Button>
+                    </div>
+                    <p className="text-muted-foreground">
+                      {vendorContext?.contactEmail || "sales@vendor.com"}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {vendorContext?.contactPhone || "+1 (408) 555-1234"}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {vendorContext?.address || "Vendor address pending"}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">PO Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">PO Number</span>
+                      <span className="font-semibold">
+                        {primaryPurchaseOrder?.poNumber || formattedOrderNumber}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">PO Date</span>
+                      <span>{order.orderDate}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Payment Terms
+                      </span>
+                      <span>
+                        {primaryPurchaseOrder?.paymentTerms || "Net 30"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Currency</span>
+                      <span>USD</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">
+                      Billing Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <p className="text-muted-foreground">
+                      {order.billingAddress}
+                    </p>
+                    <div>
+                      <p className="font-medium">Payment Method</p>
+                      <p className="text-muted-foreground">
+                        {order.paymentMethod}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Payment Terms</p>
+                      <p className="text-muted-foreground">
+                        {primaryPurchaseOrder?.paymentTerms || "Net 30"}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">
+                      Shipping Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <p className="text-muted-foreground">
+                      {order.shippingAddress}
+                    </p>
+                    <div>
+                      <p className="font-medium">Delivery Method</p>
+                      <p className="text-muted-foreground">
+                        {order.deliveryMethod}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Requested Delivery</p>
+                      <p className="text-muted-foreground">{order.orderDate}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Items</span>
+                      <span className="font-semibold">
+                        {scopedOrderItems.length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Sub Total</span>
+                      <span>${scopedTotalAmount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tax (10%)</span>
+                      <span>
+                        ${Math.round(scopedTotalAmount * 0.1).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-base font-semibold">
+                      <span>Total Amount</span>
+                      <span>
+                        ${Math.round(scopedTotalAmount * 1.1).toLocaleString()}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid gap-4 xl:grid-cols-[repeat(4,minmax(0,1fr))]">
+                <Card className="rounded-2xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">
+                      Billing Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <p className="text-muted-foreground">
+                      {order.billingAddress}
+                    </p>
+                    <div>
+                      <p className="font-medium">Payment Method</p>
+                      <p className="text-muted-foreground">
+                        {order.paymentMethod}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Payment Terms</p>
+                      <p className="text-muted-foreground">Net 30</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">
+                      Shipping Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <p className="text-muted-foreground">
+                      {order.shippingAddress}
+                    </p>
+                    <div>
+                      <p className="font-medium">Delivery Method</p>
+                      <p className="text-muted-foreground">
+                        {order.deliveryMethod}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Requested Delivery</p>
+                      <p className="text-muted-foreground">{order.orderDate}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">
+                      Requestor / Client Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div>
+                      <p className="font-medium">{order.requestingUser}</p>
+                      <p className="text-muted-foreground">{requestorEmail}</p>
+                    </div>
+                    <p className="text-muted-foreground">{requestorPhone}</p>
+                    <p className="text-muted-foreground">
+                      {order.organization}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Order Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Master Order ID
+                      </span>
+                      <span className="font-semibold">
+                        {formattedOrderNumber}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Sub Orders</span>
+                      <span>{scopedOrderItems.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Items</span>
+                      <span>{orderItems.length}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-semibold">
+                      <span>Total Amount</span>
+                      <span>${order.totalAmount.toLocaleString()}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+                <Card
+                  id="sla-overall"
+                  className="rounded-2xl border-blue-100 bg-gradient-to-br from-blue-50 via-white to-sky-50 shadow-sm"
                 >
-                  {order.slaStatus
-                    .replace("_", " ")
-                    .replace(/\b\w/g, (c) => c.toUpperCase())}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isVendorScopedView && vendorContext && (
-                <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                  Vendor SLA Mode: {vendorContext.name}
+                  <CardContent className="space-y-5 p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full border border-blue-200 bg-white text-primary">
+                          <Truck className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">
+                            Master Order Status
+                          </p>
+                          <p className="text-2xl font-semibold text-primary">
+                            {scopedOrderItems.some((item) => item.vendorId)
+                              ? "Partially Shipped"
+                              : "Processing"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {
+                              scopedOrderItems.filter((item) => item.vendorId)
+                                .length
+                            }{" "}
+                            of {scopedOrderItems.length} sub-orders assigned to
+                            vendors
+                          </p>
+                        </div>
+                      </div>
+                      <Select
+                        value={order.status}
+                        onValueChange={handleStatusUpdate}
+                      >
+                        <SelectTrigger className="w-[190px]">
+                          <SelectValue placeholder="Update Master Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Processing">Processing</SelectItem>
+                          <SelectItem value="Shipped">
+                            Partially Shipped
+                          </SelectItem>
+                          <SelectItem value="Delivered">Delivered</SelectItem>
+                          <SelectItem value="Completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-4">
+                      {masterStatusSteps.map((step) => (
+                        <div key={step.label} className="text-center">
+                          <div
+                            className={cn(
+                              "mx-auto flex h-12 w-12 items-center justify-center rounded-full border-2",
+                              step.state === "done" &&
+                                "border-emerald-300 bg-emerald-100 text-emerald-700",
+                              step.state === "current" &&
+                                "border-blue-300 bg-blue-100 text-blue-700",
+                              step.state === "pending" &&
+                                "border-slate-200 bg-white text-slate-400",
+                            )}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                          </div>
+                          <p className="mt-3 text-sm font-medium">
+                            {step.label}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {step.caption}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="space-y-4">
+                  <Card className="rounded-2xl border-slate-200 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">
+                        Vendor Purchase Orders
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      {existingPurchaseOrders.length === 0 && (
+                        <p className="text-muted-foreground">
+                          No vendor purchase orders created yet.
+                        </p>
+                      )}
+                      {existingPurchaseOrders.slice(0, 3).map((po) => (
+                        <div
+                          key={po.id}
+                          className="rounded-2xl border border-slate-100 p-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold text-primary">
+                                {po.poNumber}
+                              </p>
+                              <p className="text-muted-foreground">
+                                {po.vendorName}
+                              </p>
+                            </div>
+                            <Button variant="outline" size="sm">
+                              View PO
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="rounded-2xl border-slate-200 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">
+                        Order Activity Timeline
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 text-sm">
+                      {orderActivityTimeline.map((entry) => (
+                        <div key={entry.id} className="flex gap-3">
+                          <span className="mt-1 h-3 w-3 rounded-full bg-primary" />
+                          <div>
+                            <p className="font-medium">{entry.title}</p>
+                            <p className="text-muted-foreground">
+                              {formatTimelineDate(entry.timestamp)} •{" "}
+                              {entry.subtitle}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
                 </div>
-              )}
-
-              <div className="relative mx-auto w-full max-w-[360px]">
-                {!isDelivered && (
-                  <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-blue-300/35 via-cyan-300/30 to-sky-300/35 blur-md" />
-                )}
-                <div
-                  className={`relative rounded-2xl border px-4 py-5 text-center ${
-                    isDelivered
-                      ? "border-emerald-300 bg-emerald-50"
-                      : "border-blue-200 bg-white/95 shadow-[0_10px_30px_rgba(2,132,199,0.16)]"
-                  }`}
-                >
-                  <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-                    Live SLA Timer
-                  </p>
-                  <p className="mt-2 text-5xl font-mono font-bold tracking-[0.18em] text-slate-800">
-                    {slaTime}
-                  </p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Started {new Date(order.slaStartTime).toLocaleString()}
-                  </p>
-                </div>
               </div>
-
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <Badge variant="outline" className="text-xs">
-                  SLA controls moved to Client Configuration
-                </Badge>
-              </div>
-
-              {isDelivered && (
-                <p className="text-center text-xs text-emerald-700 font-medium">
-                  SLA timer stopped because this order is delivered.
-                </p>
-              )}
-
-              <div className="rounded-lg border bg-white/80 p-3 text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">SLA start time:</span>
-                  <span>{new Date(order.slaStartTime).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">SLA Status:</span>
-                  <span
-                    className={
-                      order.slaStatus === "within_sla"
-                        ? "text-success font-medium"
-                        : order.slaStatus === "at_risk"
-                          ? "text-warning font-medium"
-                          : "text-destructive font-medium"
-                    }
-                  >
-                    {order.slaStatus
-                      .replace("_", " ")
-                      .replace(/\b\w/g, (c) => c.toUpperCase())}
-                  </span>
-                </div>
-              </div>
-
-              {isBulkOrder && (
-                <p className="text-xs text-muted-foreground text-center">
-                  Click any Sub-Order ID below to view individual SLA details.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Assignment Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Assigned Analyst:</span>
-                <span className="font-medium">{order.assignedAnalyst}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Analyst team:</span>
-                <span>{order.analystTeam}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Assignment:</span>
-                <span>{new Date(order.slaStartTime).toLocaleString()}</span>
-              </div>
-            </CardContent>
-          </Card>
+            </>
+          )}
         </div>
 
         {/* Item Details */}
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               {isBulkOrder && <Package className="h-4 w-4 text-primary" />}
@@ -1169,7 +1745,7 @@ export default function OrderDetailsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/20 bg-gradient-to-br from-blue-50 to-cyan-50">
+        <Card className="rounded-2xl border-primary/20 bg-gradient-to-br from-blue-50 to-cyan-50 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">
               Item-wise Procurement Tracking Timeline
@@ -1281,7 +1857,7 @@ export default function OrderDetailsPage() {
         </Card>
 
         {!isVendorScopedView && (
-          <Card>
+          <Card className="rounded-2xl shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center justify-between">
                 <span>Vendor Selection</span>
@@ -1428,6 +2004,10 @@ export default function OrderDetailsPage() {
                                           });
                                           return;
                                         }
+                                        assignOrderVendor(order.id, vendor.id, {
+                                          itemId: item.id,
+                                          vendorName: vendor.name,
+                                        });
                                         setVendorByItemId((prev) => ({
                                           ...prev,
                                           [item.id]: vendor.id,
@@ -1457,7 +2037,7 @@ export default function OrderDetailsPage() {
                   })}
                 </div>
 
-                <Card className="border-primary/20 bg-primary/5">
+                <Card className="border-primary/20 bg-primary/5 rounded-2xl shadow-sm">
                   <CardContent className="pt-4 space-y-2 text-sm">
                     <p className="font-medium">Selection Summary</p>
                     <p className="text-muted-foreground">
@@ -1505,66 +2085,215 @@ export default function OrderDetailsPage() {
           </Card>
         )}
 
-        {/* Billing & Shipping + Requestor */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">
-                Billing & Shipping Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm space-y-3">
-              <div>
-                <p className="font-medium">Billing Address:</p>
-                <p className="text-muted-foreground">{order.billingAddress}</p>
-              </div>
-              <div>
-                <p className="font-medium">Payment Information:</p>
-                <p className="text-muted-foreground">{order.paymentMethod}</p>
-              </div>
-              <div>
-                <p className="font-medium">Shipping Address:</p>
-                <p className="text-muted-foreground">{order.shippingAddress}</p>
-              </div>
-              <div>
-                <p className="font-medium">Delivery Method:</p>
-                <p className="text-muted-foreground">{order.deliveryMethod}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <p className="font-medium">Tracking Number:</p>
-                <span className="text-primary text-xs">
-                  {order.trackingNumber}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+        {isVendorScopedView ? (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px_220px_260px]">
+            <Card className="rounded-2xl border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Activity Timeline</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                {orderActivityTimeline.map((entry) => (
+                  <div key={entry.id} className="flex gap-3">
+                    <span className="mt-1 h-3 w-3 rounded-full bg-primary" />
+                    <div>
+                      <p className="font-medium">{entry.title}</p>
+                      <p className="text-muted-foreground">
+                        {formatTimelineDate(entry.timestamp)} • {entry.subtitle}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">
-                Requestor/User Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              <p>
-                <span className="font-medium">Full contact details:</span>
-              </p>
-              <p className="text-muted-foreground">+40180335-3779673</p>
-              <p className="text-muted-foreground">
-                E-mail: contact@mygmail.com
-              </p>
-              <p className="text-muted-foreground">Www.acorpessentials.com</p>
-              <p>
-                <span className="font-medium">Organization:</span>
-              </p>
-              <p className="text-muted-foreground">{order.organization}</p>
-            </CardContent>
-          </Card>
-        </div>
+            <Card className="rounded-2xl border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Vendor Contact</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <UserCircle2 className="h-5 w-5 text-primary" />
+                  <div>
+                    <p className="font-medium">
+                      {vendorContext?.name || "Assigned Vendor"}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {vendorContext?.category || "Sales Manager"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <Mail className="h-4 w-4 text-primary" />
+                  <span>
+                    {vendorContext?.contactEmail || "sales@vendor.com"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <Phone className="h-4 w-4 text-primary" />
+                  <span>
+                    {vendorContext?.contactPhone || "+1 (408) 555-1234"}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Related Orders</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Master Order</span>
+                  <Button variant="outline" size="sm">
+                    View
+                  </Button>
+                </div>
+                <p className="font-semibold text-primary">
+                  {formattedOrderNumber}
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Sub Orders</span>
+                  <span>{scopedOrderItems.length}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-blue-200 bg-gradient-to-br from-blue-50 via-white to-sky-50 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Timer className="h-4 w-4 text-primary" />
+                  SLA Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="text-center">
+                  <p className="text-2xl font-mono font-bold text-primary">
+                    {slaTime}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Live Timer
+                  </p>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Status</span>
+                  <Badge
+                    className={cn(
+                      order.slaStatus === "within_sla"
+                        ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+                        : order.slaStatus === "at_risk"
+                          ? "bg-amber-100 text-amber-700 border-amber-300"
+                          : "bg-red-100 text-red-700 border-red-300",
+                    )}
+                    variant="outline"
+                  >
+                    {order.slaStatus.replace("_", " ")}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Order Status</span>
+                  <span className="font-medium">{order.status}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Items</span>
+                  <span className="font-medium">{scopedOrderItems.length}</span>
+                </div>
+                <div className="pt-2 border-t">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Delivery Progress</span>
+                    <span className="font-medium text-foreground">
+                      {
+                        vendorProcurementTimeline.filter(
+                          (s) => s.state === "done",
+                        ).length
+                      }{" "}
+                      / {vendorProcurementTimeline.length}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card className="rounded-2xl border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Requestor Directory</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <UserCircle2 className="h-5 w-5 text-primary" />
+                  <div>
+                    <p className="font-medium">{order.requestingUser}</p>
+                    <p className="text-muted-foreground">
+                      {order.organization}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <Mail className="h-4 w-4 text-primary" />
+                  <span>{requestorEmail}</span>
+                </div>
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <Phone className="h-4 w-4 text-primary" />
+                  <span>{requestorPhone}</span>
+                </div>
+                <div className="flex items-start gap-3 text-muted-foreground">
+                  <MapPin className="mt-0.5 h-4 w-4 text-primary" />
+                  <span>{requestorLocation}</span>
+                </div>
+                <p className="text-muted-foreground">{requestorWebsite}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">
+                  SLA & Assignment Snapshot
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Live SLA</span>
+                  <span className="font-semibold">{slaTime}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">SLA Status</span>
+                  <span
+                    className={
+                      order.slaStatus === "within_sla"
+                        ? "font-medium text-emerald-600"
+                        : order.slaStatus === "at_risk"
+                          ? "font-medium text-amber-600"
+                          : "font-medium text-rose-600"
+                    }
+                  >
+                    {order.slaStatus.replace("_", " ")}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Assigned Analyst
+                  </span>
+                  <span>{order.assignedAnalyst}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Analyst Team</span>
+                  <span>{order.analystTeam}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tracking Number</span>
+                  <span className="text-primary">
+                    {order.trackingNumber || "Pending"}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Comments & Collaboration */}
         {!isVendorScopedView && (
-          <Card>
+          <Card className="rounded-2xl shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1695,7 +2424,7 @@ export default function OrderDetailsPage() {
         )}
 
         {/* Document Attachments */}
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
               <Paperclip className="h-4 w-4 text-primary" /> Document
@@ -1748,7 +2477,7 @@ export default function OrderDetailsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Update Order Status</CardTitle>
           </CardHeader>
@@ -1909,7 +2638,7 @@ function SubOrderSLADialog({
           <Separator />
 
           {/* Item Summary */}
-          <Card className="bg-muted/30">
+          <Card className="bg-muted/30 rounded-2xl shadow-sm">
             <CardContent className="p-4">
               <Table>
                 <TableHeader>

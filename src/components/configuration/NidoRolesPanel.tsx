@@ -65,7 +65,11 @@ const defaultModulePermissions = (): ModulePermission[] =>
     approve: false,
   }));
 
-export default function NidoRolesPanel() {
+export default function NidoRolesPanel({
+  organization,
+}: {
+  organization?: string;
+}) {
   const { userRoles, addUserRole, updateUserRole, deleteUserRole } = useData();
   const importFileRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -73,10 +77,11 @@ export default function NidoRolesPanel() {
   const [overviewRole, setOverviewRole] = useState<UserRole | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserRole | null>(null);
   const [search, setSearch] = useState("");
+  const isClientScoped = Boolean(organization);
   const [form, setForm] = useState<Omit<UserRole, "id">>({
     name: "",
     description: "",
-    roleType: "Internal User",
+    roleType: isClientScoped ? "Client User" : "Internal User",
     roleCode: "",
     status: "Active",
     isDefault: false,
@@ -88,16 +93,22 @@ export default function NidoRolesPanel() {
     approvalLimit: 0,
   });
 
-  const filtered = userRoles.filter(
-    (r) => !search || r.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = userRoles.filter((r) => {
+    if (search && !r.name.toLowerCase().includes(search.toLowerCase())) {
+      return false;
+    }
+    if (isClientScoped) {
+      return r.roleType === "Client User";
+    }
+    return true;
+  });
 
   const openCreate = () => {
     setEditingId(null);
     setForm({
       name: "",
       description: "",
-      roleType: "Internal User",
+      roleType: isClientScoped ? "Client User" : "Internal User",
       roleCode: "",
       status: "Active",
       isDefault: false,
@@ -254,7 +265,12 @@ export default function NidoRolesPanel() {
       });
       return;
     }
-    const sanitizedForm = { ...form, roleType: "Internal User" as const };
+    const sanitizedForm = {
+      ...form,
+      roleType: (isClientScoped ? "Client User" : "Internal User") as
+        | "Client User"
+        | "Internal User",
+    };
     if (editingId) {
       updateUserRole(editingId, sanitizedForm);
       toast({ title: "Updated", description: `Role "${form.name}" updated` });
@@ -479,7 +495,15 @@ export default function NidoRolesPanel() {
               </div>
               <div>
                 <Label className="text-xs">Role Type</Label>
-                <Input value="Internal User" readOnly />
+                <Input
+                  value={isClientScoped ? "Client User" : "Internal User"}
+                  readOnly
+                />
+                {isClientScoped && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Scoped to {organization}
+                  </p>
+                )}
               </div>
               <div>
                 <Label className="text-xs">Description</Label>

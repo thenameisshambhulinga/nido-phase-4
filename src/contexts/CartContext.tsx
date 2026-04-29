@@ -8,7 +8,7 @@ import React, {
 import { safeReadJson } from "@/lib/storage";
 
 export interface CartItem {
-  id: number;
+  id: string;
   name: string;
   category: string;
   price: number;
@@ -19,14 +19,14 @@ export interface CartItem {
 interface CartContextType {
   items: CartItem[];
   addToCart: (product: {
-    id: number;
+    id: string;
     name: string;
     category: string;
     price: number;
     emoji: string;
   }) => void;
-  removeFromCart: (id: number) => void;
-  updateQuantity: (id: number, quantity: number) => void;
+  removeFromCart: (id: string) => void;
+  updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   totalItems: number;
   subtotal: number;
@@ -47,7 +47,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const addToCart = useCallback(
     (product: {
-      id: number;
+      id: string;
       name: string;
       category: string;
       price: number;
@@ -65,11 +65,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     [],
   );
 
-  const removeFromCart = useCallback((id: number) => {
+  const removeFromCart = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }, []);
 
-  const updateQuantity = useCallback((id: number, quantity: number) => {
+  const updateQuantity = useCallback((id: string, quantity: number) => {
     if (quantity <= 0) {
       setItems((prev) => prev.filter((i) => i.id !== id));
       return;

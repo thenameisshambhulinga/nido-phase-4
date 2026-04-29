@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useData } from "@/contexts/DataContext";
@@ -33,11 +34,13 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 
 const STATUS_COLORS: Record<string, string> = {
+  New: "hsl(38, 92%, 50%)",
+  Assigned: "hsl(220, 90%, 56%)",
   Pending: "hsl(38, 92%, 50%)",
   Processing: "hsl(24, 95%, 53%)",
-  Approved: "hsl(142, 70%, 40%)",
-  Shipped: "hsl(213, 94%, 56%)",
+  Completed: "hsl(160, 84%, 39%)",
   Delivered: "hsl(160, 84%, 39%)",
+  Rejected: "hsl(0, 84%, 60%)",
   Cancelled: "hsl(0, 84%, 60%)",
   "On Hold": "hsl(220, 9%, 46%)",
 };
@@ -58,7 +61,9 @@ export default function MainDashboard() {
 
   const totalSpend = orders.reduce((s, o) => s + o.totalAmount, 0);
   const activeVendors = vendors.filter((v) => v.status === "active").length;
-  const pendingOrders = orders.filter((o) => o.status === "Pending").length;
+  const pendingOrders = orders.filter((o) =>
+    ["pending", "new"].includes(o.status.toLowerCase()),
+  ).length;
 
   const statusData = Object.entries(
     orders.reduce(
@@ -104,37 +109,38 @@ export default function MainDashboard() {
   );
 
   // Order distribution for dashboard analysis
-  const orderDistData = [
-    {
-      name: "Approved",
-      value: orders.filter((o) => o.status === "Approved").length,
-    },
-    {
-      name: "Pending",
-      value: orders.filter((o) => o.status === "Pending").length,
-    },
-    {
-      name: "Cancelled",
-      value: orders.filter((o) => o.status === "Cancelled").length,
-    },
-    {
-      name: "Processing",
-      value: orders.filter((o) => o.status === "Processing").length,
-    },
-    {
-      name: "Delivered",
-      value: orders.filter((o) => o.status === "Delivered").length,
-    },
-  ].filter((d) => d.value > 0);
+  const orderDistData = useMemo(
+    () =>
+      Object.entries(
+        orders.reduce(
+          (acc, order) => {
+            const key = order.status || "Unknown";
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ),
+      )
+        .map(([name, value]) => ({ name, value }))
+        .filter((entry) => entry.value > 0),
+    [orders],
+  );
 
-  const spendByMonth = [
-    { month: "Jan", spend: 58000 },
-    { month: "Feb", spend: 42000 },
-    { month: "Mar", spend: 67000 },
-    { month: "Apr", spend: 35000 },
-    { month: "May", spend: 52000 },
-    { month: "Jun", spend: 48000 },
-  ];
+  const spendByMonth = useMemo(() => {
+    const grouped = orders.reduce(
+      (acc, order) => {
+        if (!order.orderDate) return acc;
+        const date = new Date(order.orderDate);
+        if (Number.isNaN(date.getTime())) return acc;
+        const month = date.toLocaleString("en-US", { month: "short" });
+        acc[month] = (acc[month] || 0) + (order.totalAmount || 0);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    return Object.entries(grouped).map(([month, spend]) => ({ month, spend }));
+  }, [orders]);
 
   const CHART_COLORS = [
     "hsl(213, 55%, 35%)",
@@ -257,31 +263,37 @@ export default function MainDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {statusData.map((entry, i) => (
-                      <Cell
-                        key={i}
-                        fill={
-                          STATUS_COLORS[entry.name] ||
-                          CHART_COLORS[i % CHART_COLORS.length]
-                        }
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              {statusData.length === 0 ? (
+                <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
+                  No real order status data yet
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                    >
+                      {statusData.map((entry, i) => (
+                        <Cell
+                          key={i}
+                          fill={
+                            STATUS_COLORS[entry.name] ||
+                            CHART_COLORS[i % CHART_COLORS.length]
+                          }
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -292,28 +304,34 @@ export default function MainDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {categoryData.map((_, i) => (
-                      <Cell
-                        key={i}
-                        fill={CHART_COLORS[i % CHART_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              {categoryData.length === 0 ? (
+                <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
+                  No vendor category data yet
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                    >
+                      {categoryData.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={CHART_COLORS[i % CHART_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -384,31 +402,37 @@ export default function MainDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={orderDistData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {orderDistData.map((entry, i) => (
-                      <Cell
-                        key={i}
-                        fill={
-                          STATUS_COLORS[entry.name] ||
-                          CHART_COLORS[i % CHART_COLORS.length]
-                        }
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              {orderDistData.length === 0 ? (
+                <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
+                  No order distribution data yet
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={orderDistData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                    >
+                      {orderDistData.map((entry, i) => (
+                        <Cell
+                          key={i}
+                          fill={
+                            STATUS_COLORS[entry.name] ||
+                            CHART_COLORS[i % CHART_COLORS.length]
+                          }
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -421,27 +445,33 @@ export default function MainDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={spendByMonth}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="hsl(var(--border))"
-                />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v) => `$${v / 1000}K`}
-                />
-                <Tooltip
-                  formatter={(v: number) => [`$${v.toLocaleString()}`, "Spend"]}
-                />
-                <Bar
-                  dataKey="spend"
-                  fill="hsl(213, 55%, 35%)"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            {spendByMonth.length === 0 ? (
+              <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
+                No spend data available yet
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={spendByMonth}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                  />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v) => `$${v / 1000}K`}
+                  />
+                  <Tooltip
+                    formatter={(v: number) => [`$${v.toLocaleString()}`, "Spend"]}
+                  />
+                  <Bar
+                    dataKey="spend"
+                    fill="hsl(213, 55%, 35%)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 

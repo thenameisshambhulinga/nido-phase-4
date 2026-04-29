@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,149 +44,12 @@ import {
   Trash2,
   Mail,
 } from "lucide-react";
-import { useData } from "@/contexts/DataContext";
+import { useData, type Invoice as CoreInvoice } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
-import { safeReadJson } from "@/lib/storage";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 
-interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  vendorOrClient: string;
-  type: "vendor" | "client";
-  issueDate: string;
-  dueDate: string;
-  amount: number;
-  tax: number;
-  totalAmount: number;
-  status: "paid" | "pending" | "overdue" | "draft" | "sent";
-  items: {
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-  }[];
-  notes: string;
-  autoReminder: boolean;
-  lastReminderSent?: string;
-}
-
 const generateInvoiceNumber = () => `INV-${Date.now().toString().slice(-6)}`;
-
-const DEFAULT_INVOICES: Invoice[] = [
-  {
-    id: "inv-1",
-    invoiceNumber: "INV-240001",
-    vendorOrClient: "Apex Tech Solutions",
-    type: "vendor",
-    issueDate: "2026-01-10",
-    dueDate: "2026-02-10",
-    amount: 58000,
-    tax: 5800,
-    totalAmount: 63800,
-    status: "paid",
-    items: [
-      {
-        description: "Apple iPhone 16 128GB x50",
-        quantity: 50,
-        unitPrice: 1160,
-        total: 58000,
-      },
-    ],
-    notes: "Payment received via wire transfer",
-    autoReminder: true,
-  },
-  {
-    id: "inv-2",
-    invoiceNumber: "INV-240002",
-    vendorOrClient: "Global Corp Industries",
-    type: "client",
-    issueDate: "2026-01-15",
-    dueDate: "2026-02-15",
-    amount: 24000,
-    tax: 2400,
-    totalAmount: 26400,
-    status: "pending",
-    items: [
-      {
-        description: "Dell Latitude 5540 x20",
-        quantity: 20,
-        unitPrice: 1200,
-        total: 24000,
-      },
-    ],
-    notes: "Net 30 payment terms",
-    autoReminder: true,
-  },
-  {
-    id: "inv-3",
-    invoiceNumber: "INV-240003",
-    vendorOrClient: "SecureTech Ltd",
-    type: "vendor",
-    issueDate: "2025-12-01",
-    dueDate: "2025-12-31",
-    amount: 15000,
-    tax: 1500,
-    totalAmount: 16500,
-    status: "overdue",
-    items: [
-      {
-        description: "Security System Installation",
-        quantity: 1,
-        unitPrice: 15000,
-        total: 15000,
-      },
-    ],
-    notes: "Overdue - follow up required",
-    autoReminder: true,
-    lastReminderSent: "2026-01-15",
-  },
-  {
-    id: "inv-4",
-    invoiceNumber: "INV-240004",
-    vendorOrClient: "EuroTech Partners",
-    type: "client",
-    issueDate: "2026-02-01",
-    dueDate: "2026-03-01",
-    amount: 8500,
-    tax: 850,
-    totalAmount: 9350,
-    status: "sent",
-    items: [
-      {
-        description: "Consulting Services - Feb 2026",
-        quantity: 1,
-        unitPrice: 8500,
-        total: 8500,
-      },
-    ],
-    notes: "Monthly consulting retainer",
-    autoReminder: true,
-  },
-  {
-    id: "inv-5",
-    invoiceNumber: "INV-240005",
-    vendorOrClient: "CloudNet Services",
-    type: "vendor",
-    issueDate: "2026-03-01",
-    dueDate: "2026-04-01",
-    amount: 3400,
-    tax: 340,
-    totalAmount: 3740,
-    status: "draft",
-    items: [
-      {
-        description: "Cloud Hosting - Q1 2026",
-        quantity: 3,
-        unitPrice: 1133.33,
-        total: 3400,
-      },
-    ],
-    notes: "",
-    autoReminder: false,
-  },
-];
 
 const STATUS_CONFIG: Record<
   string,
@@ -196,20 +59,29 @@ const STATUS_CONFIG: Record<
     icon: React.ElementType;
   }
 > = {
-  paid: { label: "Paid", variant: "default", icon: CheckCircle2 },
-  pending: { label: "Pending", variant: "secondary", icon: Clock },
-  overdue: { label: "Overdue", variant: "destructive", icon: AlertTriangle },
-  sent: { label: "Sent", variant: "outline", icon: Send },
-  draft: { label: "Draft", variant: "secondary", icon: FileText },
+  PAID: { label: "Paid", variant: "default", icon: CheckCircle2 },
+  "PARTIALLY PAID": {
+    label: "Partially Paid",
+    variant: "secondary",
+    icon: Clock,
+  },
+  OVERDUE: { label: "Overdue", variant: "destructive", icon: AlertTriangle },
+  SENT: { label: "Sent", variant: "outline", icon: Send },
+  DRAFT: { label: "Draft", variant: "secondary", icon: FileText },
 };
 
 export default function InvoicesPage() {
-  const { vendors, clients, addAuditEntry } = useData();
+  const {
+    vendors,
+    clients,
+    invoices,
+    createInvoice,
+    updateInvoice,
+    deleteInvoice: removeInvoice,
+    addAuditEntry,
+  } = useData();
   const { user } = useAuth();
   const { addNotification, notifications } = useNotifications();
-  const [invoices, setInvoices] = useState<Invoice[]>(() =>
-    safeReadJson<Invoice[]>("nido_invoices", DEFAULT_INVOICES),
-  );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -239,29 +111,47 @@ export default function InvoicesPage() {
     autoReminder: true,
   });
 
-  const persist = useCallback((updated: Invoice[]) => {
-    setInvoices(updated);
-    localStorage.setItem("nido_invoices", JSON.stringify(updated));
-  }, []);
+  const invoiceRows = useMemo(
+    () =>
+      invoices.map((invoice) => ({
+        ...invoice,
+        amount: invoice.subtotal,
+        tax: invoice.cgst + invoice.sgst,
+        totalAmount: invoice.total,
+        vendorOrClient:
+          invoice.vendorOrClient || invoice.customerName || "Unknown",
+        type: invoice.type || "client",
+        issueDate: invoice.issueDate || invoice.invoiceDate,
+        items: invoice.items.map((item) => ({
+          description: item.description || item.itemName,
+          quantity: item.quantity,
+          unitPrice: item.rate,
+          total: item.amount,
+        })),
+        autoReminder: invoice.autoReminder ?? true,
+      })),
+    [invoices],
+  );
 
   // Automation: auto-mark overdue invoices
-  useMemo(() => {
+  useEffect(() => {
     const today = new Date().toISOString().split("T")[0];
-    const needsUpdate = invoices.some(
+    const needsUpdate = invoiceRows.some(
       (inv) =>
-        (inv.status === "pending" || inv.status === "sent") &&
+        (inv.status === "SENT" || inv.status === "PARTIALLY PAID") &&
         inv.dueDate < today,
     );
     if (needsUpdate) {
-      const updated = invoices.map((inv) =>
-        (inv.status === "pending" || inv.status === "sent") &&
-        inv.dueDate < today
-          ? { ...inv, status: "overdue" as const }
-          : inv,
-      );
-      persist(updated);
+      invoiceRows.forEach((inv) => {
+        if (
+          (inv.status === "SENT" || inv.status === "PARTIALLY PAID") &&
+          inv.dueDate < today
+        ) {
+          updateInvoice(inv.id, { status: "OVERDUE" });
+        }
+      });
     }
-  }, []);
+  }, [invoiceRows, updateInvoice]);
 
   // Auto-detect 30+ day overdue invoices and send notification with drafted mail
   const overdueCheckDone = useRef(false);
@@ -270,8 +160,8 @@ export default function InvoicesPage() {
     overdueCheckDone.current = true;
 
     const today = new Date();
-    const overdueInvoices = invoices.filter((inv) => {
-      if (inv.status !== "overdue") return false;
+    const overdueInvoices = invoiceRows.filter((inv) => {
+      if (inv.status !== "OVERDUE") return false;
       const dueDate = new Date(inv.dueDate);
       const daysPastDue = Math.floor(
         (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
@@ -351,10 +241,10 @@ NidoTech Platform`;
         );
       }
     }
-  }, [invoices]);
+  }, [invoiceRows, notifications, addNotification, addAuditEntry]);
 
   const filtered = useMemo(() => {
-    return invoices.filter((inv) => {
+    return invoiceRows.filter((inv) => {
       const matchSearch =
         inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
         inv.vendorOrClient.toLowerCase().includes(search.toLowerCase());
@@ -362,22 +252,22 @@ NidoTech Platform`;
       const matchType = typeFilter === "all" || inv.type === typeFilter;
       return matchSearch && matchStatus && matchType;
     });
-  }, [invoices, search, statusFilter, typeFilter]);
+  }, [invoiceRows, search, statusFilter, typeFilter]);
 
   const stats = useMemo(
     () => ({
-      total: invoices.reduce((s, i) => s + i.totalAmount, 0),
-      paid: invoices
-        .filter((i) => i.status === "paid")
+      total: invoiceRows.reduce((s, i) => s + i.totalAmount, 0),
+      paid: invoiceRows
+        .filter((i) => i.status === "PAID")
         .reduce((s, i) => s + i.totalAmount, 0),
-      pending: invoices
-        .filter((i) => i.status === "pending" || i.status === "sent")
+      pending: invoiceRows
+        .filter((i) => i.status === "SENT" || i.status === "PARTIALLY PAID")
         .reduce((s, i) => s + i.totalAmount, 0),
-      overdue: invoices
-        .filter((i) => i.status === "overdue")
+      overdue: invoiceRows
+        .filter((i) => i.status === "OVERDUE")
         .reduce((s, i) => s + i.totalAmount, 0),
     }),
-    [invoices],
+    [invoiceRows],
   );
 
   const handleCreate = () => {
@@ -386,30 +276,54 @@ NidoTech Platform`;
       0,
     );
     const tax = amount * 0.1;
-    const invoice: Invoice = {
-      id: `inv-${Date.now()}`,
+    const invoice: CoreInvoice = {
+      id: `draft-${Date.now()}`,
       invoiceNumber: generateInvoiceNumber(),
       vendorOrClient: newInvoice.vendorOrClient,
       type: newInvoice.type,
+      invoiceDate: new Date().toISOString().split("T")[0],
       issueDate: new Date().toISOString().split("T")[0],
       dueDate: newInvoice.dueDate,
-      amount,
-      tax,
-      totalAmount: amount + tax,
-      status: "draft",
-      items: newInvoice.items.map((i) => ({
-        ...i,
-        total: i.quantity * i.unitPrice,
+      paymentTerms: "Due on Receipt",
+      billingAddress: "",
+      shippingAddress: "",
+      placeOfSupply: "",
+      emailRecipients: [],
+      subtotal: amount,
+      cgst: tax / 2,
+      sgst: tax / 2,
+      adjustment: 0,
+      shippingCharges: 0,
+      total: amount + tax,
+      amountPaid: 0,
+      balanceDue: amount + tax,
+      status: "DRAFT",
+      paymentStatus: "UNPAID",
+      items: newInvoice.items.map((i, index) => ({
+        id: `item-${index}`,
+        itemName: i.description,
+        description: i.description,
+        hsnSac: "",
+        quantity: i.quantity,
+        rate: i.unitPrice,
+        discount: 0,
+        taxRate: 10,
+        amount: i.quantity * i.unitPrice,
       })),
       notes: newInvoice.notes,
+      termsAndConditions: "",
+      bankDetails: "",
       autoReminder: newInvoice.autoReminder,
+      createdBy: user?.name || "System",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
-    persist([invoice, ...invoices]);
+    createInvoice(invoice);
     addAuditEntry({
       user: user?.name || "System",
       action: "Invoice Created",
       module: "Invoices",
-      details: `Created invoice ${invoice.invoiceNumber} for ${invoice.vendorOrClient} ($${invoice.totalAmount.toLocaleString()})`,
+      details: `Created invoice ${invoice.invoiceNumber} for ${invoice.vendorOrClient} ($${invoice.total.toLocaleString()})`,
       ipAddress: "192.168.1.1",
       status: "success",
     });
@@ -425,12 +339,12 @@ NidoTech Platform`;
     toast.success("Invoice created successfully");
   };
 
-  const updateStatus = (id: string, status: Invoice["status"]) => {
-    const inv = invoices.find((i) => i.id === id);
-    persist(invoices.map((i) => (i.id === id ? { ...i, status } : i)));
+  const updateStatus = (id: string, status: CoreInvoice["status"]) => {
+    const inv = invoiceRows.find((i) => i.id === id);
+    updateInvoice(id, { status });
     addAuditEntry({
       user: user?.name || "System",
-      action: `Invoice ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+      action: `Invoice ${status}`,
       module: "Invoices",
       details: `Marked invoice ${inv?.invoiceNumber} as ${status}`,
       ipAddress: "192.168.1.1",
@@ -440,9 +354,9 @@ NidoTech Platform`;
     setSelectedInvoice(null);
   };
 
-  const deleteInvoice = (id: string) => {
-    const inv = invoices.find((i) => i.id === id);
-    persist(invoices.filter((i) => i.id !== id));
+  const handleDeleteInvoice = (id: string) => {
+    const inv = invoiceRows.find((i) => i.id === id);
+    removeInvoice(id);
     addAuditEntry({
       user: user?.name || "System",
       action: "Invoice Deleted",
@@ -455,14 +369,10 @@ NidoTech Platform`;
     setSelectedInvoice(null);
   };
 
-  const sendReminder = (inv: Invoice) => {
-    persist(
-      invoices.map((i) =>
-        i.id === inv.id
-          ? { ...i, lastReminderSent: new Date().toISOString().split("T")[0] }
-          : i,
-      ),
-    );
+  const sendReminder = (inv: (typeof invoiceRows)[number]) => {
+    updateInvoice(inv.id, {
+      lastReminderSent: new Date().toISOString().split("T")[0],
+    });
     addAuditEntry({
       user: user?.name || "System",
       action: "Invoice Reminder Sent",
@@ -474,7 +384,7 @@ NidoTech Platform`;
     toast.success(`Payment reminder sent to ${inv.vendorOrClient}`);
   };
 
-  const exportPDF = (inv: Invoice) => {
+  const exportPDF = (inv: (typeof invoiceRows)[number]) => {
     const content = `
 INVOICE: ${inv.invoiceNumber}
 ==========================================
@@ -506,7 +416,7 @@ Notes: ${inv.notes || "N/A"}
   const exportAllCSV = () => {
     const headers =
       "Invoice #,Vendor/Client,Type,Issue Date,Due Date,Amount,Tax,Total,Status\n";
-    const rows = invoices
+    const rows = invoiceRows
       .map(
         (i) =>
           `${i.invoiceNumber},${i.vendorOrClient},${i.type},${i.issueDate},${i.dueDate},${i.amount},${i.tax},${i.totalAmount},${i.status}`,
@@ -613,11 +523,11 @@ Notes: ${inv.notes || "N/A"}
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="sent">Sent</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="PAID">Paid</SelectItem>
+              <SelectItem value="PARTIALLY PAID">Partially Paid</SelectItem>
+              <SelectItem value="OVERDUE">Overdue</SelectItem>
+              <SelectItem value="SENT">Sent</SelectItem>
+              <SelectItem value="DRAFT">Draft</SelectItem>
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -717,8 +627,9 @@ Notes: ${inv.notes || "N/A"}
                           >
                             <Download className="h-3.5 w-3.5" />
                           </Button>
-                          {(inv.status === "pending" ||
-                            inv.status === "overdue") && (
+                          {(inv.status === "SENT" ||
+                            inv.status === "PARTIALLY PAID" ||
+                            inv.status === "OVERDUE") && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -995,7 +906,7 @@ Notes: ${inv.notes || "N/A"}
                     >
                       <Download className="h-3.5 w-3.5 mr-1" /> Export
                     </Button>
-                    {inv.status === "draft" && (
+                    {inv.status === "DRAFT" && (
                       <Button
                         size="sm"
                         onClick={() =>
@@ -1005,14 +916,15 @@ Notes: ${inv.notes || "N/A"}
                             description: `Send ${inv.invoiceNumber} now?`,
                             confirmLabel: "Send",
                             tone: "default",
-                            onConfirm: () => updateStatus(inv.id, "sent"),
+                            onConfirm: () => updateStatus(inv.id, "SENT"),
                           })
                         }
                       >
                         <Send className="h-3.5 w-3.5 mr-1" /> Send
                       </Button>
                     )}
-                    {(inv.status === "sent" || inv.status === "pending") && (
+                    {(inv.status === "SENT" ||
+                      inv.status === "PARTIALLY PAID") && (
                       <Button
                         size="sm"
                         onClick={() =>
@@ -1022,14 +934,14 @@ Notes: ${inv.notes || "N/A"}
                             description: `Mark ${inv.invoiceNumber} as paid?`,
                             confirmLabel: "Mark Paid",
                             tone: "default",
-                            onConfirm: () => updateStatus(inv.id, "paid"),
+                            onConfirm: () => updateStatus(inv.id, "PAID"),
                           })
                         }
                       >
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark Paid
                       </Button>
                     )}
-                    {inv.status === "overdue" && (
+                    {inv.status === "OVERDUE" && (
                       <>
                         <Button
                           variant="outline"
@@ -1047,7 +959,7 @@ Notes: ${inv.notes || "N/A"}
                               description: `Mark ${inv.invoiceNumber} as paid?`,
                               confirmLabel: "Mark Paid",
                               tone: "default",
-                              onConfirm: () => updateStatus(inv.id, "paid"),
+                              onConfirm: () => updateStatus(inv.id, "PAID"),
                             })
                           }
                         >
@@ -1066,7 +978,7 @@ Notes: ${inv.notes || "N/A"}
                           description: `Delete ${inv.invoiceNumber}? This action cannot be undone.`,
                           confirmLabel: "Delete",
                           tone: "destructive",
-                          onConfirm: () => deleteInvoice(inv.id),
+                          onConfirm: () => handleDeleteInvoice(inv.id),
                         })
                       }
                     >

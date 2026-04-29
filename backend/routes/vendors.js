@@ -1,6 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import Vendor from "../models/Vendor.js";
+import { ensureBusinessId } from "../utils/businessIds.js";
 
 const router = express.Router();
 
@@ -198,8 +199,10 @@ router.get("/:id", async (req, res) => {
 // POST create new vendor
 router.post("/", async (req, res) => {
   try {
+    const sequence = (await Vendor.countDocuments()) + 1;
     const vendorData = {
       ...req.body,
+      vendorId: ensureBusinessId(req.body?.vendorId, "VID", sequence, 4),
       updatedAt: new Date(),
     };
     const vendor = new Vendor(vendorData);

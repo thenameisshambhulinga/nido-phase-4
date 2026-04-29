@@ -33,10 +33,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useCart } from "@/contexts/CartContext";
+import { useData } from "@/contexts/DataContext";
 import { cn } from "@/lib/utils";
 
 interface Product {
-  id: number;
+  id: string;
   name: string;
   category: string;
   price: number;
@@ -47,173 +48,6 @@ interface Product {
   image: string;
 }
 
-const PRODUCTS: Product[] = [
-  {
-    id: 1,
-    name: "Ergonomic Office Chair",
-    category: "Wooden Furniture",
-    price: 599,
-    rating: 4.8,
-    stock: 45,
-    emoji: "🪑",
-    description:
-      "Ergonomic build with lumbar support for long work sessions and executive comfort.",
-    image:
-      "https://images.unsplash.com/photo-1505843513577-22bb7d21e455?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 2,
-    name: "Wireless Mouse",
-    category: "Electronics",
-    price: 89,
-    rating: 4.6,
-    stock: 120,
-    emoji: "🖱️",
-    description:
-      "Precision wireless tracking with smooth productivity response and durable battery life.",
-    image:
-      "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 3,
-    name: "Filing Cabinet",
-    category: "Office Supplies",
-    price: 299,
-    rating: 4.7,
-    stock: 32,
-    emoji: "🗄️",
-    description:
-      "Secure multi-drawer storage for organized office documentation and daily access.",
-    image:
-      "https://images.unsplash.com/photo-1541558869434-2840d308329a?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 4,
-    name: 'Desktop Monitor 27"',
-    category: "Electronics",
-    price: 349,
-    rating: 4.9,
-    stock: 67,
-    emoji: "🖥️",
-    description:
-      "High-clarity display suited for dashboards, analytics and extended professional use.",
-    image:
-      "https://images.unsplash.com/photo-1545235617-9465d2a55698?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 5,
-    name: "Printer Paper (Box)",
-    category: "Office Supplies",
-    price: 45,
-    rating: 4.5,
-    stock: 200,
-    emoji: "📄",
-    description:
-      "A4 office-grade sheets optimized for high-volume printing and smooth feed quality.",
-    image:
-      "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 6,
-    name: "Executive Chair",
-    category: "Wooden Furniture",
-    price: 399,
-    rating: 4.8,
-    stock: 28,
-    emoji: "💺",
-    description:
-      "Executive seating with balanced cushioning and premium posture support for teams.",
-    image:
-      "https://images.unsplash.com/photo-1580480055273-228ff5388ef8?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 7,
-    name: "USB-C Hub",
-    category: "Electronics",
-    price: 59,
-    rating: 4.4,
-    stock: 150,
-    emoji: "🔌",
-    description:
-      "Compact multi-port expansion hub for laptops and modern workstation connectivity.",
-    image:
-      "https://images.unsplash.com/photo-1625842268584-8f3296236761?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 8,
-    name: "Stapler Set",
-    category: "Office Supplies",
-    price: 25,
-    rating: 4.3,
-    stock: 300,
-    emoji: "📎",
-    description:
-      "Reliable stapling set with easy handling for recurring documentation workflows.",
-    image:
-      "https://images.unsplash.com/photo-1472289065668-ce650ac443d2?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 9,
-    name: "Standing Desk",
-    category: "Wooden Furniture",
-    price: 699,
-    rating: 4.9,
-    stock: 18,
-    emoji: "🪵",
-    description:
-      "Spacious standing desk designed for healthy posture, cable order and sturdy daily use.",
-    image:
-      "https://images.unsplash.com/photo-1595514535415-dae2d1ff629b?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 10,
-    name: "Mechanical Keyboard",
-    category: "Electronics",
-    price: 149,
-    rating: 4.7,
-    stock: 85,
-    emoji: "⌨️",
-    description:
-      "Responsive mechanical typing experience for coding, admin operations and fast input.",
-    image:
-      "https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 11,
-    name: "Shipping Boxes (50 pk)",
-    category: "Logistics Equipment",
-    price: 89,
-    rating: 4.5,
-    stock: 500,
-    emoji: "📦",
-    description:
-      "Durable corrugated carton bundle for secure packing, dispatch and storage operations.",
-    image:
-      "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1200&h=800&fit=crop",
-  },
-  {
-    id: 12,
-    name: "Pallet Jack",
-    category: "Logistics Equipment",
-    price: 1299,
-    rating: 4.6,
-    stock: 12,
-    emoji: "🏗️",
-    description:
-      "Heavy-duty handling tool for warehouse movement and consistent logistics throughput.",
-    image:
-      "https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=1200&h=800&fit=crop",
-  },
-];
-
-const CATEGORIES = [
-  "All Categories",
-  "Electronics",
-  "Office Supplies",
-  "Wooden Furniture",
-  "Logistics Equipment",
-];
-
 const getAvailabilityLabel = (stock: number) =>
   stock > 0 ? "In Stock" : "Out of Stock";
 
@@ -221,6 +55,25 @@ const toDataUri = (productName: string, emoji: string) => {
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='1000' height='700' viewBox='0 0 1000 700'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='#0f172a' offset='0'/><stop stop-color='#0369a1' offset='1'/></linearGradient></defs><rect width='1000' height='700' fill='url(#g)'/><circle cx='860' cy='120' r='140' fill='rgba(255,255,255,0.12)'/><circle cx='120' cy='580' r='190' fill='rgba(34,197,94,0.16)'/><text x='500' y='320' text-anchor='middle' fill='white' font-size='110'>${emoji}</text><text x='500' y='410' text-anchor='middle' fill='white' font-size='32' font-family='Arial, sans-serif'>${productName}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 };
+
+function getEmojiForCategory(category: string) {
+  const c = category.toLowerCase();
+  if (c.includes("hardware") || c.includes("electronic") || c.includes("tech"))
+    return "💻";
+  if (c.includes("stationery") || c.includes("paper")) return "📄";
+  if (c.includes("furniture") || c.includes("chair") || c.includes("desk"))
+    return "🪑";
+  if (c.includes("office")) return "🖨️";
+  if (c.includes("food") || c.includes("pantry")) return "☕";
+  if (c.includes("safety") || c.includes("fire")) return "🧯";
+  if (c.includes("cloud") || c.includes("digital")) return "☁️";
+  return "📦";
+}
+
+function getStockFromStatus(status?: string, initialStock?: number) {
+  if (status === "Out of Stock") return 0;
+  return initialStock ?? 50;
+}
 
 function ProductImage({ product }: { product: Product }) {
   const [failed, setFailed] = useState(false);
@@ -255,9 +108,38 @@ export default function CategoriesPage() {
     updateQuantity,
     removeFromCart,
   } = useCart();
+  const { masterCatalogItems, isCoreDataLoading } = useData();
+
+  const products = useMemo<Product[]>(() => {
+    return masterCatalogItems
+      .filter((item) => !!item.name && !!item.category)
+      .map((item) => {
+        const stock = getStockFromStatus(item.status, item.initialStock);
+        return {
+          id: item.id || item.masterProductId || `prd-${item.productCode}`,
+          name: item.name,
+          category: item.category,
+          price: Number(item.price) || 0,
+          rating: item.performanceRating ?? 4.5,
+          stock,
+          emoji: getEmojiForCategory(item.category),
+          description:
+            item.description?.trim() ||
+            `${item.name} is optimized for business procurement with dependable pricing and delivery planning.`,
+          image:
+            item.image ||
+            toDataUri(item.name, getEmojiForCategory(item.category)),
+        };
+      });
+  }, [masterCatalogItems]);
+
+  const categories = useMemo(() => {
+    const cats = Array.from(new Set(products.map((p) => p.category)));
+    return ["All Categories", ...cats];
+  }, [products]);
 
   const filtered = useMemo(() => {
-    return PRODUCTS.filter((p) => {
+    return products.filter((p) => {
       const term = search.trim().toLowerCase();
       const matchSearch =
         !term ||
@@ -267,7 +149,7 @@ export default function CategoriesPage() {
       const matchCat = category === "All Categories" || p.category === category;
       return matchSearch && matchCat;
     });
-  }, [search, category]);
+  }, [products, search, category]);
 
   const handleAddToCart = (product: Product) => {
     addToCartCtx({
@@ -451,6 +333,11 @@ export default function CategoriesPage() {
                   Explore premium business essentials with catalog-grade
                   discovery, product intelligence, and faster add-to-cart flow.
                 </p>
+                {isCoreDataLoading && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Loading products from master catalogue...
+                  </p>
+                )}
               </div>
 
               <Button
@@ -490,7 +377,7 @@ export default function CategoriesPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((c) => (
+                    {categories.map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}
                       </SelectItem>
@@ -577,7 +464,7 @@ export default function CategoriesPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-bold text-primary">
-                        ₹{p.price}
+                        ₹{p.price.toLocaleString()}
                       </span>
                       <Button
                         size="sm"
@@ -631,7 +518,7 @@ export default function CategoriesPage() {
                     </div>
                   </div>
                   <span className="shrink-0 text-xl font-bold text-primary">
-                    ₹{p.price}
+                    ₹{p.price.toLocaleString()}
                   </span>
                   <Button
                     size="sm"
@@ -651,9 +538,13 @@ export default function CategoriesPage() {
 
         {filtered.length === 0 && (
           <div className="py-20 text-center text-muted-foreground">
-            <p className="text-lg font-medium">No products found</p>
+            <p className="text-lg font-medium">
+              {isCoreDataLoading ? "Loading products..." : "No products found"}
+            </p>
             <p className="mt-1 text-sm">
-              Try adjusting your search or category filters
+              {isCoreDataLoading
+                ? "Fetching from master catalogue..."
+                : "Try adjusting your search or category filters"}
             </p>
           </div>
         )}

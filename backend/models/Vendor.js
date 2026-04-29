@@ -1,6 +1,13 @@
 import mongoose from "mongoose";
 
 const vendorSchema = new mongoose.Schema({
+  vendorId: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    index: true,
+  },
   vendorCode: {
     type: String,
     required: true,
@@ -28,6 +35,8 @@ const vendorSchema = new mongoose.Schema({
   address: String,
   city: String,
   state: String,
+  country: String,
+  description: String,
   status: {
     type: String,
     enum: ["active", "inactive", "suspended"],
@@ -48,5 +57,7 @@ const vendorSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+vendorSchema.index({ vendorId: 1 });
 
 export default mongoose.model("Vendor", vendorSchema);

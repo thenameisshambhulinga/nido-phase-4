@@ -1,6 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import Client from "../models/Client.js";
+import { ensureBusinessId } from "../utils/businessIds.js";
 
 const router = express.Router();
 
@@ -39,8 +40,10 @@ router.get("/:id", async (req, res) => {
 // POST create new client
 router.post("/", async (req, res) => {
   try {
+    const sequence = (await Client.countDocuments()) + 1;
     const clientData = {
       ...req.body,
+      clientId: ensureBusinessId(req.body?.clientId, "CID", sequence, 4),
       updatedAt: new Date(),
     };
     const client = new Client(clientData);

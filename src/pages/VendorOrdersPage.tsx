@@ -33,7 +33,6 @@ import {
   Truck,
 } from "lucide-react";
 
-const VENDOR_ASSIGNMENT_STORAGE_KEY = "nido_order_vendor_assignments_v1";
 const SLA_REMINDER_STORAGE_KEY = "nido_sla_reminders_v1";
 
 type SlaReminder = {
@@ -105,10 +104,6 @@ export default function VendorOrdersPage() {
   };
 
   const rows = useMemo(() => {
-    const assignments = safeReadJson<Record<string, Record<string, string>>>(
-      VENDOR_ASSIGNMENT_STORAGE_KEY,
-      {},
-    );
     const reminders = safeReadJson<Record<string, SlaReminder[]>>(
       SLA_REMINDER_STORAGE_KEY,
       {},
@@ -117,25 +112,16 @@ export default function VendorOrdersPage() {
     const derivedRows: VendorOrderRow[] = [];
 
     orders.forEach((order) => {
-      const assignedByItem = assignments[order.id] || {};
-      const itemIds = Object.keys(assignedByItem);
       const vendorItemCounter = new Map<string, number>();
 
-      itemIds.forEach((itemId) => {
-        const assignedVendorId = assignedByItem[itemId];
+      order.items.forEach((item) => {
+        const assignedVendorId = item.vendorId || order.vendorId || "";
         if (!assignedVendorId) return;
         vendorItemCounter.set(
           assignedVendorId,
           (vendorItemCounter.get(assignedVendorId) || 0) + 1,
         );
       });
-
-      const orgVendor = vendors.find(
-        (entry) => entry.name === order.organization,
-      );
-      if (orgVendor && !vendorItemCounter.has(orgVendor.id)) {
-        vendorItemCounter.set(orgVendor.id, Math.max(1, order.items.length));
-      }
 
       vendorItemCounter.forEach((assignedItems, vendorId) => {
         const vendor = vendors.find((entry) => entry.id === vendorId);
@@ -193,6 +179,9 @@ export default function VendorOrdersPage() {
 
   const metrics = useMemo(() => {
     const total = filteredRows.length;
+    const withinSla = filteredRows.filter(
+      (entry) => entry.slaStatus === "within_sla",
+    ).length;
     const breached = filteredRows.filter(
       (entry) => entry.slaStatus === "breached",
     ).length;
@@ -203,7 +192,7 @@ export default function VendorOrdersPage() {
       (sum, entry) => sum + entry.dueReminderCount,
       0,
     );
-    return { total, breached, atRisk, dueReminders };
+    return { total, withinSla, breached, atRisk, dueReminders };
   }, [filteredRows]);
 
   return (
@@ -430,6 +419,131 @@ export default function VendorOrdersPage() {
                             <Truck className="h-4 w-4" /> Go to Procure Orders
                           </Button>
                         </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          id="sla-overall"
+          className="rounded-2xl border border-slate-200 shadow-sm"
+        >
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-sm">SLA Overview</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Live vendor SLA status with quick actions for procurement.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => navigate("/orders")}
+              >
+                <Truck className="h-4 w-4" /> Open Procure Orders
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-emerald-700/80">
+                  Within SLA
+                </p>
+                <p className="mt-2 text-3xl font-semibold text-emerald-800">
+                  {metrics.withinSla}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-amber-700/80">
+                  At Risk
+                </p>
+                <p className="mt-2 text-3xl font-semibold text-amber-800">
+                  {metrics.atRisk}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-rose-700/80">
+                  Breached
+                </p>
+                <p className="mt-2 text-3xl font-semibold text-rose-800">
+                  {metrics.breached}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                  Due Reminders
+                </p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900">
+                  {metrics.dueReminders}
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-slate-100">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Vendor</TableHead>
+                    <TableHead>SLA Elapsed</TableHead>
+                    <TableHead>SLA Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRows.slice(0, 4).map((row) => (
+                    <TableRow key={`sla-${row.orderId}-${row.vendorId}`}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-slate-900">
+                            {row.orderNumber}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {row.organization}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{row.vendorName}</TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-2 text-sm">
+                          <Clock3 className="h-4 w-4 text-muted-foreground" />
+                          {toReadableDuration(row.elapsedMs)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={getSlaTone(row.slaStatus)}
+                          variant="outline"
+                        >
+                          {row.slaStatus.replace("_", " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => openSlaView(row.orderId, row.vendorId)}
+                        >
+                          <Eye className="h-4 w-4" /> View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredRows.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="py-8 text-center text-muted-foreground"
+                      >
+                        No SLA data available.
                       </TableCell>
                     </TableRow>
                   )}

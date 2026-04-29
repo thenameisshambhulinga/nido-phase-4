@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js",
+    "dev": "nodemon server.js",
     "seed": "node seed.js"
   },
   "keywords": [
@@ -20,7 +20,8 @@
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "mongoose": "^7.7.0",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "nodemailer": "^6.9.13"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

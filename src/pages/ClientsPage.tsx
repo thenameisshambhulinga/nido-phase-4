@@ -96,7 +96,13 @@ const getAvatarColor = (name: string): string => {
 };
 
 export default function ClientsPage() {
-  const { clients, updateClient, deleteClient, addAuditEntry } = useData();
+  const {
+    clients,
+    orders,
+    updateClient,
+    deleteClient,
+    addAuditEntry,
+  } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -124,6 +130,67 @@ export default function ClientsPage() {
     businessType: "",
   });
 
+  const clientOrderMetrics = useMemo(() => {
+    const aliasToClientId = new Map<string, string>();
+    const metrics = new Map<
+      string,
+      { totalOrders: number; totalSpend: number }
+    >();
+
+    clients.forEach((client) => {
+      metrics.set(client.id, {
+        totalOrders: 0,
+        totalSpend: 0,
+      });
+
+      [
+        client.id,
+        client.clientId,
+        client.clientCode,
+        client.email,
+        client.companyName,
+        client.name,
+      ]
+        .filter(Boolean)
+        .forEach((alias) => {
+          aliasToClientId.set(String(alias).trim().toLowerCase(), client.id);
+        });
+    });
+
+    orders.forEach((order) => {
+      const matchedClientId = [
+        order.clientId,
+        order.organization,
+        order.requestingUser,
+      ]
+        .filter(Boolean)
+        .map((alias) => aliasToClientId.get(String(alias).trim().toLowerCase()))
+        .find(Boolean);
+
+      if (!matchedClientId) return;
+
+      const current = metrics.get(matchedClientId) || {
+        totalOrders: 0,
+        totalSpend: 0,
+      };
+
+      metrics.set(matchedClientId, {
+        totalOrders: current.totalOrders + 1,
+        totalSpend: current.totalSpend + safeNumber(order.totalAmount),
+      });
+    });
+
+    return metrics;
+  }, [clients, orders]);
+
+  const getClientTotalOrders = (client: (typeof clients)[number]) => {
+    const liveCount = clientOrderMetrics.get(client.id)?.totalOrders ?? 0;
+    return liveCount || safeNumber(client.totalOrders);
+  };
+
+  const getClientTotalSpend = (client: (typeof clients)[number]) =>
+    clientOrderMetrics.get(client.id)?.totalSpend ?? 0;
+
   // Filter clients
   const filtered = useMemo(() => {
     return clients.filter((c) => {
@@ -132,12 +199,14 @@ export default function ClientsPage() {
       const contactPerson = String(c.contactPerson ?? "");
       const email = String(c.email ?? "");
       const clientCode = String(c.clientCode ?? "");
+      const clientId = String(c.clientId ?? "");
 
       const matchSearch =
         name.toLowerCase().includes(searchText) ||
         contactPerson.toLowerCase().includes(searchText) ||
         email.toLowerCase().includes(searchText) ||
-        clientCode.toLowerCase().includes(searchText);
+        clientCode.toLowerCase().includes(searchText) ||
+        clientId.toLowerCase().includes(searchText);
 
       const matchStatus =
         statusFilter === "All" ||
@@ -157,7 +226,9 @@ export default function ClientsPage() {
 
   // Calculate stats
   const stats = useMemo(() => {
-    const premium = clients.filter((c) => c.totalOrders > 10).length;
+    const premium = clients.filter((client) => {
+      return getClientTotalOrders(client) > 10;
+    }).length;
     const active = clients.filter((c) => c.status === "active").length;
     const pending = clients.filter(
       (c) => c.status !== "active" && c.status !== "inactive",
@@ -165,7 +236,7 @@ export default function ClientsPage() {
     const inactive = clients.filter((c) => c.status === "inactive").length;
 
     return { premium, active, pending, inactive, total: clients.length };
-  }, [clients]);
+  }, [clientOrderMetrics, clients]);
 
   const contractTypes = useMemo(
     () =>
@@ -198,15 +269,17 @@ export default function ClientsPage() {
       "Email",
       "Status",
       "Total Orders",
+      "Total Spend (INR)",
     ];
 
     const rows = source.map((c) => [
-      c.clientCode || c.id,
-      c.name,
+      c.clientId || c.clientCode || c.id,
+      c.companyName || c.name,
       c.contactPerson,
       c.email,
       c.status,
-      c.totalOrders,
+      getClientTotalOrders(c),
+      getClientTotalSpend(c),
     ]);
 
     const blob =
@@ -263,10 +336,7 @@ export default function ClientsPage() {
       contractEnd: form.contractEnd,
       status: form.status,
       contractType: form.contractType,
-      businessType: form.businessType as
-        | "Registered"
-        | "Unregistered"
-        | "Consumer",
+      businessType: form.businessType,
     });
 
     addAuditEntry({
@@ -438,6 +508,9 @@ export default function ClientsPage() {
                     />
                   </TableHead>
                   <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
+                    Client ID
+                  </TableHead>
+                  <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
                     Client Name
                   </TableHead>
                   <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
@@ -447,7 +520,7 @@ export default function ClientsPage() {
                     Email
                   </TableHead>
                   <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700 text-right">
-                    Total Spend (USD)
+                    Total Spend (INR)
                   </TableHead>
                   <TableHead className="px-4 py-4 text-xs font-semibold text-gray-700">
                     Status
@@ -471,6 +544,12 @@ export default function ClientsPage() {
                       />
                     </TableCell>
                     <TableCell
+                      className="px-4 py-4 text-xs font-mono text-gray-600 cursor-pointer"
+                      onClick={() => navigate(`/clients/${client.id}`)}
+                    >
+                      {client.clientId || client.clientCode || client.id}
+                    </TableCell>
+                    <TableCell
                       className="px-4 py-4 cursor-pointer"
                       onClick={() => navigate(`/clients/${client.id}`)}
                     >
@@ -483,9 +562,6 @@ export default function ClientsPage() {
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm text-gray-900 truncate">
                             {client.name}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {client.clientCode || client.id}
                           </p>
                         </div>
                       </div>
@@ -522,8 +598,8 @@ export default function ClientsPage() {
                       className="px-4 py-4 text-sm font-semibold text-gray-900 text-right cursor-pointer"
                       onClick={() => navigate(`/clients/${client.id}`)}
                     >
-                      $
-                      {(safeNumber(client.totalOrders) * 5000).toLocaleString()}
+                      ₹
+                      {getClientTotalSpend(client).toLocaleString()}
                     </TableCell>
                     <TableCell
                       className="px-4 py-4 cursor-pointer"
@@ -609,7 +685,8 @@ export default function ClientsPage() {
                 )}
               </div>
               <div>
-                1-{Math.min(10, filtered.length)} of {filtered.length} clients
+                Showing {filtered.length} client
+                {filtered.length === 1 ? "" : "s"}
               </div>
             </div>
           )}

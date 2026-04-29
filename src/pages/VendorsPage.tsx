@@ -224,6 +224,7 @@ export default function VendorsPage() {
 
   const handleExportCSV = () => {
     const headers = [
+      "Vendor ID",
       "Name",
       "Category",
       "Email",
@@ -234,6 +235,7 @@ export default function VendorsPage() {
       "Status",
     ];
     const rows = filtered.map((v) => [
+      v.vendorId || v.vendorCode || v.id,
       v.name,
       v.category,
       v.contactEmail,
@@ -428,6 +430,7 @@ export default function VendorsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Vendor ID</TableHead>
                   <TableHead>Vendor</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Contact</TableHead>
@@ -445,6 +448,9 @@ export default function VendorsPage() {
                     className="cursor-pointer"
                     onClick={() => navigate(`/vendors/${v.id}`)}
                   >
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {v.vendorId || v.vendorCode || v.id}
+                    </TableCell>
                     <TableCell className="font-medium text-primary">
                       {v.name}
                     </TableCell>
@@ -513,7 +519,7 @@ export default function VendorsPage() {
                 {filtered.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={9}
                       className="text-center py-8 text-muted-foreground"
                     >
                       No vendors found.

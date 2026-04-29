@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 
 interface ShopProduct {
-  id: number;
+  id: string;
   sku: string;
   name: string;
   category: string;
@@ -232,7 +232,7 @@ export default function ShopPage() {
     const fromCatalog = masterCatalogItems
       .filter((item) => !!item.name && !!item.category)
       .map((item, idx) => ({
-        id: Number(item.id.replace(/\D/g, "")) || idx + 1,
+        id: item.id || item.masterProductId || `prd-${idx}`,
         sku: item.productCode || `SKU-${idx + 1000}`,
         name: item.name,
         category: item.category,

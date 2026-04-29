@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +70,7 @@ export default function OrderConfirmationPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { createInvoice } = useData();
   const [order, setOrder] = useState<Order | null>(null);
   const [copied, setCopied] = useState(false);
   const [trackingStage, setTrackingStage] =
@@ -362,21 +364,44 @@ export default function OrderConfirmationPage() {
       toast.error("You are not authorized to convert this order to invoice.");
       return;
     }
-    const existing = JSON.parse(
-      localStorage.getItem("nido_shop_invoices") || "[]",
-    );
-    const invoice = {
-      id: `INV-${Date.now().toString().slice(-8)}`,
-      sourceOrderId: order.id,
-      date: new Date().toISOString(),
-      amount: order.total,
-      status: "generated",
-    };
-    localStorage.setItem(
-      "nido_shop_invoices",
-      JSON.stringify([invoice, ...existing]),
-    );
-    toast.success(`Converted to invoice ${invoice.id}`);
+    const invoice = createInvoice({
+      orderId: order.id,
+      vendorOrClient:
+        order.shippingInfo.companyName || order.shippingInfo.fullName,
+      customerName: order.shippingInfo.companyName || order.shippingInfo.fullName,
+      customerId: order.clientId,
+      type: "client",
+      invoiceDate: new Date().toISOString().slice(0, 10),
+      issueDate: new Date().toISOString().slice(0, 10),
+      dueDate: order.requiredBy.slice(0, 10),
+      paymentTerms: order.paymentMethod,
+      billingAddress: `${order.shippingInfo.address}, ${order.shippingInfo.city}, ${order.shippingInfo.state} ${order.shippingInfo.zipCode}`,
+      shippingAddress: `${order.shippingInfo.address}, ${order.shippingInfo.city}, ${order.shippingInfo.state} ${order.shippingInfo.zipCode}`,
+      placeOfSupply: order.shippingInfo.state,
+      emailRecipients: order.shippingInfo.email ? [order.shippingInfo.email] : [],
+      items: order.items.map((item) => ({
+        id: item.id,
+        itemName: item.name,
+        description: item.category,
+        hsnSac: "",
+        quantity: item.quantity,
+        rate: item.price,
+        discount: 0,
+        taxRate: 0,
+        amount: item.total,
+      })),
+      subtotal: order.subtotal,
+      cgst: order.tax / 2,
+      sgst: order.tax / 2,
+      adjustment: 0,
+      shippingCharges: order.shippingCost,
+      total: order.total,
+      notes: `Generated from shop order ${order.id}`,
+      termsAndConditions: "",
+      bankDetails: "",
+      createdBy: user?.name || "System",
+    });
+    toast.success(`Converted to invoice ${invoice.invoiceNumber}`);
   };
 
   const advanceTracking = () => {

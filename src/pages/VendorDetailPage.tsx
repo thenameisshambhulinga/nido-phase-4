@@ -64,7 +64,6 @@ import VendorScorecard from "@/components/shared/VendorScorecard";
 import { normalizeOrderCode } from "@/lib/documentNumbering";
 import { safeReadJson } from "@/lib/storage";
 
-const VENDOR_ASSIGNMENT_STORAGE_KEY = "nido_order_vendor_assignments_v1";
 const PURCHASE_ORDER_STORAGE_KEY = "nido_purchase_orders_v1";
 
 const CHART_COLORS = [
@@ -170,7 +169,7 @@ export default function VendorDetailPage() {
     const fetchVendorAnalytics = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/vendors/${id}/analytics`,
+          `http://localhost:5000/api/vendors/${id}/analytics`,
         );
 
         if (!response.ok) {
@@ -274,17 +273,12 @@ export default function VendorDetailPage() {
 
   const vendorAssignedOrderIds = useMemo(() => {
     if (!vendor) return new Set<string>();
-    const allAssignments = safeReadJson<Record<string, Record<string, string>>>(
-      VENDOR_ASSIGNMENT_STORAGE_KEY,
-      {},
-    );
-
     return new Set(
-      Object.entries(allAssignments)
-        .filter(([, itemAssignments]) =>
-          Object.values(itemAssignments || {}).includes(vendor.id),
+      orders
+        .filter((order) =>
+          (order.items || []).some((item) => item.vendorId === vendor.id),
         )
-        .map(([orderId]) => orderId),
+        .map((order) => order.id),
     );
   }, [vendor, orders]);
 
@@ -327,8 +321,9 @@ export default function VendorDetailPage() {
   );
   const openOrders = useMemo(
     () =>
-      vendorOrders.filter((o) => !["Delivered", "Cancelled"].includes(o.status))
-        .length,
+      vendorOrders.filter((o) =>
+        !["Completed", "Delivered", "Cancelled", "Rejected"].includes(o.status),
+      ).length,
     [vendorOrders],
   );
   const overdueOrders = useMemo(
@@ -675,7 +670,7 @@ export default function VendorDetailPage() {
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
+              <Card className="rounded-2xl shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">
                     Spend Analysis (Monthly)
@@ -717,7 +712,7 @@ export default function VendorDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="rounded-2xl shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">
                     Purchase Analysis
@@ -805,7 +800,7 @@ export default function VendorDetailPage() {
 
             {/* Charts Row 2: Pie charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
+              <Card className="rounded-2xl shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">
                     Procurement Status
@@ -858,7 +853,7 @@ export default function VendorDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="rounded-2xl shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">
                     Spend Breakdown
@@ -905,7 +900,7 @@ export default function VendorDetailPage() {
             </div>
 
             {/* Recent Orders */}
-            <Card>
+            <Card className="rounded-2xl shadow-sm">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium">
@@ -998,7 +993,7 @@ export default function VendorDetailPage() {
 
           {/* Orders Tab */}
           <TabsContent value="orders" className="space-y-4">
-            <Card>
+            <Card className="rounded-2xl shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">
                   All Orders from {vendor.name}
@@ -1080,7 +1075,7 @@ export default function VendorDetailPage() {
           {/* Profile Tab */}
           <TabsContent value="profile" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="lg:col-span-2">
+              <Card className="lg:col-span-2 rounded-2xl shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-sm">Vendor Information</CardTitle>
                 </CardHeader>
@@ -1135,7 +1130,7 @@ export default function VendorDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="rounded-2xl shadow-sm">
                 <CardContent className="p-6">
                   <div className="flex flex-col items-center text-center space-y-4">
                     <div className="h-20 w-20 rounded-full bg-primary flex items-center justify-center text-2xl font-bold text-primary-foreground">
@@ -1250,7 +1245,7 @@ export default function VendorDetailPage() {
               </div>
             </div>
 
-            <Card>
+            <Card className="rounded-2xl shadow-sm">
               <CardContent className="pt-4">
                 <Table>
                   <TableHeader>
@@ -1341,7 +1336,7 @@ export default function VendorDetailPage() {
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card>
+              <Card className="rounded-2xl shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm">O/S Category</CardTitle>
                 </CardHeader>
@@ -1381,7 +1376,7 @@ export default function VendorDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="rounded-2xl shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm">Procure Status</CardTitle>
                 </CardHeader>
@@ -1410,7 +1405,7 @@ export default function VendorDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="rounded-2xl shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm">Spend Analysis</CardTitle>
                 </CardHeader>
@@ -1449,7 +1444,7 @@ export default function VendorDetailPage() {
           <TabsContent value="scorecard" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <VendorScorecard vendor={vendor} orders={vendorOrders} />
-              <Card>
+              <Card className="rounded-2xl shadow-sm">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm">Services Export</CardTitle>

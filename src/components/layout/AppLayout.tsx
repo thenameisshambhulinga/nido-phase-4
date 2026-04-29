@@ -1,14 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
-import Header from "./Header";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu, X } from "lucide-react";
+import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useData } from "@/contexts/DataContext";
+import { applyBrandTheme } from "@/lib/theme";
 
 export default function AppLayout() {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { organizations, generalSettings } = useData();
+
+  useEffect(() => {
+    const primaryOrgId = organizations[0]?.id || "";
+    applyBrandTheme(generalSettings[primaryOrgId]?.primaryColor);
+  }, [generalSettings, organizations]);
 
   return (
     <div className="relative flex min-h-screen bg-background">

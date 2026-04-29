@@ -153,7 +153,17 @@ function AppRoutes() {
         <Route path="vendors/categories" element={<VendorCategoriesPage />} />
         <Route path="vendors/onboarding" element={<VendorOnboardingPage />} />
         <Route path="vendors/:id" element={<VendorDetailPage />} />
-        <Route path="procure/orders/:id" element={<OrderDetailsPage />} />
+        <Route
+          path="procure/orders/:id"
+          element={
+            <PageErrorBoundary
+              title="Procure order details failed to load"
+              resetKey={location.pathname}
+            >
+              <OrderDetailsPage />
+            </PageErrorBoundary>
+          }
+        />
         <Route
           path="clients"
           element={
@@ -334,7 +344,7 @@ function AppRoutes() {
             </PageErrorBoundary>
           }
         />
-        <Route path="services" element={<MainDashboard />} />
+        <Route path="services" element={<SupportPage />} />
         <Route path="support" element={<SupportPage />} />
         <Route
           path="transactions"

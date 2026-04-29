@@ -5,15 +5,20 @@ import dotenv from "dotenv";
 import Client from "./models/Client.js";
 import Vendor from "./models/Vendor.js";
 import Product from "./models/Product.js";
+import { ensureBusinessId } from "./utils/businessIds.js";
 
 dotenv.config();
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/nido";
+const { MONGODB_URI } = process.env;
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const dataDir = path.join(__dirname, "data");
 
 async function seedDatabase() {
   try {
+    if (!MONGODB_URI) {
+      throw new Error("MONGODB_URI is required for seeding");
+    }
+
     // Connect to MongoDB
     await mongoose.connect(MONGODB_URI);
     console.log("✅ Connected to MongoDB");
@@ -33,70 +38,103 @@ async function seedDatabase() {
     console.log(`📋 Read ${vendorsData.length} vendors`);
     console.log(`📋 Read ${productsData.length} products`);
 
-    // Remove duplicates (by code/identifier) and remove the id field
+    // Normalize business IDs and remove duplicate rows by stable business code.
     const uniqueClients = Array.from(
       new Map(clientsData.map((c) => [c.clientCode, c])).values(),
-    ).map((c) => {
-      const { id, ...rest } = c;
-      return rest;
-    });
+    ).map((c, index) => ({
+      ...c,
+      clientId: ensureBusinessId(c.clientId, "CID", index + 1, 4),
+    }));
     const uniqueVendors = Array.from(
       new Map(vendorsData.map((v) => [v.vendorCode, v])).values(),
-    ).map((v) => {
-      const { id, ...rest } = v;
-      return rest;
-    });
+    ).map((v, index) => ({
+      ...v,
+      vendorId: ensureBusinessId(v.vendorId, "VID", index + 1, 4),
+    }));
     const uniqueProducts = Array.from(
       new Map(
-        productsData.map((p) => [p.serialNumber || p.productName, p]),
+        productsData.map((p) => [
+          p.masterProductId || p.productCode || p.sku || p.productName,
+          p,
+        ]),
       ).values(),
-    ).map((p) => {
-      const { id, ...rest } = p;
-      return rest;
+    ).map((p, index) => ({
+      ...p,
+      masterProductId: ensureBusinessId(p.masterProductId, "MP", index + 1, 4),
+    }));
+
+    let clientsUpserted = 0;
+    for (const client of uniqueClients) {
+      const { id, ...payload } = client;
+      await Client.updateOne(
+        { clientCode: payload.clientCode },
+        { $set: payload },
+        { upsert: true },
+      );
+      clientsUpserted += 1;
+    }
+
+    const validClientCodes = uniqueClients
+      .map((client) => client.clientCode)
+      .filter(Boolean);
+    const staleClientsResult = await Client.deleteMany({
+      clientCode: { $nin: validClientCodes },
     });
 
-    // Seed only empty collections
-    const [clientCountBefore, vendorCountBefore, productCountBefore] =
-      await Promise.all([
-        Client.countDocuments(),
-        Vendor.countDocuments(),
-        Product.countDocuments(),
-      ]);
-
-    if (clientCountBefore === 0) {
-      const clientResult = await Client.insertMany(uniqueClients);
-      console.log(`✅ Inserted ${clientResult.length} clients`);
-    } else {
-      console.log(
-        `ℹ️  Skipped clients seeding (existing: ${clientCountBefore})`,
+    let vendorsUpserted = 0;
+    for (const vendor of uniqueVendors) {
+      const { id, ...payload } = vendor;
+      await Vendor.updateOne(
+        { vendorCode: payload.vendorCode },
+        { $set: payload },
+        { upsert: true },
       );
+      vendorsUpserted += 1;
     }
 
-    if (vendorCountBefore === 0) {
-      const vendorResult = await Vendor.insertMany(uniqueVendors);
-      console.log(`✅ Inserted ${vendorResult.length} vendors`);
-    } else {
-      console.log(
-        `ℹ️  Skipped vendors seeding (existing: ${vendorCountBefore})`,
+    const validVendorCodes = uniqueVendors
+      .map((vendor) => vendor.vendorCode)
+      .filter(Boolean);
+    const staleVendorsResult = await Vendor.deleteMany({
+      vendorCode: { $nin: validVendorCodes },
+    });
+
+    let productsUpserted = 0;
+    for (const product of uniqueProducts) {
+      const { id, ...payload } = product;
+      await Product.updateOne(
+        {
+          $or: [
+            { masterProductId: payload.masterProductId },
+            { serialNumber: payload.serialNumber },
+            { sku: payload.sku },
+          ],
+        },
+        { $set: payload },
+        { upsert: true },
       );
+      productsUpserted += 1;
     }
 
-    if (productCountBefore === 0) {
-      const productResult = await Product.insertMany(uniqueProducts);
-      console.log(`✅ Inserted ${productResult.length} products`);
-    } else {
-      console.log(
-        `ℹ️  Skipped products seeding (existing: ${productCountBefore})`,
-      );
-    }
+    const validProductIds = uniqueProducts
+      .map((product) => product.masterProductId)
+      .filter(Boolean);
+    const staleProductsResult = await Product.deleteMany({
+      masterProductId: { $nin: validProductIds },
+    });
+
+    console.log(`✅ Upserted ${clientsUpserted} clients`);
+    console.log(`✅ Upserted ${vendorsUpserted} vendors`);
+    console.log(`✅ Upserted ${productsUpserted} products`);
+    console.log(`🧹 Removed ${staleClientsResult.deletedCount || 0} stale clients`);
+    console.log(`🧹 Removed ${staleVendorsResult.deletedCount || 0} stale vendors`);
+    console.log(`🧹 Removed ${staleProductsResult.deletedCount || 0} stale products`);
 
     const clientCount = await Client.countDocuments();
     const vendorCount = await Vendor.countDocuments();
     const productCount = await Product.countDocuments();
 
-    console.log(
-      `\n📊 Total in DB - Clients: ${clientCount}, Vendors: ${vendorCount}, Products: ${productCount}`,
-    );
+    console.log(`\n📊 Total in DB - Clients: ${clientCount}, Vendors: ${vendorCount}, Products: ${productCount}`);
     console.log("\n🎉 Database seeding completed successfully!");
     await mongoose.connection.close();
     process.exit(0);

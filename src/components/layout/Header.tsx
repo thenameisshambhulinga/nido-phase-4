@@ -92,18 +92,18 @@ export default function Header({ title }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/70 bg-card/85 px-3 backdrop-blur-md sm:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b px-3 backdrop-blur-md sm:px-6 border-[hsl(var(--header-border)/0.85)] bg-[hsl(var(--header-background)/0.92)] text-[hsl(var(--header-foreground))]">
       <div className="flex items-center gap-2 sm:gap-3">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 rounded-lg border border-transparent transition-transform hover:scale-105 hover:border-border/60 hover:bg-background/80 active:scale-95"
+          className="h-8 w-8 rounded-lg border border-transparent text-[hsl(var(--header-foreground))] transition-transform hover:scale-105 hover:border-white/20 hover:bg-white/10 hover:text-[hsl(var(--header-foreground))] active:scale-95"
           onClick={() => navigate(-1)}
           title="Go back"
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h2 className="max-w-[150px] truncate text-base font-display font-semibold text-foreground sm:max-w-none sm:text-lg">
+        <h2 className="max-w-[150px] truncate text-base font-display font-semibold text-[hsl(var(--header-foreground))] sm:max-w-none sm:text-lg">
           {title}
         </h2>
       </div>
@@ -122,7 +122,7 @@ export default function Header({ title }: HeaderProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="relative h-9 w-9 rounded-lg border border-transparent transition-transform hover:scale-105 hover:border-border/60 hover:bg-background/80 active:scale-95"
+              className="relative h-9 w-9 rounded-lg border border-transparent text-[hsl(var(--header-foreground))] transition-transform hover:scale-105 hover:border-white/20 hover:bg-white/10 hover:text-[hsl(var(--header-foreground))] active:scale-95"
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
@@ -247,7 +247,7 @@ export default function Header({ title }: HeaderProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 rounded-lg border border-transparent transition-transform hover:scale-105 hover:border-border/60 hover:bg-background/80 active:scale-95"
+              className="h-9 w-9 rounded-lg border border-transparent text-[hsl(var(--header-foreground))] transition-transform hover:scale-105 hover:border-white/20 hover:bg-white/10 hover:text-[hsl(var(--header-foreground))] active:scale-95"
             >
               <Settings className="h-4 w-4" />
             </Button>
@@ -282,7 +282,7 @@ export default function Header({ title }: HeaderProps) {
               : "ghost"
           }
           size="sm"
-          className="gap-2 transition-transform hover:scale-105 active:scale-95"
+          className="gap-2 text-[hsl(var(--header-foreground))] transition-transform hover:scale-105 active:scale-95"
           onClick={() => navigate("/organizations")}
         >
           <Building2 className="h-4 w-4" />
