@@ -102,14 +102,19 @@ async function seedDatabase() {
     let productsUpserted = 0;
     for (const product of uniqueProducts) {
       const { id, ...payload } = product;
+      const productMatch = {};
+      if (payload.masterProductId) {
+        productMatch.masterProductId = payload.masterProductId;
+      } else if (payload.productCode) {
+        productMatch.productCode = payload.productCode;
+      } else if (payload.sku) {
+        productMatch.sku = payload.sku;
+      } else {
+        productMatch.productName = payload.productName;
+      }
+
       await Product.updateOne(
-        {
-          $or: [
-            { masterProductId: payload.masterProductId },
-            { serialNumber: payload.serialNumber },
-            { sku: payload.sku },
-          ],
-        },
+        productMatch,
         { $set: payload },
         { upsert: true },
       );
@@ -126,15 +131,23 @@ async function seedDatabase() {
     console.log(`✅ Upserted ${clientsUpserted} clients`);
     console.log(`✅ Upserted ${vendorsUpserted} vendors`);
     console.log(`✅ Upserted ${productsUpserted} products`);
-    console.log(`🧹 Removed ${staleClientsResult.deletedCount || 0} stale clients`);
-    console.log(`🧹 Removed ${staleVendorsResult.deletedCount || 0} stale vendors`);
-    console.log(`🧹 Removed ${staleProductsResult.deletedCount || 0} stale products`);
+    console.log(
+      `🧹 Removed ${staleClientsResult.deletedCount || 0} stale clients`,
+    );
+    console.log(
+      `🧹 Removed ${staleVendorsResult.deletedCount || 0} stale vendors`,
+    );
+    console.log(
+      `🧹 Removed ${staleProductsResult.deletedCount || 0} stale products`,
+    );
 
     const clientCount = await Client.countDocuments();
     const vendorCount = await Vendor.countDocuments();
     const productCount = await Product.countDocuments();
 
-    console.log(`\n📊 Total in DB - Clients: ${clientCount}, Vendors: ${vendorCount}, Products: ${productCount}`);
+    console.log(
+      `\n📊 Total in DB - Clients: ${clientCount}, Vendors: ${vendorCount}, Products: ${productCount}`,
+    );
     console.log("\n🎉 Database seeding completed successfully!");
     await mongoose.connection.close();
     process.exit(0);
