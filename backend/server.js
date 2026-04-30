@@ -9,6 +9,7 @@ import productRoutes from "./routes/products.js";
 import orderRoutes from "./routes/orders.js";
 import invoiceRoutes from "./routes/invoices.js";
 import emailRoutes from "./routes/email.js";
+import authRoutes, { ensureDefaultOwnerAccount } from "./routes/auth.js";
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/email", emailRoutes);
+app.use("/api/auth", authRoutes);
 
 /* ================= ERROR HANDLER ================= */
 app.use((err, req, res, next) => {
@@ -75,8 +77,10 @@ mongoose
   .connect(MONGODB_URI)
   .then(() => {
     console.log("✅ Connected to MongoDB successfully");
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
+    return ensureDefaultOwnerAccount().then(() => {
+      app.listen(PORT, () => {
+        console.log(`🚀 Server running on http://localhost:${PORT}`);
+      });
     });
   })
   .catch((error) => {

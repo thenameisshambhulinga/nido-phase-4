@@ -73,6 +73,9 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: [
         "pending",
+        "pending_approval",
+        "approved",
+        "placed",
         "assigned",
         "processing",
         "completed",
@@ -141,6 +144,26 @@ const orderSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
+    },
+    requesterEmail: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    createdByRole: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    companyId: {
+      type: String,
+      trim: true,
+      default: "nido-tech",
+      index: true,
+    },
+    statusHistory: {
+      type: Array,
+      default: [],
     },
     invoiceId: {
       type: String,

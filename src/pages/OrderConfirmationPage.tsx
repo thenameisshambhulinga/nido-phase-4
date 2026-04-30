@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { normalizeOrderCode } from "@/lib/documentNumbering";
+import { apiRequest } from "@/lib/api";
 
 type TrackingStage = "confirmed" | "processing" | "shipped" | "delivered";
 
@@ -85,12 +86,9 @@ export default function OrderConfirmationPage() {
 
       const fetchOrder = async () => {
         try {
-          const response = await fetch(
-            `http://localhost:5000/api/orders?orderNumber=${encodeURIComponent(orderId)}`,
+          const orders = await apiRequest<any[]>(
+            `/orders?orderNumber=${encodeURIComponent(orderId)}`,
           );
-          if (!response.ok) return;
-          const payload = await response.json();
-          const orders = Array.isArray(payload) ? payload : payload?.data || [];
           const backendOrder = orders[0];
           if (!backendOrder) return;
 
@@ -368,7 +366,8 @@ export default function OrderConfirmationPage() {
       orderId: order.id,
       vendorOrClient:
         order.shippingInfo.companyName || order.shippingInfo.fullName,
-      customerName: order.shippingInfo.companyName || order.shippingInfo.fullName,
+      customerName:
+        order.shippingInfo.companyName || order.shippingInfo.fullName,
       customerId: order.clientId,
       type: "client",
       invoiceDate: new Date().toISOString().slice(0, 10),
@@ -378,7 +377,9 @@ export default function OrderConfirmationPage() {
       billingAddress: `${order.shippingInfo.address}, ${order.shippingInfo.city}, ${order.shippingInfo.state} ${order.shippingInfo.zipCode}`,
       shippingAddress: `${order.shippingInfo.address}, ${order.shippingInfo.city}, ${order.shippingInfo.state} ${order.shippingInfo.zipCode}`,
       placeOfSupply: order.shippingInfo.state,
-      emailRecipients: order.shippingInfo.email ? [order.shippingInfo.email] : [],
+      emailRecipients: order.shippingInfo.email
+        ? [order.shippingInfo.email]
+        : [],
       items: order.items.map((item) => ({
         id: item.id,
         itemName: item.name,

@@ -1,7 +1,22 @@
-const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://nido-backend-iztc.onrender.com/api";
+const getAPIBase = (): string => {
+  // Development: use localhost backend
+  if (
+    typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1"].includes(window.location.hostname)
+  ) {
+    return "http://localhost:5000/api";
+  }
+
+  // Environment variables
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (import.meta.env.VITE_API_BASE_URL)
+    return import.meta.env.VITE_API_BASE_URL;
+
+  // Production
+  return "https://nido-backend-iztc.onrender.com/api";
+};
+
+const API_BASE = getAPIBase();
 
 type RequestOptions = RequestInit & {
   body?: unknown;
@@ -14,10 +29,15 @@ export async function apiRequest<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const { body, headers, ...rest } = options;
+  const authToken =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("nido_auth_token")
+      : null;
   const response = await fetch(`${API_BASE}${path}`, {
     ...rest,
     headers: {
       "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...(headers || {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),

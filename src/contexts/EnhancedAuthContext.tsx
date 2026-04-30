@@ -12,6 +12,12 @@ import React, {
   ReactNode,
 } from "react";
 import { safeReadJson } from "@/lib/storage";
+import { emailTemplates, sendEmail } from "@/lib/emailService";
+import {
+  isValidEmail,
+  isValidPhoneNumber,
+  normalizeEmail,
+} from "@/lib/validation";
 import {
   RoleTemplateKey,
   ROLE_TEMPLATES,
@@ -34,7 +40,17 @@ import {
 // CONTEXT TYPE
 // ─────────────────────────────────────────────────────────────────
 
+interface Credentials {
+  username: string;
+  email: string;
+  temporaryPassword: string;
+  userType?: string;
+}
+
 interface EnhancedAuthContextType {
+  credentials: Credentials | null;
+  setCredentials: (creds: Credentials | null) => void;
+
   // Current user & authentication
   user: EnhancedAppUser | null;
   isAuthenticated: boolean;
@@ -53,7 +69,12 @@ interface EnhancedAuthContextType {
       | "isLocked"
       | "lastLogin"
     >,
-  ) => Promise<{ success: boolean; userId?: string; tempPassword?: string }>;
+  ) => Promise<{
+    success: boolean;
+    userId?: string;
+    tempPassword?: string;
+    credentials?: Credentials;
+  }>;
   createBulkUsers: (
     rows: Array<
       Omit<
@@ -220,6 +241,8 @@ export const EnhancedAuthProvider: React.FC<{ children: ReactNode }> = ({
     return Array.isArray(stored) ? stored : [];
   });
 
+  const [credentials, setCredentials] = useState<Credentials | null>(null);
+
   // ─ Persist to localStorage ─
   useEffect(() => {
     localStorage.setItem("nido_auth_user", JSON.stringify(user));
@@ -335,9 +358,28 @@ export const EnhancedAuthProvider: React.FC<{ children: ReactNode }> = ({
         | "lastLogin"
       >,
     ) => {
+      const fullName = String(data.fullName || "").trim();
+      const email = normalizeEmail(String(data.email || ""));
+      const phone = String(data.phone || "").trim();
+
+      if (!fullName || !isValidEmail(email)) {
+        return { success: false };
+      }
+
+      if (phone && !isValidPhoneNumber(phone)) {
+        return { success: false };
+      }
+
+      if (users.some((entry) => normalizeEmail(entry.email) === email)) {
+        return { success: false };
+      }
+
       const tempPassword = generateTemporaryPassword();
       const newUser: EnhancedAppUser = {
         ...data,
+        fullName,
+        email,
+        phone,
         id: `user-${Date.now()}`,
         passwordHash: hashPassword(tempPassword),
         createdAt: new Date().toISOString(),
@@ -356,13 +398,36 @@ export const EnhancedAuthProvider: React.FC<{ children: ReactNode }> = ({
         `User created with role: ${newUser.roleTemplate}`,
       );
 
+      // Auto send credentials email
+      sendEmail(
+        newUser.email,
+        emailTemplates.userCredentials({
+          username: newUser.username || newUser.email.split("@")[0],
+          email: newUser.email,
+          temporaryPassword: tempPassword,
+          createdBy: user?.fullName || "Nido Admin",
+          userType: newUser.userType || "Internal User",
+          loginUrl: window.location.origin + "/login",
+        }),
+      ).catch(console.error);
+
+      const createdCredentials: Credentials = {
+        username: newUser.username || newUser.email.split("@")[0],
+        email: newUser.email,
+        temporaryPassword: tempPassword,
+        userType: newUser.userType,
+      };
+
+      setCredentials(createdCredentials);
+
       return {
         success: true,
         userId: newUser.id,
         tempPassword,
+        credentials: createdCredentials,
       };
     },
-    [],
+    [user, users],
   );
 
   const createBulkUsers = useCallback(
@@ -829,6 +894,9 @@ export const EnhancedAuthProvider: React.FC<{ children: ReactNode }> = ({
   // ─────────────────────────────────────────────────────────────────
 
   const value: EnhancedAuthContextType = {
+    // existing fields
+    credentials,
+    setCredentials,
     user,
     isAuthenticated: !!user,
     isOwner: user?.roleTemplate === "owner",

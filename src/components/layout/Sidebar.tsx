@@ -57,6 +57,12 @@ const NAV_ITEMS: NavItem[] = [
   },
   { label: "Services", icon: Wrench, module: "services", path: "/services" },
   {
+    label: "New AMC",
+    icon: ClipboardList,
+    module: "services",
+    path: "/services/amc/new",
+  },
+  {
     label: "Support",
     icon: HeadphonesIcon,
     module: "support",
@@ -182,6 +188,11 @@ const isConfigAllowed = (
   return false;
 };
 
+const isClientAccount = (role?: string) =>
+  String(role || "")
+    .toLowerCase()
+    .startsWith("client_");
+
 interface SidebarProps {
   onClose?: () => void;
   isMobile?: boolean;
@@ -258,6 +269,9 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
 
       <nav className="flex-1 overflow-y-auto scrollbar-thin py-2">
         {NAV_ITEMS.map((item) => {
+          if (item.module === "procure" && isClientAccount(user?.role)) {
+            return null;
+          }
           if (
             item.module === "configuration" &&
             !isConfigAllowed(user, hasPermission)

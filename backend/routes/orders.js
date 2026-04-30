@@ -2,12 +2,19 @@ import express from "express";
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Invoice from "../models/Invoice.js";
+import User from "../models/User.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import { roleMiddleware } from "../middleware/roleMiddleware.js";
+import { sendEmail } from "../utils/emailService.js";
 
 const router = express.Router();
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const ORDER_STATUSES = new Set([
   "pending",
+  "pending_approval",
+  "approved",
+  "placed",
   "assigned",
   "processing",
   "completed",
@@ -21,7 +28,9 @@ const safeNumber = (value, fallback = 0) => {
 };
 
 const buildInvoiceNumber = (orderNumber) =>
-  `INV-${String(orderNumber || Date.now()).replace(/[^A-Za-z0-9]/g, "").slice(-16)}`;
+  `INV-${String(orderNumber || Date.now())
+    .replace(/[^A-Za-z0-9]/g, "")
+    .slice(-16)}`;
 
 const generateInvoiceForOrder = async (orderDoc) => {
   if (!orderDoc || orderDoc.invoiceId) {
@@ -57,7 +66,8 @@ const generateInvoiceForOrder = async (orderDoc) => {
     invoiceNumber,
     orderId: String(orderDoc._id),
     orderNumber: orderDoc.orderNumber,
-    vendorOrClient: orderDoc.organization || orderDoc.requestingUser || "Client",
+    vendorOrClient:
+      orderDoc.organization || orderDoc.requestingUser || "Client",
     customerName: orderDoc.organization || "",
     customerId: orderDoc.clientId || "",
     type: orderDoc.vendorId ? "vendor" : "client",
@@ -136,9 +146,116 @@ const normalizeOrderPayload = (payload) => {
     ...payload,
     vendorId: payload.vendorId || "",
     vendorName: payload.vendorName || "",
+    requesterEmail:
+      payload.requesterEmail || payload.ownerNotificationEmail || "",
+    createdByRole: String(
+      payload.createdByRole || payload.requesterRole || payload.userRole || "",
+    ),
+    companyId: payload.companyId || "nido-tech",
     items,
     totalAmount,
   };
+};
+
+const pushHistory = (order, status, actor, note = "") => {
+  const nextHistory = Array.isArray(order.statusHistory)
+    ? [...order.statusHistory]
+    : [];
+  nextHistory.push({
+    status,
+    actor,
+    note,
+    timestamp: new Date().toISOString(),
+  });
+  order.statusHistory = nextHistory;
+};
+
+const sendOrderNotification = async (order, type) => {
+  const recipient = order.requesterEmail || order.ownerNotificationEmail;
+  if (!recipient) return;
+
+  try {
+    const data = {
+      orderNumber: order.orderNumber || order._id,
+      orderDate: order.createdAt || new Date(),
+      items: order.items || [],
+      subtotal: order.subtotal || 0,
+      tax: order.tax || 0,
+      shippingCharges: order.shippingCharges || 0,
+      totalAmount: order.totalAmount || 0,
+      clientName: order.shippingInfo?.fullName || "Client",
+      clientEmail: recipient,
+      organization: order.shippingInfo?.companyName || "Organization",
+      deliveryAddress: order.shippingInfo?.address || "",
+      shippingMethod: order.shippingMethod || "Standard",
+      paymentMethod: order.paymentMethod || "Payment",
+    };
+
+    const templateType = type === "approved" ? "approval" : "order";
+
+    // For approval emails, add approver info
+    if (type === "approved") {
+      data.approvedBy = "System Administrator";
+    }
+
+    void sendEmail({
+      to: recipient,
+      type: templateType,
+      data,
+      async: true,
+    }).catch((err) => {
+      console.error(`Failed to send ${type} email:`, err);
+    });
+  } catch (error) {
+    console.error("Error in sendOrderNotification:", error);
+  }
+};
+
+const sendApprovalRequestEmails = async (order) => {
+  const approvers = await User.find({
+    companyId: order.companyId || "nido-tech",
+    status: "active",
+    role: { $in: ["CLIENT_ADMIN", "INTERNAL_EMPLOYEE"] },
+  })
+    .select("email")
+    .lean();
+
+  const recipients = [
+    ...new Set(approvers.map((user) => user.email).filter(Boolean)),
+  ];
+  if (!recipients.length && order.ownerNotificationEmail) {
+    recipients.push(order.ownerNotificationEmail);
+  }
+  if (!recipients.length) return;
+
+  const subtotal = (order.items || []).reduce(
+    (sum, item) => sum + safeNumber(item.totalCost),
+    0,
+  );
+
+  void sendEmail({
+    to: recipients,
+    type: "order",
+    data: {
+      orderNumber: order.orderNumber || order._id,
+      orderDate: order.orderDate || order.createdAt || new Date(),
+      items: order.items || [],
+      subtotal,
+      tax: safeNumber(order.tax),
+      shippingCharges: safeNumber(order.shippingCharges),
+      totalAmount: safeNumber(order.totalAmount, subtotal),
+      clientName: order.requestingUser || "Client User",
+      clientEmail: order.requesterEmail || "",
+      organization: order.organization || "Client Organization",
+      deliveryAddress: order.shippingAddress || "",
+      shippingMethod:
+        order.shippingMethod || order.deliveryMethod || "Standard",
+      paymentMethod: order.paymentMethod || "Payment",
+    },
+    async: true,
+  }).catch((err) => {
+    console.error("Failed to send approval request email:", err);
+  });
 };
 
 router.get("/", async (req, res) => {
@@ -150,6 +267,7 @@ router.get("/", async (req, res) => {
     if (vendorId) query.vendorId = String(vendorId);
     if (status) query.status = String(status).toLowerCase();
     if (orderNumber) query.orderNumber = String(orderNumber);
+    if (req.query.companyId) query.companyId = String(req.query.companyId);
 
     const orders = await Order.find(query).sort({ createdAt: -1 });
     res.json({ success: true, data: orders });
@@ -188,7 +306,15 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const normalizedStatus = String(payload.status || "pending").toLowerCase();
+    const creatorRole = String(
+      payload.createdByRole || payload.requesterRole || payload.userRole || "",
+    ).toUpperCase();
+    const normalizedStatus =
+      creatorRole === "CLIENT_USER"
+        ? "pending_approval"
+        : creatorRole === "CLIENT_ADMIN"
+          ? "placed"
+          : String(payload.status || "pending").toLowerCase();
     if (!ORDER_STATUSES.has(normalizedStatus)) {
       return res.status(400).json({
         success: false,
@@ -201,7 +327,21 @@ router.post("/", async (req, res) => {
       status: normalizedStatus,
     });
 
+    pushHistory(
+      order,
+      normalizedStatus,
+      payload.requestingUser || payload.createdBy || "System",
+      "Order created",
+    );
+
     await order.save();
+    if (normalizedStatus === "pending_approval") {
+      void sendApprovalRequestEmails(order);
+    }
+    void sendOrderNotification(
+      order,
+      normalizedStatus === "placed" ? "approved" : "placed",
+    );
     res.status(201).json({ success: true, data: order });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -220,9 +360,10 @@ router.put("/:id", async (req, res) => {
     if (payload.status) {
       payload.status = String(payload.status).toLowerCase();
       if (!ORDER_STATUSES.has(payload.status)) {
-        return res
-          .status(400)
-          .json({ success: false, error: `Invalid status '${payload.status}'` });
+        return res.status(400).json({
+          success: false,
+          error: `Invalid status '${payload.status}'`,
+        });
       }
     }
 
@@ -259,9 +400,10 @@ router.patch("/:id", async (req, res) => {
     if (payload.status) {
       payload.status = String(payload.status).toLowerCase();
       if (!ORDER_STATUSES.has(payload.status)) {
-        return res
-          .status(400)
-          .json({ success: false, error: `Invalid status '${payload.status}'` });
+        return res.status(400).json({
+          success: false,
+          error: `Invalid status '${payload.status}'`,
+        });
       }
     }
 
@@ -313,6 +455,12 @@ router.put("/:id/status", async (req, res) => {
     }
 
     order.status = status;
+    pushHistory(
+      order,
+      status,
+      req.user?.email || req.body?.actor || "System",
+      "Status updated",
+    );
     if (status === "completed" && !order.completedAt) {
       order.completedAt = new Date();
     }
@@ -326,6 +474,50 @@ router.put("/:id/status", async (req, res) => {
     res.status(400).json({ success: false, error: error.message });
   }
 });
+
+router.post(
+  "/:id/approve",
+  authMiddleware,
+  roleMiddleware(["OWNER", "INTERNAL_EMPLOYEE", "CLIENT_ADMIN"]),
+  async (req, res) => {
+    try {
+      if (!isValidObjectId(req.params.id)) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid order ID" });
+      }
+
+      const order = await Order.findById(req.params.id);
+      if (!order) {
+        return res
+          .status(404)
+          .json({ success: false, error: "Order not found" });
+      }
+
+      order.status = "approved";
+      pushHistory(
+        order,
+        "approved",
+        req.user.email,
+        "Approved by client admin",
+      );
+      order.status = "placed";
+      pushHistory(
+        order,
+        "placed",
+        req.user.email,
+        "Automatically placed after approval",
+      );
+      await order.save();
+
+      await sendOrderNotification(order, "approved");
+
+      res.json({ success: true, data: order });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+);
 
 router.put("/:id/assign", async (req, res) => {
   try {

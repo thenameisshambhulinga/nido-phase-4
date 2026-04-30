@@ -27,13 +27,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth, UserRole } from "@/contexts/AuthContext";
+import { useEnhancedAuth } from "@/contexts/EnhancedAuthContext";
+import CredentialsModal from "@/components/shared/CredentialsModal";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import { isValidEmail, normalizeEmail } from "@/lib/validation";
 
 export default function UsersPage() {
-  const { users, createUser, updateUser, deleteUser, isOwner } = useAuth();
+  const {
+    users,
+    createUser,
+    updateUser,
+    deleteUser,
+    isOwner,
+    credentials,
+    setCredentials,
+  } = useEnhancedAuth();
 
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -42,26 +52,26 @@ export default function UsersPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const [form, setForm] = useState<{
-    name: string;
+    fullName: string;
     email: string;
-    role: UserRole;
+    roleTemplate: "employee" | "vendor_user";
     organization: string;
     jobTitle: string;
     department: string;
-    status: "active" | "inactive" | "suspended";
+    status: "Active" | "Inactive" | "Suspended";
   }>({
-    name: "",
+    fullName: "",
     email: "",
-    role: "employee" as UserRole,
+    roleTemplate: "employee",
     organization: "",
     jobTitle: "",
     department: "",
-    status: "active",
+    status: "Active",
   });
 
   const filtered = users.filter(
     (u) =>
-      String(u.name ?? "")
+      String(u.fullName ?? "")
         .toLowerCase()
         .includes(search.toLowerCase()) ||
       String(u.email ?? "")
@@ -69,26 +79,46 @@ export default function UsersPage() {
         .includes(search.toLowerCase()),
   );
 
-  const sendWelcomeEmail = (email: string, name: string) => {
-    console.log("📧 Sending welcome email to:", email);
-    toast({
-      title: "Signup Email Sent",
-      description: `Welcome email sent to ${name}`,
-    });
-  };
-
-  const handleCreate = () => {
-    if (!form.name || !form.email) {
+  const handleCreate = async () => {
+    if (!form.fullName || !form.email) {
       toast({ title: "Error", description: "Name & Email required" });
       return;
     }
 
-    createUser({
+    if (!isValidEmail(form.email)) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const result = await createUser({
       ...form,
-      modules: ["dashboard"],
+      username: form.email.split("@")[0],
+      phone: "",
+      email: normalizeEmail(form.email),
+      userType: "Vendor User",
+      requiresPasswordReset: true,
+      createdBy: "owner",
+      twoFactorEnabled: false,
     });
 
-    sendWelcomeEmail(form.email, form.name);
+    if (result.success && result.credentials) {
+      setCredentials(result.credentials);
+      toast({
+        title: "User created",
+        description: `Credentials generated for ${result.credentials.email}`,
+      });
+    } else if (!result.success) {
+      toast({
+        title: "Create failed",
+        description: "Please check the entered details and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setShowCreate(false);
     resetForm();
@@ -116,13 +146,13 @@ export default function UsersPage() {
 
   const resetForm = () => {
     setForm({
-      name: "",
+      fullName: "",
       email: "",
-      role: "employee",
+      roleTemplate: "employee",
       organization: "",
       jobTitle: "",
       department: "",
-      status: "active",
+      status: "Active",
     } as const);
   };
 
@@ -152,7 +182,7 @@ export default function UsersPage() {
 
               <FormFields form={form} setForm={setForm} />
 
-              <Button onClick={handleCreate}>Create</Button>
+              <Button onClick={() => void handleCreate()}>Create</Button>
             </DialogContent>
           </Dialog>
         </div>
@@ -174,7 +204,7 @@ export default function UsersPage() {
               <TableBody>
                 {filtered.map((u) => (
                   <TableRow key={u.id}>
-                    <TableCell>{u.name}</TableCell>
+                    <TableCell>{u.fullName}</TableCell>
                     <TableCell>{u.email}</TableCell>
                     <TableCell>{u.jobTitle || "-"}</TableCell>
                     <TableCell>{u.department || "-"}</TableCell>
@@ -213,9 +243,16 @@ export default function UsersPage() {
         }}
         onConfirm={() => {
           if (!deleteTargetId) return;
-          deleteUser(deleteTargetId);
+          void deleteUser(deleteTargetId);
           setDeleteTargetId(null);
         }}
+      />
+
+      <CredentialsModal
+        open={!!credentials}
+        onClose={() => setCredentials(null)}
+        credentials={credentials}
+        userType="VENDOR_USER"
       />
     </div>
   );
@@ -226,11 +263,12 @@ function FormFields({ form, setForm }: any) {
     <div className="space-y-3">
       <Input
         placeholder="Name"
-        value={form.name}
-        onChange={(e) => setForm({ ...form, name: e.target.value })}
+        value={form.fullName}
+        onChange={(e) => setForm({ ...form, fullName: e.target.value })}
       />
 
       <Input
+        type="email"
         placeholder="Email"
         value={form.email}
         onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -256,9 +294,9 @@ function FormFields({ form, setForm }: any) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="active">Active</SelectItem>
-          <SelectItem value="inactive">Inactive</SelectItem>
-          <SelectItem value="suspended">Suspended</SelectItem>
+          <SelectItem value="Active">Active</SelectItem>
+          <SelectItem value="Inactive">Inactive</SelectItem>
+          <SelectItem value="Suspended">Suspended</SelectItem>
         </SelectContent>
       </Select>
     </div>

@@ -36,6 +36,11 @@ import {
 } from "@/lib/documentNumbering";
 import { emailTemplates, sendEmail } from "@/lib/emailService";
 import { apiRequest } from "@/lib/api";
+import {
+  isValidEmail,
+  isValidPhoneNumber,
+  normalizeEmail,
+} from "@/lib/validation";
 
 interface ShippingInfo {
   fullName: string;
@@ -57,18 +62,16 @@ interface PaymentInfo {
   purchaseOrderNumber: string;
 }
 
-const isValidEmail = (value: string) =>
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { items, subtotal, clearCart, totalItems } = useCart();
   const { user, isOwner, hasPermission } = useAuth();
-  const { orders, addAuditEntry } = useData();
+  const { orders, addAuditEntry, organizations } = useData();
 
   const [shippingMethod, setShippingMethod] = useState<"standard" | "express">(
     "standard",
   );
+  const [shippingCost, setShippingCost] = useState(25);
   const [paymentMethod, setPaymentMethod] = useState<
     "card" | "bank" | "purchase_order"
   >("card");
@@ -77,6 +80,9 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [sendOwnerNotification, setSendOwnerNotification] = useState(false);
   const [ownerNotificationEmail, setOwnerNotificationEmail] = useState("");
+  const [paymentErrors, setPaymentErrors] = useState<Record<string, string>>(
+    {},
+  );
 
   // Shipping Info State
   const [shipping, setShipping] = useState<ShippingInfo>({
@@ -101,30 +107,57 @@ export default function CheckoutPage() {
   });
 
   // Calculations
-  const shippingCost = shippingMethod === "express" ? 75 : 25;
   const tax = subtotal * 0.1;
   const total = subtotal + tax + shippingCost;
   const canConfigureOwnerNotification =
     isOwner || hasPermission("procure", "approve");
 
   const handleShippingChange = (field: keyof ShippingInfo, value: string) => {
-    setShipping((prev) => ({ ...prev, [field]: value }));
+    let nextValue = value;
+    if (field === "zipCode" || field === "phone") {
+      nextValue = value.replace(/\D/g, "").slice(0, 10);
+    }
+    if (field === "email") {
+      nextValue = value.trim();
+    }
+    setShipping((prev) => ({ ...prev, [field]: nextValue }));
   };
 
   const handlePaymentChange = (field: keyof PaymentInfo, value: string) => {
     let formattedValue = value;
     if (field === "cardNumber") {
       formattedValue = value
-        .replace(/\s/g, "")
+        .replace(/\D/g, "")
+        .slice(0, 19)
         .replace(/(\d{4})/g, "$1 ")
         .trim();
     }
+    if (field === "cvv") {
+      formattedValue = value.replace(/\D/g, "").slice(0, 3);
+    }
     setPayment((prev) => ({ ...prev, [field]: formattedValue }));
+    setPaymentErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const luhnCheck = (cardNumber: string) => {
+    const digits = cardNumber.replace(/\D/g, "").split("").reverse();
+    if (digits.length < 12) return false;
+    const sum = digits.reduce((total, digit, index) => {
+      let value = Number(digit);
+      if (index % 2 === 1) {
+        value *= 2;
+        if (value > 9) value -= 9;
+      }
+      return total + value;
+    }, 0);
+    return sum % 10 === 0;
   };
 
   const validateShipping = () => {
+    const zipDigits = shipping.zipCode.replace(/\D/g, "");
     if (
       !shipping.fullName ||
+      !shipping.companyName ||
       !shipping.address ||
       !shipping.city ||
       !shipping.state ||
@@ -132,12 +165,30 @@ export default function CheckoutPage() {
       !shipping.phone ||
       !shipping.email
     ) {
-      toast.error("Please fill in all shipping information");
+      toast.error("Please fill in all shipping information (company required)");
       return false;
     }
 
-    if (shipping.phone.replace(/\D/g, "").length !== 10) {
+    if (!/^[A-Za-z][A-Za-z\s.'-]{1,}$/.test(shipping.fullName.trim())) {
+      toast.error("Please enter a valid recipient name");
+      return false;
+    }
+
+    if (!isValidEmail(shipping.email)) {
+      toast.error("Please enter a valid shipping email");
+      return false;
+    }
+
+    if (
+      !isValidPhoneNumber(shipping.phone) ||
+      shipping.phone.replace(/\D/g, "").length !== 10
+    ) {
       toast.error("Phone number must be exactly 10 digits");
+      return false;
+    }
+
+    if (zipDigits.length < 5 || zipDigits.length > 10) {
+      toast.error("Please enter a valid zip code");
       return false;
     }
 
@@ -145,6 +196,7 @@ export default function CheckoutPage() {
   };
 
   const validatePayment = () => {
+    const nextErrors: Record<string, string> = {};
     if (paymentMethod === "card") {
       if (
         !payment.cardholderName ||
@@ -153,15 +205,39 @@ export default function CheckoutPage() {
         !payment.expiryYear ||
         !payment.cvv
       ) {
+        nextErrors.cardholderName = !payment.cardholderName
+          ? "Cardholder name is required"
+          : "";
+        nextErrors.cardNumber = !payment.cardNumber
+          ? "Card number is required"
+          : "";
+        nextErrors.expiryMonth = !payment.expiryMonth
+          ? "Select expiry month"
+          : "";
+        nextErrors.expiryYear = !payment.expiryYear ? "Select expiry year" : "";
+        nextErrors.cvv = !payment.cvv ? "CVV is required" : "";
+        setPaymentErrors(nextErrors);
         toast.error("Please fill in all payment information");
         return false;
       }
-      if (payment.cardNumber.replace(/\s/g, "").length !== 16) {
-        toast.error("Please enter a valid 16-digit card number");
-        return false;
+      if (!/^[A-Za-z][A-Za-z\s.'-]{1,}$/.test(payment.cardholderName.trim())) {
+        nextErrors.cardholderName = "Enter a valid cardholder name";
+      }
+      if (!luhnCheck(payment.cardNumber)) {
+        nextErrors.cardNumber = "Enter a valid card number";
+      }
+      const expiryMonth = Number(payment.expiryMonth);
+      const expiryYear = Number(payment.expiryYear);
+      const expiryDate = new Date(expiryYear, expiryMonth, 0, 23, 59, 59);
+      if (Number.isNaN(expiryDate.getTime()) || expiryDate <= new Date()) {
+        nextErrors.expiryMonth = "Card expiry must be in the future";
       }
       if (payment.cvv.length !== 3) {
-        toast.error("Please enter a valid 3-digit CVV");
+        nextErrors.cvv = "CVV must be 3 digits";
+      }
+      setPaymentErrors(nextErrors);
+      if (Object.values(nextErrors).some(Boolean)) {
+        toast.error("Please correct the payment details");
         return false;
       }
     }
@@ -230,13 +306,25 @@ export default function CheckoutPage() {
       const createProcureOrderPayload = (generatedOrderId: string) => ({
         orderNumber: generatedOrderId,
         clientId: user?.id || "shop-client",
+        companyId: user?.organization || "nido-tech",
         vendorId: "",
         orderDate: new Date().toISOString(),
+        requesterEmail: normalizeEmail(shipping.email),
         organization:
           shipping.companyName || user?.organization || "Client Order",
         requestingUser: shipping.fullName || user?.name || "Client User",
         approvingUser: user?.name || "System Owner",
-        status: "pending",
+        createdByRole: isOwner
+          ? "OWNER"
+          : user?.role === "client_admin"
+            ? "CLIENT_ADMIN"
+            : user?.role === "client_employee"
+              ? "CLIENT_USER"
+              : "INTERNAL_EMPLOYEE",
+        status:
+          isOwner || user?.role === "client_admin"
+            ? "placed"
+            : "pending_approval",
         assignedUser: "Procurement Desk",
         items: items.map((i) => ({
           productId: i.id.toString(),
@@ -340,7 +428,7 @@ export default function CheckoutPage() {
               id: persistedOrderId,
               orderDate: todayIso,
               shippingInfo: {
-                email: shipping.email,
+                email: normalizeEmail(shipping.email),
                 fullName: shipping.fullName,
                 companyName: shipping.companyName,
               },
@@ -475,14 +563,30 @@ export default function CheckoutPage() {
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                     Company Name
                   </Label>
-                  <Input
+                  <Select
                     value={shipping.companyName}
-                    onChange={(e) =>
-                      handleShippingChange("companyName", e.target.value)
+                    onValueChange={(v) =>
+                      handleShippingChange("companyName", v)
                     }
-                    placeholder="Tech Solutions Inc."
-                    className="mt-1"
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {organizations && organizations.length > 0 ? (
+                        organizations.map((org: any) => (
+                          <SelectItem key={org.id} value={org.name}>
+                            {org.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="">No companies available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Select the company for this order.
+                  </p>
                 </div>
               </div>
 
@@ -534,9 +638,15 @@ export default function CheckoutPage() {
                   <Input
                     value={shipping.zipCode}
                     onChange={(e) =>
-                      handleShippingChange("zipCode", e.target.value)
+                      handleShippingChange(
+                        "zipCode",
+                        e.target.value.replace(/\D/g, "").slice(0, 10),
+                      )
                     }
                     placeholder="94103"
+                    inputMode="numeric"
+                    pattern="[0-9]{5,10}"
+                    maxLength={10}
                     className="mt-1"
                   />
                 </div>
@@ -645,9 +755,11 @@ export default function CheckoutPage() {
                   <div className="flex items-start gap-3">
                     <RadioGroup
                       value={shippingMethod}
-                      onValueChange={(v) =>
-                        setShippingMethod(v as "standard" | "express")
-                      }
+                      onValueChange={(v) => {
+                        const nextMethod = v as "standard" | "express";
+                        setShippingMethod(nextMethod);
+                        setShippingCost(nextMethod === "express" ? 75 : 25);
+                      }}
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem
@@ -679,9 +791,11 @@ export default function CheckoutPage() {
                   <div className="flex items-start gap-3">
                     <RadioGroup
                       value={shippingMethod}
-                      onValueChange={(v) =>
-                        setShippingMethod(v as "standard" | "express")
-                      }
+                      onValueChange={(v) => {
+                        const nextMethod = v as "standard" | "express";
+                        setShippingMethod(nextMethod);
+                        setShippingCost(nextMethod === "express" ? 75 : 25);
+                      }}
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="express" id="express-shipping" />
@@ -704,6 +818,26 @@ export default function CheckoutPage() {
                       </div>
                     </RadioGroup>
                   </div>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-100 bg-sky-50/70 px-3 py-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Shipping price
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Editable before placing the order
+                    </p>
+                  </div>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={shippingCost}
+                    onChange={(e) =>
+                      setShippingCost(Math.max(0, Number(e.target.value) || 0))
+                    }
+                    className="w-28 text-right font-medium"
+                  />
                 </div>
               </div>
             </CardContent>
@@ -810,6 +944,11 @@ export default function CheckoutPage() {
                       placeholder="John Doe"
                       className="mt-1"
                     />
+                    {paymentErrors.cardholderName && (
+                      <p className="mt-1 text-xs text-rose-600">
+                        {paymentErrors.cardholderName}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -839,6 +978,11 @@ export default function CheckoutPage() {
                             : "Unknown"}
                       </Badge>
                     </div>
+                    {paymentErrors.cardNumber && (
+                      <p className="mt-1 text-xs text-rose-600">
+                        {paymentErrors.cardNumber}
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-3 gap-3">
@@ -866,6 +1010,11 @@ export default function CheckoutPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {paymentErrors.expiryMonth && (
+                        <p className="mt-1 text-xs text-rose-600">
+                          {paymentErrors.expiryMonth}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -892,6 +1041,11 @@ export default function CheckoutPage() {
                           })}
                         </SelectContent>
                       </Select>
+                      {paymentErrors.expiryYear && (
+                        <p className="mt-1 text-xs text-rose-600">
+                          {paymentErrors.expiryYear}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -921,6 +1075,11 @@ export default function CheckoutPage() {
                           )}
                         </button>
                       </div>
+                      {paymentErrors.cvv && (
+                        <p className="mt-1 text-xs text-rose-600">
+                          {paymentErrors.cvv}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -1082,11 +1241,18 @@ export default function CheckoutPage() {
                   <span className="text-muted-foreground">Tax (10%)</span>
                   <span className="font-medium">${tax.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span className="font-medium">
-                    ${shippingCost.toLocaleString()}
-                  </span>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={shippingCost}
+                    onChange={(e) =>
+                      setShippingCost(Math.max(0, Number(e.target.value) || 0))
+                    }
+                    className="h-8 w-24 text-right"
+                  />
                 </div>
               </div>
 

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import Header from "@/components/layout/Header";
+import AMCForm from "@/components/forms/AMCForm";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { safeReadJson } from "@/lib/storage";
@@ -742,7 +743,7 @@ const statCardStyles = [
 ];
 
 export default function SupportPage() {
-  const { clients, vendors, orders } = useData();
+  const { clients, vendors, orders, organizations } = useData();
   const { user } = useAuth();
   const [tickets, setTickets] = useState<TicketRecord[]>(loadTickets);
   const [mode, setMode] = useState<"dashboard" | "create" | "detail">(
@@ -1076,6 +1077,58 @@ export default function SupportPage() {
     setMode("detail");
     setDetailTab(created.childIds.length > 0 ? "children" : "overview");
     resetWizard();
+  };
+
+  const createAMCTicket = (amcPayload: any) => {
+    const id = buildNewTicketId(tickets);
+    const now = new Date("2025-05-23T09:30:00");
+    const due = new Date(now.getTime() + 48 * 3600000);
+    const org =
+      organizations?.find((o: any) => o.id === amcPayload.companyId)?.name ||
+      "Client";
+    const created: TicketRecord = {
+      id,
+      subject: `AMC Request - ${org}`,
+      requestType: "Services",
+      category: "AMC Request",
+      subCategory: amcPayload.amcType || "new",
+      organization: org,
+      status: "Open",
+      priority: "Medium",
+      impact: "Medium",
+      urgency: "Medium",
+      assignedTeam: "Service Desk",
+      assignee: "Service Desk",
+      backupAssignee: "",
+      ticketType: "Issue",
+      source: "Portal",
+      description: `AMC details:\nContact: ${amcPayload.contactPerson} (${amcPayload.mobile})\nServices: ${amcPayload.servicesRequired.join(", ")}\nScope: ${amcPayload.scopeNotes}`,
+      createdAt: now.toISOString(),
+      createdBy: user?.name || "System Owner",
+      dueDate: due.toISOString(),
+      slaHours: 48,
+      typicalSla: "8 - 48 hrs",
+      poNumber: "",
+      orderId: "",
+      invoiceNumber: "",
+      vendorName: "",
+      location: "",
+      tags: ["AMC"],
+      childIds: [],
+      attachments: [],
+      comments: [],
+      timeline: [],
+    };
+
+    const next = [created, ...tickets];
+    saveTickets(next);
+    setTickets(next);
+    toast({
+      title: "AMC Request submitted",
+      description: `${created.id} created.`,
+    });
+    setSelectedTicketId(created.id);
+    setMode("detail");
   };
 
   const addComment = () => {
@@ -1712,16 +1765,22 @@ export default function SupportPage() {
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <p className="text-sm font-medium">Description</p>
-                          <Textarea
-                            rows={6}
-                            value={form.description}
-                            onChange={(event) =>
-                              updateForm("description", event.target.value)
-                            }
-                          />
-                        </div>
+                        {/* If AMC Request selected, show AMCForm else show description */}
+                        {form.requestType === "Services" &&
+                        form.category === "AMC Request" ? (
+                          <AMCForm onSubmit={createAMCTicket} />
+                        ) : (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Description</p>
+                            <Textarea
+                              rows={6}
+                              value={form.description}
+                              onChange={(event) =>
+                                updateForm("description", event.target.value)
+                              }
+                            />
+                          </div>
+                        )}
 
                         <Card className="rounded-[24px] border-slate-100">
                           <CardHeader>

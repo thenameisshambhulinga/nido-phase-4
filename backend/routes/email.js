@@ -1,96 +1,96 @@
 import express from "express";
-import nodemailer from "nodemailer";
+import { sendEmail, verifyEmailService } from "../utils/emailService.js";
 
 const router = express.Router();
 
-/* ================= SMTP TRANSPORT ================= */
-/* In production, configure real SMTP credentials via environment variables.
-   For development/demo, we fall back to console logging.            */
-const transporter = (() => {
-  const host = process.env.SMTP_HOST;
-  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
-  if (host && user && pass) {
-    return nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
-  }
-
-  /* Ethereal fallback for demo/testing */
-  return nodemailer.createTransport({
-    host: "smtp.ethereal.email",
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.ETHEREAL_USER || "",
-      pass: process.env.ETHEREAL_PASS || "",
-    },
-  });
-})();
-
-const hasRealCredentials = Boolean(
-  process.env.SMTP_HOST || process.env.ETHEREAL_USER,
-);
-
-/* ================= POST /send ================= */
+/**
+ * POST /api/email/send
+ * Send email using template system or raw HTML
+ * Body: { to, type, data } or { to, subject, html, text }
+ */
 router.post("/send", async (req, res) => {
   try {
-    const { to, subject, html, text, from } = req.body || {};
+    const { to, type, data, subject, html, text, plainText } = req.body || {};
 
-    if (!to || !subject) {
+    if (!to) {
       return res.status(400).json({
         success: false,
-        error: "'to' and 'subject' are required",
+        error: "Recipient email is required",
       });
     }
 
-    const recipients = Array.isArray(to) ? to : [to];
+    // Handle template-based emails
+    if (type && data) {
+      const result = await sendEmail({
+        to,
+        type,
+        data,
+        async: false,
+      });
+      return res.json({
+        success: true,
+        data: result,
+      });
+    } else if (subject && (html || text || plainText)) {
+      // Raw HTML/text email (legacy support)
+      const nodemailer = (await import("nodemailer")).default;
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || "smtp.ethereal.email",
+        port: process.env.SMTP_PORT || 587,
+        secure: process.env.SMTP_PORT == 465,
+        auth: {
+          user: process.env.SMTP_USER || process.env.ETHEREAL_USER,
+          pass: process.env.SMTP_PASS || process.env.ETHEREAL_PASS,
+        },
+      });
 
-    /* Fallback: log email when no SMTP is configured */
-    if (!hasRealCredentials) {
-      console.log("\n========== EMAIL (no SMTP configured) ==========");
-      console.log(`To:      ${recipients.join(", ")}`);
-      console.log(`Subject: ${subject}`);
-      console.log(`From:    ${from || "noreply@nidotech.com"}`);
-      console.log("------------------------------------------------");
-      console.log(text || html || "(no body)");
-      console.log("================================================\n");
+      const info = await transporter.sendMail({
+        from: `"Nido Tech" <${process.env.EMAIL_FROM || "noreply@nidotech.com"}>`,
+        to: Array.isArray(to) ? to.join(", ") : to,
+        subject,
+        html: html || "",
+        text: text || plainText || "",
+      });
 
       return res.json({
         success: true,
         data: {
-          messageId: `fallback-${Date.now()}`,
-          preview: true,
-          recipients,
+          messageId: info.messageId,
+          recipients: Array.isArray(to) ? to : [to],
         },
       });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "Either 'type + data' or 'subject + (html/text)' is required",
+      });
     }
-
-    const info = await transporter.sendMail({
-      from: from || `"Nido Tech" <noreply@nidotech.com>`,
-      to: recipients.join(", "),
-      subject,
-      text: text || "",
-      html: html || "",
-    });
-
-    res.json({
-      success: true,
-      data: {
-        messageId: info.messageId,
-        recipients,
-      },
-    });
   } catch (error) {
-    console.error("Email send error:", error);
+    console.error("❌ Email send error:", error);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to send email",
+    });
+  }
+});
+
+/**
+ * GET /api/email/verify
+ * Verify email service is working
+ */
+router.get("/verify", async (req, res) => {
+  try {
+    const isValid = await verifyEmailService();
+    res.json({
+      success: isValid,
+      message: isValid
+        ? "Email service is operational"
+        : "Email service verification failed",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 });

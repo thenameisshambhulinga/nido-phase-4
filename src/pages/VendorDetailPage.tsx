@@ -27,6 +27,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/lib/api";
 import {
   ArrowLeft,
   TrendingUp,
@@ -168,17 +169,7 @@ export default function VendorDetailPage() {
 
     const fetchVendorAnalytics = async () => {
       try {
-        const response = await fetch(
-          `http://localhost:5000/api/vendors/${id}/analytics`,
-        );
-
-        if (!response.ok) {
-          setVendorAnalytics(null);
-          return;
-        }
-
-        const raw = await response.json();
-        const data = raw?.data || raw;
+        const data = await apiRequest<any>(`/vendors/${id}/analytics`);
 
         setVendorAnalytics({
           totalSpend: Number(data?.totalSpend || 0),
@@ -321,8 +312,11 @@ export default function VendorDetailPage() {
   );
   const openOrders = useMemo(
     () =>
-      vendorOrders.filter((o) =>
-        !["Completed", "Delivered", "Cancelled", "Rejected"].includes(o.status),
+      vendorOrders.filter(
+        (o) =>
+          !["Completed", "Delivered", "Cancelled", "Rejected"].includes(
+            o.status,
+          ),
       ).length,
     [vendorOrders],
   );

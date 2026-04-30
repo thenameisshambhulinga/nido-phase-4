@@ -6,6 +6,8 @@ import React, {
   useCallback,
 } from "react";
 import { safeReadJson } from "@/lib/storage";
+import { apiBaseUrl, apiRequest } from "@/lib/api";
+import { isValidEmail, normalizeEmail } from "@/lib/validation";
 
 export type UserRole =
   | "owner"
@@ -39,9 +41,16 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   signup: (data: Partial<User> & { password: string }) => Promise<boolean>;
   logout: () => void;
-  createUser: (data: Partial<User>) => void;
-  updateUser: (id: string, data: Partial<User>) => void;
-  deleteUser: (id: string) => void;
+  createUser: (data: Partial<User>) => Promise<{
+    user?: User;
+    credentials?: {
+      username: string;
+      email: string;
+      temporaryPassword: string;
+    };
+  } | null>;
+  updateUser: (id: string, data: Partial<User>) => Promise<boolean>;
+  deleteUser: (id: string) => Promise<boolean>;
   hasPermission: (module: string, action: string) => boolean;
   isOwner: boolean;
 }
@@ -156,18 +165,59 @@ const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
   },
   client_admin: {
     dashboard: ["view"],
+    orders: ["view", "create", "edit", "approve"],
     shop: ["view", "edit"],
     procure: ["view", "approve"],
+    inventory: ["view"],
   },
   client_employee: {
     dashboard: ["view"],
+    orders: ["view", "create"],
     shop: ["view"],
+    inventory: ["view"],
+    notifications: ["view"],
   },
+};
+
+const toFrontendRole = (role?: string): UserRole => {
+  const normalized = String(role || "").toUpperCase();
+  if (normalized === "OWNER") return "owner";
+  if (normalized === "INTERNAL_EMPLOYEE") return "admin";
+  if (normalized === "CLIENT_ADMIN") return "client_admin";
+  if (normalized === "CLIENT_USER") return "client_employee";
+  return String(role || "employee").toLowerCase() as UserRole;
+};
+
+const toFrontendUser = (user: any): User => ({
+  id: String(user.id || user._id || `user-${Date.now()}`),
+  email: String(user.email || ""),
+  name: String(user.name || user.fullName || ""),
+  role: toFrontendRole(user.role),
+  avatar: user.avatar,
+  organization: user.organization || user.companyId || "",
+  status: String(user.status || "active").toLowerCase() as User["status"],
+  createdAt: user.createdAt || new Date().toISOString(),
+  modules: user.modules,
+  jobTitle: user.jobTitle,
+  department: user.department,
+});
+
+const toBackendRole = (role?: string) => {
+  const normalized = String(role || "employee").toLowerCase();
+  if (normalized === "owner") return "OWNER";
+  if (normalized === "admin") return "INTERNAL_EMPLOYEE";
+  if (normalized === "client_admin") return "CLIENT_ADMIN";
+  if (normalized === "client_employee") return "CLIENT_USER";
+  return "INTERNAL_EMPLOYEE";
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof localStorage === "undefined") return null;
+    return localStorage.getItem("nido_auth_token");
+  });
   const [user, setUser] = useState<User | null>(() => {
     const parsed = safeReadJson<User | null>("nido_user", null);
     return parsed && typeof parsed === "object" ? parsed : null;
@@ -184,77 +234,184 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [user]);
 
   useEffect(() => {
+    if (!token) {
+      localStorage.removeItem("nido_auth_token");
+      return;
+    }
+    localStorage.setItem("nido_auth_token", token);
+  }, [token]);
+
+  useEffect(() => {
     localStorage.setItem("nido_users", JSON.stringify(users));
   }, [users]);
 
-  const login = useCallback(
-    async (email: string, _password: string) => {
-      // Check current users list first, then fall back to defaults
-      let found = users.find((u) => u.email === email && u.status === "active");
-      if (!found) {
-        found = DEFAULT_USERS.find(
-          (u) => u.email === email && u.status === "active",
-        );
-        if (found) {
-          // Re-add default user if missing from persisted list
-          setUsers((prev) => {
-            const exists = prev.some((u) => u.id === found!.id);
-            return exists ? prev : [...prev, found!];
-          });
-        }
+  useEffect(() => {
+    if (!token) return;
+    void (async () => {
+      try {
+        const current = await apiRequest<any>("/auth/me");
+        setUser(toFrontendUser(current));
+        const remoteUsers = await apiRequest<any[]>("/auth/users");
+        setUsers(remoteUsers.map(toFrontendUser));
+      } catch (error) {
+        console.warn("Auth refresh failed:", error);
       }
-      if (found) {
-        setUser(found);
-        return true;
-      }
+    })();
+  }, [token]);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const normalizedEmail = normalizeEmail(email);
+    if (!isValidEmail(normalizedEmail) || !password) {
+      console.warn("[Auth] Invalid email or password validation failed", {
+        email: normalizedEmail,
+        isValidEmail: isValidEmail(normalizedEmail),
+        hasPassword: !!password,
+      });
       return false;
-    },
-    [users],
-  );
+    }
+
+    try {
+      console.log("[Auth] Attempting login to", `${apiBaseUrl}/auth/login`);
+
+      const response = await fetch(`${apiBaseUrl}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, password }),
+      });
+
+      let payload: any;
+      try {
+        payload = await response.json();
+      } catch (parseError) {
+        console.error("[Auth] Failed to parse login response:", parseError, {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        return false;
+      }
+
+      if (!response.ok) {
+        console.error("[Auth] Login failed with status", response.status, {
+          error: payload?.error,
+          message: payload?.message,
+        });
+        return false;
+      }
+
+      const token = payload?.data?.token;
+      const userData = payload?.data?.user;
+
+      if (!token || !userData) {
+        console.error("[Auth] Login response missing token or user", {
+          payload,
+        });
+        return false;
+      }
+
+      setToken(token);
+      const nextUser = toFrontendUser(userData);
+      setUser(nextUser);
+
+      console.log("[Auth] Login successful", {
+        userId: userData.id,
+        email: userData.email,
+        role: userData.role,
+      });
+
+      // Fetch remote users list
+      try {
+        const remoteUsers = await apiRequest<any[]>("/auth/users");
+        setUsers(remoteUsers.map(toFrontendUser));
+      } catch (error) {
+        console.warn("[Auth] Failed to fetch users list after login:", error);
+        // Don't fail login if users list fetch fails
+      }
+
+      return true;
+    } catch (error) {
+      console.error("[Auth] Login error:", error);
+      return false;
+    }
+  }, []);
 
   const signup = useCallback(
     async (data: Partial<User> & { password: string }) => {
-      const newUser: User = {
-        id: `user-${Date.now()}`,
-        email: data.email || "",
-        name: data.name || "",
-        role: data.role || "owner",
-        organization: data.organization || "",
-        status: "active",
-        createdAt: new Date().toISOString().split("T")[0],
-        modules: data.role === "owner" ? ["all"] : ["dashboard"],
-      };
-      setUsers((prev) => [...prev, newUser]);
-      setUser(newUser);
+      if (!user || user.role !== "owner") return false;
+      await createUser(data);
       return true;
     },
-    [],
+    [user],
   );
 
-  const logout = useCallback(() => setUser(null), []);
-
-  const createUser = useCallback((data: Partial<User>) => {
-    const newUser: User = {
-      id: `user-${Date.now()}`,
-      email: data.email || "",
-      name: data.name || "",
-      role: data.role || "employee",
-      organization: data.organization || "",
-      status: data.status || "active",
-      createdAt: new Date().toISOString().split("T")[0],
-      modules: data.modules || ["dashboard"],
-    };
-    setUsers((prev) => [...prev, newUser]);
+  const logout = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem("nido_auth_token");
   }, []);
 
-  const updateUser = useCallback((id: string, data: Partial<User>) => {
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...data } : u)));
-    // If updating the currently logged-in user, reflect changes immediately
-    setUser((prev) => (prev && prev.id === id ? { ...prev, ...data } : prev));
+  const createUser = useCallback(async (data: Partial<User>) => {
+    if (!data.email || !isValidEmail(data.email)) {
+      throw new Error("Invalid email format");
+    }
+
+    try {
+      const response = await apiRequest<any>("/auth/users", {
+        method: "POST",
+        body: {
+          name: data.name,
+          role: toBackendRole(data.role),
+          companyId: data.organization,
+          permissions: {},
+          email: normalizeEmail(data.email),
+        },
+      });
+      if (response?.user) {
+        setUsers((prev) => [...prev, toFrontendUser(response.user)]);
+        return {
+          user: toFrontendUser(response.user),
+          credentials: response.credentials,
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error("Create user failed:", error);
+      return null;
+    }
   }, []);
 
-  const deleteUser = useCallback((id: string) => {
-    setUsers((prev) => prev.filter((u) => u.id !== id));
+  const updateUser = useCallback(async (id: string, data: Partial<User>) => {
+    try {
+      const response = await apiRequest<any>(`/auth/users/${id}`, {
+        method: "PUT",
+        body: {
+          name: data.name,
+          role: data.role ? toBackendRole(data.role) : undefined,
+          companyId: data.organization,
+          permissions: data.modules ? { modules: data.modules } : undefined,
+          status: data.status,
+        },
+      });
+      if (response?.data) {
+        const updated = toFrontendUser(response.data);
+        setUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
+        setUser((prev) => (prev && prev.id === id ? updated : prev));
+      }
+      return true;
+    } catch (error) {
+      console.error("Update user failed:", error);
+      return false;
+    }
+  }, []);
+
+  const deleteUser = useCallback(async (id: string) => {
+    try {
+      await apiRequest(`/auth/users/${id}`, { method: "DELETE" });
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+      return true;
+    } catch (error) {
+      console.error("Delete user failed:", error);
+      return false;
+    }
   }, []);
 
   const hasPermission = useCallback(

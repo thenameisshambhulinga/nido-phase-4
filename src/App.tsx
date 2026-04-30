@@ -45,6 +45,8 @@ import GeneralSettingsTab from "@/components/configuration/GeneralSettingsTab";
 import UserRolesTab from "@/components/configuration/UserRolesTab";
 import IntegrationsPage from "@/pages/IntegrationsPage";
 import SupportPage from "@/pages/SupportPage";
+import ServicesPage from "@/pages/ServicesPage";
+import NewAMCRequestPage from "@/pages/NewAMCRequestPage";
 import InvoicePage from "@/pages/InvoicePage";
 import InvoiceDetails from "@/pages/InvoiceDetails";
 import SalesQuotesPage from "@/pages/SalesQuotesPage";
@@ -344,7 +346,8 @@ function AppRoutes() {
             </PageErrorBoundary>
           }
         />
-        <Route path="services" element={<SupportPage />} />
+        <Route path="services" element={<ServicesPage />} />
+        <Route path="services/amc/new" element={<NewAMCRequestPage />} />
         <Route path="support" element={<SupportPage />} />
         <Route
           path="transactions"

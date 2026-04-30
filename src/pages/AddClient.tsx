@@ -17,6 +17,11 @@ import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { nextSequentialCode } from "@/lib/documentNumbering";
 import {
+  isValidEmail,
+  isValidPhoneNumber,
+  normalizeEmail,
+} from "@/lib/validation";
+import {
   ArrowLeft,
   ArrowRight,
   Check,
@@ -153,8 +158,16 @@ export default function AddClient() {
       toast({ title: "Company name and email are required" });
       return;
     }
+    if (!isValidEmail(form.email)) {
+      toast({ title: "Please enter a valid email address" });
+      return;
+    }
     if (!form.primaryContactName?.trim() || !form.contactNumber?.trim()) {
       toast({ title: "Primary contact name and phone are required" });
+      return;
+    }
+    if (!isValidPhoneNumber(form.contactNumber)) {
+      toast({ title: "Please enter a valid phone number (10-15 digits)" });
       return;
     }
     if (isRegistered && !form.gst?.trim()) {
@@ -187,7 +200,7 @@ export default function AddClient() {
       contactPerson: form.primaryContactName,
       contactEmployeeId: form.employeeId,
       contactNumber: form.contactNumber,
-      email: form.email,
+      email: normalizeEmail(form.email),
       jobTitle: form.jobTitle,
       companyLogo: form.companyLogoName,
       gst: form.gst,

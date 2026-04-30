@@ -9,16 +9,40 @@ const handleResponse = async (res) => {
   return data.data;
 };
 
+const buildHeaders = (headers = {}) => {
+  const token =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("nido_auth_token")
+      : null;
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...headers,
+  };
+};
+
 export const API = {
   // CLIENTS
-  getClients: () => fetch(`${BASE_URL}/clients`).then(handleResponse),
+  getClients: () =>
+    fetch(`${BASE_URL}/clients`, { headers: buildHeaders() }).then(
+      handleResponse,
+    ),
 
   // VENDORS
-  getVendors: () => fetch(`${BASE_URL}/vendors`).then(handleResponse),
+  getVendors: () =>
+    fetch(`${BASE_URL}/vendors`, { headers: buildHeaders() }).then(
+      handleResponse,
+    ),
 
   // PRODUCTS
-  getProducts: () => fetch(`${BASE_URL}/products`).then(handleResponse),
+  getProducts: () =>
+    fetch(`${BASE_URL}/products`, { headers: buildHeaders() }).then(
+      handleResponse,
+    ),
 
   // ORDERS
-  getOrders: () => fetch(`${BASE_URL}/orders`).then(handleResponse),
+  getOrders: () =>
+    fetch(`${BASE_URL}/orders`, { headers: buildHeaders() }).then(
+      handleResponse,
+    ),
 };

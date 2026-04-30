@@ -38,6 +38,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { isValidEmail, normalizeEmail } from "@/lib/validation";
 import NidoRolesPanel from "@/components/configuration/NidoRolesPanel";
 import {
   ArrowLeft,
@@ -442,6 +443,9 @@ export default function ClientDetailPage() {
   });
 
   const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [userRole, setUserRole] = useState<"CLIENT_USER" | "CLIENT_ADMIN">(
+    "CLIENT_USER",
+  );
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userForm, setUserForm] = useState({
     name: "",
@@ -451,6 +455,11 @@ export default function ClientDetailPage() {
     department: "",
     status: "active" as "active" | "inactive" | "suspended",
   });
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    username: string;
+    email: string;
+    temporaryPassword: string;
+  } | null>(null);
 
   const client = clients.find((c) => c.id === id);
 
@@ -1547,29 +1556,44 @@ export default function ClientDetailPage() {
     setUserDialogOpen(true);
   };
 
-  const saveUser = () => {
+  const saveUser = async () => {
     if (!userForm.name.trim() || !userForm.email.trim()) {
       toast({ title: "Name and email are required" });
       return;
     }
 
+    if (!isValidEmail(userForm.email)) {
+      toast({
+        title: "Invalid email",
+        description: "Enter a valid email address for this user.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const payload = {
       name: userForm.name,
-      email: userForm.email,
-      role: userForm.role,
+      email: normalizeEmail(userForm.email),
+      role: userRole.toLowerCase() as UserRole,
       organization: client.name,
       jobTitle: userForm.jobTitle,
       department: userForm.department,
       status: userForm.status,
+      userType: userRole,
       modules: ["dashboard"],
     };
 
     if (editingUserId) {
-      updateUser(editingUserId, payload);
+      await updateUser(editingUserId, payload);
       toast({ title: "Client user updated" });
     } else {
-      createUser(payload);
-      toast({ title: `Welcome email sent to ${userForm.email}` });
+      const result = await createUser(payload);
+      if (result?.credentials) {
+        setCreatedCredentials(result.credentials);
+      }
+      toast({
+        title: `User created! Credentials shown below and emailed to ${payload.email}`,
+      });
     }
 
     setUserDialogOpen(false);
@@ -2278,6 +2302,20 @@ export default function ClientDetailPage() {
                   >
                     <Plus className="h-4 w-4" /> Add User
                   </Button>
+                  <Select
+                    value={userRole}
+                    onValueChange={(value: "CLIENT_USER" | "CLIENT_ADMIN") =>
+                      setUserRole(value)
+                    }
+                  >
+                    <SelectTrigger className="w-44 h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CLIENT_USER">Client User</SelectItem>
+                      <SelectItem value="CLIENT_ADMIN">Client Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Card className="border-0 shadow-sm rounded-lg overflow-hidden">
                   <div className="overflow-x-auto">
@@ -5405,9 +5443,71 @@ export default function ClientDetailPage() {
               >
                 Cancel
               </Button>
-              <Button onClick={saveUser}>Save User</Button>
+              <Button onClick={() => void saveUser()}>Save User</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!createdCredentials}
+        onOpenChange={(open) => !open && setCreatedCredentials(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>User Created Successfully</DialogTitle>
+          </DialogHeader>
+          {createdCredentials && (
+            <div className="space-y-3 rounded-lg border p-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Username</p>
+                <p className="font-medium">{createdCredentials.username}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Email</p>
+                <p className="font-medium">{createdCredentials.email}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  Temporary Password
+                </p>
+                <p className="font-medium">
+                  {createdCredentials.temporaryPassword}
+                </p>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(
+                      `Username: ${createdCredentials.username}\nEmail: ${createdCredentials.email}\nPassword: ${createdCredentials.temporaryPassword}`,
+                    );
+                    toast({ title: "Credentials copied" });
+                  }}
+                >
+                  Copy
+                </Button>
+                <Button
+                  onClick={() => {
+                    const blob = new Blob(
+                      [
+                        `Username: ${createdCredentials.username}\nEmail: ${createdCredentials.email}\nTemporary Password: ${createdCredentials.temporaryPassword}`,
+                      ],
+                      { type: "text/plain" },
+                    );
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = "client-user-credentials.txt";
+                    link.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  Download credentials
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

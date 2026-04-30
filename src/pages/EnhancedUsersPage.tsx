@@ -57,10 +57,24 @@ import {
 } from "lucide-react";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import CredentialsModal from "@/components/shared/CredentialsModal";
+import {
+  isValidEmail,
+  isValidPhoneNumber,
+  normalizeEmail,
+} from "@/lib/validation";
 
 export default function EnhancedUsersPage() {
-  const { users, isOwner, createUser, updateUser, deleteUser, departments } =
-    useEnhancedAuth();
+  const {
+    users,
+    isOwner,
+    createUser,
+    updateUser,
+    deleteUser,
+    departments,
+    credentials,
+    setCredentials,
+  } = useEnhancedAuth();
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -107,10 +121,28 @@ export default function EnhancedUsersPage() {
       return;
     }
 
+    if (!isValidEmail(formData.email)) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
+      toast({
+        title: "Invalid phone",
+        description: "Phone number must contain 10 to 15 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const result = await createUser({
       ...formData,
       fullName: formData.fullName,
-      email: formData.email,
+      email: normalizeEmail(formData.email),
       jobTitle: formData.jobTitle || "",
       department: formData.department || "General",
       roleTemplate: formData.roleTemplate as RoleTemplateKey,
@@ -122,6 +154,9 @@ export default function EnhancedUsersPage() {
     } as any);
 
     if (result.success) {
+      if (result.credentials) {
+        setCredentials(result.credentials);
+      }
       toast({
         title: "User Created",
         description: `Temporary password: ${result.tempPassword}`,
@@ -371,6 +406,8 @@ export default function EnhancedUsersPage() {
                     <div>
                       <Label>Phone</Label>
                       <Input
+                        type="tel"
+                        inputMode="tel"
                         placeholder="+91-XXXXXXXXXX"
                         value={formData.phone || ""}
                         onChange={(e) =>
@@ -608,6 +645,13 @@ Jane Smith,jane@client.com,Admin,Operations,client_admin,Client User,+91-8888888
           </TabsContent>
         </Tabs>
       </div>
+
+      <CredentialsModal
+        open={!!credentials}
+        onClose={() => setCredentials(null)}
+        credentials={credentials}
+        userType="INTERNAL_EMPLOYEE"
+      />
     </div>
   );
 }

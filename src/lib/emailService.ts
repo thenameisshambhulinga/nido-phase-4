@@ -12,6 +12,115 @@ export interface EmailTemplate {
 }
 
 export const emailTemplates = {
+  userCredentials: (data: {
+    username: string;
+    email: string;
+    temporaryPassword: string;
+    createdBy: string;
+    userType: string;
+    loginUrl: string;
+  }): EmailTemplate => ({
+    subject: `Your Nido Tech Account Credentials - ${data.userType}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 0; padding: 20px; min-height: 100vh; }
+            .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); overflow: hidden; }
+            .header { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 30px 24px; text-align: center; }
+            .header h1 { margin: 0 0 8px 0; font-size: 24px; font-weight: 700; }
+            .header p { margin: 0; opacity: 0.95; font-size: 14px; }
+            .content { padding: 32px 24px; }
+            .credential-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+            .credential-label { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+            .credential-value { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; font-size: 16px; font-weight: 500; color: #1e293b; word-break: break-all; letter-spacing: -0.025em; }
+            .warning { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0; }
+            .warning-icon { display: inline-block; color: #d97706; margin-right: 8px; }
+            .cta-button { display: block; width: 100%; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; text-decoration: none; padding: 14px 24px; border-radius: 12px; font-weight: 600; text-align: center; margin: 24px 0; }
+            .footer { background: #f1f5f9; padding: 20px 24px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; }
+            .footer a { color: #4f46e5; text-decoration: none; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Welcome to Nido Tech</h1>
+              <p>Your account has been created by ${data.createdBy}</p>
+            </div>
+            <div class="content">
+              <h2 style="color: #1e293b; margin-bottom: 24px;">Account Credentials</h2>
+              
+              <div class="credential-card">
+                <div class="credential-label">Username</div>
+                <div class="credential-value">${data.username}</div>
+              </div>
+
+              <div class="credential-card">
+                <div class="credential-label">Email Address</div>
+                <div class="credential-value">${data.email}</div>
+              </div>
+
+              <div class="credential-card">
+                <div class="credential-label">Temporary Password</div>
+                <div class="credential-value">${data.temporaryPassword}</div>
+              </div>
+
+              <div class="warning">
+                <span class="warning-icon">⚠️</span>
+                <strong>Security Notice:</strong> You <strong>MUST</strong> change this temporary password on your first login. 
+                This password expires in 24 hours.
+              </div>
+
+              <a href="${data.loginUrl}" class="cta-button">Login Now →</a>
+
+              <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin-top: 24px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 16px;">Next Steps:</h3>
+                <ol style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6;">
+                  <li>Login using the credentials above</li>
+                  <li>Change your password immediately</li>
+                  <li>Complete your profile setup</li>
+                  <li>Explore your dashboard</li>
+                </ol>
+              </div>
+            </div>
+            <div class="footer">
+              <p>Need help? <a href="mailto:support@nidotech.com">Contact Support</a></p>
+              <p>&copy; 2026 Nido Tech. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    plainText: `
+Your Nido Tech Account Credentials - ${data.userType}
+
+Hi,
+
+Your account has been created by ${data.createdBy}.
+
+LOGIN DETAILS:
+Username: ${data.username}
+Email: ${data.email}
+Temporary Password: ${data.temporaryPassword}
+
+IMPORTANT SECURITY NOTICE:
+• You MUST change this temporary password on first login
+• This password expires in 24 hours
+• If you have trouble logging in, contact IT support immediately
+
+Next Steps:
+1. Login using the credentials above: ${data.loginUrl}
+2. Change your password immediately
+3. Complete your profile setup
+4. Explore your dashboard
+
+Need help? Email support@nidotech.com
+
+© 2026 Nido Tech
+    `,
+  }),
   orderConfirmation: (order: {
     id: string;
     shippingInfo: {
@@ -389,7 +498,7 @@ export const sendEmail = async (
         to: Array.isArray(to) ? to : [to],
         subject: template.subject,
         html: template.html,
-        text: template.plainText,
+        plainText: template.plainText,
       },
     });
     return true;

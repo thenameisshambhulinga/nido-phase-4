@@ -23,6 +23,8 @@ import { toast } from "@/hooks/use-toast";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import ValidationAlert from "@/components/shared/ValidationAlert";
+import { apiRequest } from "@/lib/api";
+import { isValidEmail, normalizeEmail } from "@/lib/validation";
 
 interface QuickMailComposerProps {
   open: boolean;
@@ -111,11 +113,18 @@ export default function QuickMailComposer({
     setBody(templateConfig.body);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!to) {
       setValidationError({
         open: true,
         message: "Please select a recipient before sending this email.",
+      });
+      return;
+    }
+    if (!isValidEmail(to)) {
+      setValidationError({
+        open: true,
+        message: "Please select a valid recipient email address.",
       });
       return;
     }
@@ -130,6 +139,33 @@ export default function QuickMailComposer({
       setValidationError({
         open: true,
         message: "Please write the email body before sending.",
+      });
+      return;
+    }
+
+    try {
+      await apiRequest("/email/send", {
+        method: "POST",
+        body: {
+          to: [normalizeEmail(to)],
+          subject,
+          plainText: body,
+          html: `<div style="font-family:Segoe UI,Arial,sans-serif;white-space:pre-wrap;line-height:1.6;color:#1f2937">${body
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")}</div>`,
+        },
+      });
+
+      toast({ title: "Email sent", description: `Message sent to ${to}` });
+      onClose();
+    } catch (error) {
+      setValidationError({
+        open: true,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to send email. Please check your SMTP configuration.",
       });
       return;
     }
