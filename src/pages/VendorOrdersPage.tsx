@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -94,10 +94,19 @@ const toReadableDuration = (elapsedMs: number) => {
 
 export default function VendorOrdersPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { orders, vendors } = useData();
   const [search, setSearch] = useState("");
-  const [vendorFilter, setVendorFilter] = useState("all");
+  const initialVendorFilter = searchParams.get("vendor") || "all";
+  const [vendorFilter, setVendorFilter] = useState(initialVendorFilter);
   const [slaFilter, setSlaFilter] = useState("all");
+
+  useEffect(() => {
+    const vendorParam = searchParams.get("vendor");
+    if (vendorParam) {
+      setVendorFilter(vendorParam);
+    }
+  }, [searchParams]);
 
   const openSlaView = (orderId: string, vendorId: string) => {
     navigate(`/procure/orders/${orderId}?vendorId=${vendorId}#sla-overall`);

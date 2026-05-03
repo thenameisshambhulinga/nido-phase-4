@@ -162,7 +162,12 @@ export default function OrderConfirmationPage() {
       setTrackingStage("shipped");
       return;
     }
-    if (status.includes("processing") || status.includes("approved")) {
+    if (
+      status.includes("processing") ||
+      status.includes("approved") ||
+      status.includes("confirmed") ||
+      status.includes("assigned")
+    ) {
       setTrackingStage("processing");
       return;
     }

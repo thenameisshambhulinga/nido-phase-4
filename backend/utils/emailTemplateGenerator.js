@@ -1,542 +1,420 @@
-/**
- * Production-Grade Email Template Generator
- * Generates beautiful, responsive HTML emails for SaaS platforms
- * Supports: Credentials, Orders, Approvals, Invoices
- */
+const safe = (value = "") =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
-const BRAND_COLOR = "#4F46E5";
-const ACCENT_COLOR = "#10B981";
-const DANGER_COLOR = "#EF4444";
-const NEUTRAL_100 = "#F9FAFB";
-const NEUTRAL_200 = "#F3F4F6";
-const NEUTRAL_300 = "#E5E7EB";
-const NEUTRAL_500 = "#6B7280";
-const NEUTRAL_900 = "#111827";
+const formatMoney = (value) =>
+  `₹${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })}`;
 
-/**
- * Email layout wrapper with brand styling
- */
-const emailWrapper = (content, style = "") => `
+export const baseEmailTemplate = (content) => `
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>${style}</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #f4f7fb;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+
+  .wrapper {
+    width: 100%;
+    padding: 40px 0;
+    background-color: #f4f7fb;
+  }
+
+  .container {
+    max-width: 600px;
+    margin: auto;
+    background: #ffffff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+  }
+
+  .header {
+    background: linear-gradient(135deg, #2c4a6e, #1e3a5f);
+    padding: 24px;
+    color: white;
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .content {
+    padding: 32px;
+    color: #333;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  h1 {
+    font-size: 22px;
+    margin-bottom: 16px;
+    color: #111;
+  }
+
+  p {
+    margin: 12px 0;
+  }
+
+  .highlight {
+    font-weight: 600;
+    color: #2c4a6e;
+  }
+
+  .button {
+    display: inline-block;
+    margin-top: 20px;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white !important;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .link {
+    color: #2563eb;
+    word-break: break-all;
+  }
+
+  .card {
+    margin: 18px 0;
+    padding: 16px 18px;
+    border-radius: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+  }
+
+  .label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  .mono {
+    font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 14px;
+    color: #0f172a;
+  }
+
+  ul {
+    padding-left: 18px;
+    margin: 10px 0 14px;
+  }
+
+  li {
+    margin: 6px 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0;
+  }
+
+  th, td {
+    padding: 10px 0;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  th:last-child,
+  td:last-child {
+    text-align: right;
+  }
+
+  .footer {
+    text-align: center;
+    font-size: 12px;
+    color: #777;
+    padding: 20px;
+    background: #f1f5f9;
+  }
+
+  @media only screen and (max-width: 640px) {
+    .wrapper {
+      padding: 20px 12px;
+    }
+    .content {
+      padding: 24px 20px;
+    }
+    .button {
+      display: block;
+      text-align: center;
+    }
+  }
+</style>
 </head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#f9fafb;">
-  <div style="max-width:640px;margin:0 auto;">
-    ${content}
+
+<body>
+  <div class="wrapper">
+    <div class="container">
+
+      <div class="header">
+        Nido Tech CorpEssentials
+      </div>
+
+      <div class="content">
+        ${content}
+      </div>
+
+      <div class="footer">
+        © 2026 Nido Tech. All rights reserved.<br/>
+        support@nido.com
+      </div>
+
+    </div>
   </div>
 </body>
 </html>
 `;
 
-/**
- * Header component
- */
-const emailHeader = (title, subtitle = "") => `
-<div style="background:linear-gradient(135deg,${BRAND_COLOR} 0%,#7c3aed 100%);color:white;padding:40px 24px;text-align:center;border-radius:12px 12px 0 0;">
-  <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;opacity:0.9;margin-bottom:12px;">
-    <strong>Nido Tech</strong>
-  </div>
-  <h1 style="margin:0;font-size:28px;font-weight:700;line-height:1.2;">
-    ${title}
-  </h1>
-  ${subtitle ? `<p style="margin:12px 0 0;opacity:0.95;font-size:14px;">${subtitle}</p>` : ""}
-</div>
-`;
+export const userInviteTemplate = ({
+  name,
+  link,
+  username = "",
+  email = "",
+  temporaryPassword = "",
+  roleLabel = "",
+}) =>
+  baseEmailTemplate(`
+  <h1>Welcome to Nido Tech</h1>
 
-/**
- * Card component for content sections
- */
-const card = (content, padded = true) => `
-<div style="background:white;${padded ? "padding:28px 24px;" : ""}border:1px solid ${NEUTRAL_300};border-radius:8px;">
-  ${content}
-</div>
-`;
+  <p>Hello <span class="highlight">${safe(name)}</span>,</p>
 
-/**
- * Section title component
- */
-const sectionTitle = (title) => `
-<h2 style="margin:0 0 16px;font-size:18px;font-weight:600;color:${NEUTRAL_900};">
-  ${title}
-</h2>
-`;
+  <p>
+    You have been invited to join <b>Nido Tech CorpEssentials</b>.
+    Click below to set up your account and create your password.
+  </p>
 
-/**
- * Badge component
- */
-const badge = (text, variant = "primary") => {
-  const colors = {
-    primary: { bg: BRAND_COLOR, fg: "white" },
-    success: { bg: ACCENT_COLOR, fg: "white" },
-    danger: { bg: DANGER_COLOR, fg: "white" },
-    warning: { bg: "#F59E0B", fg: "white" },
-    neutral: { bg: NEUTRAL_200, fg: NEUTRAL_900 },
-  };
-  const color = colors[variant] || colors.primary;
-  return `
-<span style="display:inline-block;background:${color.bg};color:${color.fg};padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">
-  ${text}
-</span>
-  `;
-};
-
-/**
- * Credential card
- */
-const credentialField = (label, value, masked = false) => `
-<div style="margin-bottom:14px;">
-  <div style="font-size:11px;color:${NEUTRAL_500};text-transform:uppercase;letter-spacing:0.05em;font-weight:600;margin-bottom:6px;">
-    ${label}
-  </div>
-  <div style="background:${NEUTRAL_100};padding:12px 14px;border-radius:6px;border-left:3px solid ${BRAND_COLOR};font-family:'SF Mono',Monaco,'Cascadia Code',monospace;font-size:14px;font-weight:500;color:${NEUTRAL_900};word-break:break-all;">
-    ${masked ? value.replace(/./g, "*").slice(0, -3) + value.slice(-3) : value}
-  </div>
-</div>
-`;
-
-/**
- * Data row
- */
-const dataRow = (label, value, bold = false) => `
-<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid ${NEUTRAL_200};${bold ? "font-weight:600;font-size:15px;" : ""}">
-  <span style="color:${NEUTRAL_500};">${label}</span>
-  <span style="color:${NEUTRAL_900};">${value}</span>
-</div>
-`;
-
-/**
- * Product table row
- */
-const productTableRow = (name, qty, price, category = "") => `
-<tr style="border-bottom:1px solid ${NEUTRAL_200};">
-  <td style="padding:14px 0;color:${NEUTRAL_900};">
-    <strong>${name}</strong>
-    ${category ? `<div style="font-size:12px;color:${NEUTRAL_500};">${category}</div>` : ""}
-  </td>
-  <td style="padding:14px 0;text-align:center;color:${NEUTRAL_600};">${qty}</td>
-  <td style="padding:14px 0;text-align:right;color:${NEUTRAL_900};font-weight:600;">₹${Number(price).toLocaleString()}</td>
-</tr>
-`;
-
-/**
- * CTA button
- */
-const ctaButton = (text, url, variant = "primary") => {
-  const bgColor = variant === "primary" ? BRAND_COLOR : NEUTRAL_500;
-  return `
-<a href="${url}" style="display:inline-block;background:${bgColor};color:white;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0;">
-  ${text}
-</a>
-  `;
-};
-
-/**
- * Footer component
- */
-const emailFooter = () => `
-<div style="background:${NEUTRAL_100};padding:28px 24px;text-align:center;border-radius:0 0 12px 12px;font-size:12px;color:${NEUTRAL_500};">
-  <div style="margin-bottom:12px;">
-    <strong style="color:${NEUTRAL_900};">Need Help?</strong><br>
-    Email: <a href="mailto:support@nidotech.com" style="color:${BRAND_COLOR};text-decoration:none;">support@nidotech.com</a>
-  </div>
-  <div style="margin-bottom:12px;">
-    📞 +91-XXXX-XXX-XXX | 🌐 www.nidotech.com
-  </div>
-  <div style="padding-top:12px;border-top:1px solid ${NEUTRAL_300};margin-top:12px;opacity:0.8;">
-    © 2026 Nido Tech. All rights reserved.
-  </div>
-</div>
-`;
-
-/**
- * TEMPLATE: User Credentials Email
- */
-function credentialsEmailTemplate(data) {
-  const {
-    username,
-    email,
-    temporaryPassword,
-    createdBy,
-    userType = "User",
-    loginUrl,
-  } = data;
-
-  const html = emailWrapper(
-    `
-    <div style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-      ${emailHeader("Welcome to Nido Tech", `Your account has been created by ${createdBy}`)}
-      
-      <div style="padding:28px 24px;">
-        <p style="margin:0 0 20px;color:${NEUTRAL_500};line-height:1.6;">
-          Your account is ready. Below are your login credentials. Please change your password after your first login.
-        </p>
-        
-        ${sectionTitle("Login Details")}
-        
-        <div style="background:${NEUTRAL_100};padding:20px;border-radius:8px;margin-bottom:24px;border-left:4px solid ${ACCENT_COLOR};">
-          ${credentialField("Username", username)}
-          ${credentialField("Email Address", email)}
-          ${credentialField("Temporary Password", temporaryPassword, true)}
-        </div>
-        
-        <div style="background:#FEF3C7;border:1px solid #FCD34D;padding:16px;border-radius:8px;margin-bottom:24px;">
-          <div style="font-weight:600;color:#92400E;margin-bottom:8px;">⚠️ Important Security Notice</div>
-          <ul style="margin:0;padding-left:20px;color:#B45309;font-size:14px;">
-            <li style="margin:4px 0;">You must change this temporary password on your first login</li>
-            <li style="margin:4px 0;">This password expires in 24 hours</li>
-            <li style="margin:4px 0;">Never share your credentials with anyone</li>
-          </ul>
-        </div>
-        
-        <div style="text-align:center;">
-          ${ctaButton("Login Now", loginUrl)}
-        </div>
-        
-        <div style="margin-top:28px;padding:20px;background:${NEUTRAL_100};border-radius:8px;font-size:13px;line-height:1.6;color:${NEUTRAL_600};">
-          <strong>Next Steps:</strong><br>
-          1️⃣ Login using credentials above<br>
-          2️⃣ Change your password immediately<br>
-          3️⃣ Complete your profile setup<br>
-          4️⃣ Explore your dashboard
-        </div>
-      </div>
-      
-      ${emailFooter()}
+  ${
+    username || email || temporaryPassword
+      ? `
+    <div class="card">
+      ${username ? `<span class="label">Username</span><div class="mono">${safe(username)}</div>` : ""}
+      ${email ? `<span class="label" style="margin-top:12px;">Email</span><div class="mono">${safe(email)}</div>` : ""}
+      ${temporaryPassword ? `<span class="label" style="margin-top:12px;">Temporary Password</span><div class="mono">${safe(temporaryPassword)}</div>` : ""}
+      ${roleLabel ? `<span class="label" style="margin-top:12px;">Access Role</span><div>${safe(roleLabel)}</div>` : ""}
     </div>
-    <div style="height:20px;"></div>
-    `,
-  );
-
-  return {
-    subject: `Your Nido Tech Account Credentials - ${userType}`,
-    html,
-    text: `Login Details\nUsername: ${username}\nEmail: ${email}\nTemporary Password: ${temporaryPassword}\n\nPlease change this password on first login.\n\nLogin at: ${loginUrl}`,
-  };
-}
-
-/**
- * TEMPLATE: Order Confirmation Email
- */
-function orderConfirmationEmailTemplate(data) {
-  const {
-    orderNumber,
-    orderDate,
-    items = [],
-    subtotal = 0,
-    tax = 0,
-    shippingCharges = 0,
-    totalAmount = 0,
-    clientName,
-    clientEmail,
-    organization,
-    deliveryAddress,
-    shippingMethod = "Standard",
-    paymentMethod = "Credit Card",
-  } = data;
-
-  const formattedDate = new Date(orderDate).toLocaleDateString("en-IN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const html = emailWrapper(
-    `
-    <div style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-      ${emailHeader("Order Confirmed", `Order #${orderNumber}`)}
-      
-      <div style="padding:28px 24px;">
-        <p style="margin:0 0 20px;color:${NEUTRAL_500};line-height:1.6;">
-          Thank you for placing your order. We've received it and it's now moving through our approval process.
-        </p>
-        
-        ${badge("Pending Approval", "warning")}
-        
-        <div style="margin:24px 0;padding:16px;background:${NEUTRAL_100};border-radius:8px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-            <span style="color:${NEUTRAL_500};">Order Number</span>
-            <strong>${orderNumber}</strong>
-          </div>
-          <div style="display:flex;justify-content:space-between;">
-            <span style="color:${NEUTRAL_500};">Order Date</span>
-            <strong>${formattedDate}</strong>
-          </div>
-        </div>
-        
-        ${sectionTitle("Order Details")}
-        
-        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
-          <thead>
-            <tr style="border-bottom:2px solid ${NEUTRAL_300};">
-              <th style="text-align:left;padding:12px 0;color:${NEUTRAL_600};font-weight:600;font-size:13px;">Product</th>
-              <th style="text-align:center;padding:12px 0;color:${NEUTRAL_600};font-weight:600;font-size:13px;">Qty</th>
-              <th style="text-align:right;padding:12px 0;color:${NEUTRAL_600};font-weight:600;font-size:13px;">Price</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${items
-              .map((item) =>
-                productTableRow(
-                  item.name || item.description || "Item",
-                  item.quantity || 0,
-                  item.price || 0,
-                  item.category || "",
-                ),
-              )
-              .join("")}
-          </tbody>
-        </table>
-        
-        <div style="background:${NEUTRAL_100};padding:16px;border-radius:8px;margin-bottom:24px;">
-          ${dataRow("Subtotal", `₹${Number(subtotal).toLocaleString()}`)}
-          ${dataRow("Tax (GST)", `₹${Number(tax).toLocaleString()}`)}
-          ${dataRow("Shipping", `₹${Number(shippingCharges).toLocaleString()}`)}
-          ${dataRow("Total Amount", `₹${Number(totalAmount).toLocaleString()}`, true)}
-        </div>
-        
-        ${sectionTitle("Delivery Details")}
-        
-        <div style="background:${NEUTRAL_100};padding:16px;border-radius:8px;margin-bottom:24px;font-size:14px;line-height:1.6;">
-          <div><strong>${clientName}</strong></div>
-          <div style="color:${NEUTRAL_600};">${organization || "Organization"}</div>
-          <div style="margin-top:8px;color:${NEUTRAL_600};">${deliveryAddress || "No address provided"}</div>
-          <div style="margin-top:12px;padding-top:12px;border-top:1px solid ${NEUTRAL_300};">
-            <strong>Shipping Method:</strong> ${shippingMethod}<br>
-            <strong>Payment Method:</strong> ${paymentMethod}
-          </div>
-        </div>
-        
-        <div style="margin:24px 0;padding:16px;background:#F0F9FF;border-left:4px solid #0284C7;border-radius:8px;font-size:13px;color:${NEUTRAL_700};">
-          <strong>What's Next?</strong><br>
-          Your order will be reviewed and approved by our team. You'll receive an approval confirmation email shortly.
-        </div>
-      </div>
-      
-      ${emailFooter()}
-    </div>
-    <div style="height:20px;"></div>
-    `,
-  );
-
-  return {
-    subject: `Order Confirmation - ${orderNumber}`,
-    html,
-    text: `Order #${orderNumber} confirmed on ${formattedDate}. Total: ₹${Number(totalAmount).toLocaleString()}. Items: ${items.length}`,
-  };
-}
-
-/**
- * TEMPLATE: Order Approval Email
- */
-function orderApprovalEmailTemplate(data) {
-  const {
-    orderNumber,
-    orderDate,
-    approvedBy,
-    items = [],
-    totalAmount = 0,
-  } = data;
-
-  const formattedDate = new Date(orderDate).toLocaleDateString("en-IN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const html = emailWrapper(
-    `
-    <div style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-      ${emailHeader("Order Approved ✓", `Order #${orderNumber} is ready to proceed`)}
-      
-      <div style="padding:28px 24px;">
-        <p style="margin:0 0 20px;color:${NEUTRAL_500};line-height:1.6;">
-          Great news! Your order has been approved and will be processed by our vendor team shortly.
-        </p>
-        
-        ${badge("Approved", "success")}
-        
-        <div style="margin:24px 0;padding:16px;background:${NEUTRAL_100};border-radius:8px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-            <span style="color:${NEUTRAL_500};">Approved By</span>
-            <strong>${approvedBy}</strong>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-            <span style="color:${NEUTRAL_500};">Order Number</span>
-            <strong>${orderNumber}</strong>
-          </div>
-          <div style="display:flex;justify-content:space-between;">
-            <span style="color:${NEUTRAL_500};">Total Amount</span>
-            <strong style="font-size:16px;color:${BRAND_COLOR};">₹${Number(totalAmount).toLocaleString()}</strong>
-          </div>
-        </div>
-        
-        ${sectionTitle("Items in This Order")}
-        
-        <div style="background:${NEUTRAL_100};padding:16px;border-radius:8px;margin-bottom:24px;">
-          ${items.map((item) => `<div style="padding:8px 0;border-bottom:1px solid ${NEUTRAL_300};display:flex;justify-content:space-between;"><span>${item.name || "Item"}</span><span style="color:${NEUTRAL_600};">×${item.quantity}</span></div>`).join("")}
-        </div>
-        
-        <div style="margin:24px 0;padding:16px;background:#ECFDF5;border-left:4px solid ${ACCENT_COLOR};border-radius:8px;font-size:13px;color:#065F46;">
-          <strong>Status Update:</strong><br>
-          Your order is now in the vendor queue. You'll be notified when it's shipped.
-        </div>
-      </div>
-      
-      ${emailFooter()}
-    </div>
-    <div style="height:20px;"></div>
-    `,
-  );
-
-  return {
-    subject: `Order Approved - ${orderNumber}`,
-    html,
-    text: `Order #${orderNumber} has been approved. Total: ₹${Number(totalAmount).toLocaleString()}. Items: ${items.length}`,
-  };
-}
-
-/**
- * TEMPLATE: Invoice Email
- */
-function invoiceEmailTemplate(data) {
-  const {
-    invoiceNumber,
-    invoiceDate,
-    dueDate,
-    items = [],
-    subtotal = 0,
-    tax = 0,
-    totalAmount = 0,
-    clientName,
-    clientEmail,
-    organization,
-    invoiceUrl,
-  } = data;
-
-  const formattedInvoiceDate = new Date(invoiceDate).toLocaleDateString(
-    "en-IN",
-    { year: "numeric", month: "long", day: "numeric" },
-  );
-  const formattedDueDate = new Date(dueDate).toLocaleDateString("en-IN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const html = emailWrapper(
-    `
-    <div style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-      ${emailHeader("Invoice Ready", `Invoice #${invoiceNumber}`)}
-      
-      <div style="padding:28px 24px;">
-        <p style="margin:0 0 20px;color:${NEUTRAL_500};line-height:1.6;">
-          Your invoice is ready. Please review the details below and make payment by the due date.
-        </p>
-        
-        <div style="margin:24px 0;padding:16px;background:${NEUTRAL_100};border-radius:8px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-            <span style="color:${NEUTRAL_500};">Invoice Number</span>
-            <strong>${invoiceNumber}</strong>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-            <span style="color:${NEUTRAL_500};">Invoice Date</span>
-            <strong>${formattedInvoiceDate}</strong>
-          </div>
-          <div style="display:flex;justify-content:space-between;">
-            <span style="color:${NEUTRAL_500};">Due Date</span>
-            <strong>${formattedDueDate}</strong>
-          </div>
-        </div>
-        
-        ${sectionTitle("Billed To")}
-        
-        <div style="background:${NEUTRAL_100};padding:16px;border-radius:8px;margin-bottom:24px;font-size:14px;line-height:1.6;">
-          <strong>${clientName}</strong><br>
-          ${organization || "Organization"}<br>
-          ${clientEmail}
-        </div>
-        
-        ${sectionTitle("Invoice Items")}
-        
-        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
-          <thead>
-            <tr style="border-bottom:2px solid ${NEUTRAL_300};">
-              <th style="text-align:left;padding:12px 0;color:${NEUTRAL_600};font-weight:600;font-size:13px;">Description</th>
-              <th style="text-align:center;padding:12px 0;color:${NEUTRAL_600};font-weight:600;font-size:13px;">Qty</th>
-              <th style="text-align:right;padding:12px 0;color:${NEUTRAL_600};font-weight:600;font-size:13px;">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${items
-              .map((item) =>
-                productTableRow(
-                  item.description || item.name || "Item",
-                  item.quantity || 0,
-                  item.amount || 0,
-                ),
-              )
-              .join("")}
-          </tbody>
-        </table>
-        
-        <div style="background:${NEUTRAL_100};padding:16px;border-radius:8px;margin-bottom:24px;">
-          ${dataRow("Subtotal", `₹${Number(subtotal).toLocaleString()}`)}
-          ${dataRow("Tax (GST)", `₹${Number(tax).toLocaleString()}`)}
-          ${dataRow("Total Due", `₹${Number(totalAmount).toLocaleString()}`, true)}
-        </div>
-        
-        <div style="text-align:center;">
-          ${ctaButton("View Full Invoice", invoiceUrl)}
-        </div>
-        
-        <div style="margin:24px 0;padding:16px;background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:8px;font-size:13px;color:#92400E;">
-          <strong>Payment Instructions:</strong><br>
-          Please complete your payment by ${formattedDueDate}. Late payments may incur additional charges.
-        </div>
-      </div>
-      
-      ${emailFooter()}
-    </div>
-    <div style="height:20px;"></div>
-    `,
-  );
-
-  return {
-    subject: `Invoice ${invoiceNumber} - Due by ${formattedDueDate}`,
-    html,
-    text: `Invoice #${invoiceNumber} for ₹${Number(totalAmount).toLocaleString()}. Due: ${formattedDueDate}`,
-  };
-}
-
-/**
- * MAIN EXPORT: Template Generator
- */
-export function generateEmailTemplate(type, data) {
-  const templates = {
-    credentials: credentialsEmailTemplate,
-    order: orderConfirmationEmailTemplate,
-    approval: orderApprovalEmailTemplate,
-    invoice: invoiceEmailTemplate,
-  };
-
-  const generator = templates[type];
-  if (!generator) {
-    throw new Error(`Unknown email template type: ${type}`);
+  `
+      : ""
   }
 
-  return generator(data);
-}
+  <a href="${safe(link)}" class="button">Set Up Your Account</a>
 
-/**
- * Export individual templates for direct use
- */
-export {
-  credentialsEmailTemplate,
-  orderConfirmationEmailTemplate,
-  orderApprovalEmailTemplate,
-  invoiceEmailTemplate,
-};
+  <p>
+    Invitation link:<br/>
+    <span class="link">${safe(link)}</span>
+  </p>
+
+  <p>This link will expire in 7 days.</p>
+
+  <p>If you did not expect this, you can ignore this email.</p>
+
+  <p>— Nido Tech Team</p>
+`);
+
+export const orderTemplate = ({
+  name,
+  orderId,
+  items = [],
+  total = 0,
+  title = "Order Confirmation",
+  intro = "Your order has been placed successfully.",
+}) =>
+  baseEmailTemplate(`
+  <h1>${safe(title)}</h1>
+
+  <p>Hello <span class="highlight">${safe(name)}</span>,</p>
+
+  <p>${safe(intro)} <b>${safe(orderId)}</b>.</p>
+
+  <p><b>Items:</b></p>
+  <ul>
+    ${items
+      .map(
+        (item) =>
+          `<li>${safe(item.name || "Item")} (Qty: ${safe(item.quantity || 0)})</li>`,
+      )
+      .join("")}
+  </ul>
+
+  <div class="card">
+    <span class="label">Total</span>
+    <div class="mono">${formatMoney(total)}</div>
+  </div>
+
+  <p>We will notify you once it is approved and processed.</p>
+`);
+
+export const orderApprovalTemplate = ({
+  name,
+  orderId,
+  approvedBy,
+  items = [],
+  total = 0,
+}) =>
+  baseEmailTemplate(`
+  <h1>Order Approved</h1>
+
+  <p>Hello <span class="highlight">${safe(name)}</span>,</p>
+
+  <p>Your order <b>${safe(orderId)}</b> has been approved by <b>${safe(approvedBy)}</b>.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Qty</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${items
+        .map(
+          (item) => `
+        <tr>
+          <td>${safe(item.name || "Item")}</td>
+          <td>${safe(item.quantity || 0)}</td>
+        </tr>
+      `,
+        )
+        .join("")}
+    </tbody>
+  </table>
+
+  <div class="card">
+    <span class="label">Confirmed Total</span>
+    <div class="mono">${formatMoney(total)}</div>
+  </div>
+
+  <p>Your order is now moving into vendor assignment and fulfillment.</p>
+`);
+
+export const invoiceTemplate = ({
+  name,
+  invoiceNumber,
+  items = [],
+  subtotal = 0,
+  tax = 0,
+  total = 0,
+  dueDate = "",
+  invoiceUrl = "",
+}) =>
+  baseEmailTemplate(`
+  <h1>Invoice Ready</h1>
+
+  <p>Hello <span class="highlight">${safe(name)}</span>,</p>
+
+  <p>Your invoice <b>${safe(invoiceNumber)}</b> is ready for review.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${items
+        .map(
+          (item) => `
+        <tr>
+          <td>${safe(item.description || item.name || "Item")} (Qty: ${safe(item.quantity || 0)})</td>
+          <td>${formatMoney(item.total || item.amount || 0)}</td>
+        </tr>
+      `,
+        )
+        .join("")}
+      <tr>
+        <td><b>Subtotal</b></td>
+        <td><b>${formatMoney(subtotal)}</b></td>
+      </tr>
+      <tr>
+        <td><b>Tax</b></td>
+        <td><b>${formatMoney(tax)}</b></td>
+      </tr>
+      <tr>
+        <td><b>Total</b></td>
+        <td><b>${formatMoney(total)}</b></td>
+      </tr>
+    </tbody>
+  </table>
+
+  ${invoiceUrl ? `<a href="${safe(invoiceUrl)}" class="button">View Invoice</a>` : ""}
+
+  ${dueDate ? `<p>Payment due date: <b>${safe(dueDate)}</b></p>` : ""}
+`);
+
+export function generateEmailTemplate(type, data = {}) {
+  switch (type) {
+    case "credentials":
+      return {
+        subject: "Complete your Nido Tech account setup",
+        html: userInviteTemplate({
+          name: data.name || data.username || "User",
+          link: data.setupLink || data.loginUrl || process.env.FRONTEND_URL || "",
+          username: data.username,
+          email: data.email,
+          temporaryPassword: data.temporaryPassword,
+          roleLabel: data.userType || data.roleLabel || "",
+        }),
+        text: `Welcome to Nido Tech. Complete your setup: ${data.setupLink || data.loginUrl || ""}`,
+      };
+    case "order":
+      return {
+        subject: `Order Confirmation - ${data.orderNumber || data.orderId || ""}`,
+        html: orderTemplate({
+          name: data.clientName || data.name || "Customer",
+          orderId: data.orderNumber || data.orderId || "",
+          items: data.items || [],
+          total: data.totalAmount || data.total || 0,
+        }),
+        text: `Order confirmation for ${data.orderNumber || data.orderId || ""}`,
+      };
+    case "approval":
+      return {
+        subject: `Order Approved - ${data.orderNumber || data.orderId || ""}`,
+        html: orderApprovalTemplate({
+          name: data.clientName || data.name || "Customer",
+          orderId: data.orderNumber || data.orderId || "",
+          approvedBy: data.approvedBy || "Nido Tech",
+          items: data.items || [],
+          total: data.totalAmount || data.total || 0,
+        }),
+        text: `Order approved: ${data.orderNumber || data.orderId || ""}`,
+      };
+    case "invoice":
+      return {
+        subject: `Invoice ${data.invoiceNumber || ""}`,
+        html: invoiceTemplate({
+          name: data.clientName || data.name || "Customer",
+          invoiceNumber: data.invoiceNumber || "",
+          items: data.items || [],
+          subtotal: data.subtotal || 0,
+          tax: data.tax || 0,
+          total: data.totalAmount || data.total || 0,
+          dueDate: data.dueDate || "",
+          invoiceUrl: data.invoiceUrl || "",
+        }),
+        text: `Invoice ${data.invoiceNumber || ""} is ready.`,
+      };
+    default:
+      throw new Error(`Unknown email template type: ${type}`);
+  }
+}

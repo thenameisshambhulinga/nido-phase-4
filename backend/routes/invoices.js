@@ -1,6 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import Invoice from "../models/Invoice.js";
+import { sendEmail } from "../utils/emailService.js";
 
 const router = express.Router();
 
@@ -60,6 +61,30 @@ const normalizeInvoicePayload = (payload = {}) => {
   };
 };
 
+const sendInvoiceNotification = async (invoice) => {
+  const recipients = Array.isArray(invoice.emailRecipients)
+    ? invoice.emailRecipients.filter(Boolean)
+    : [];
+  if (!recipients.length) return;
+
+  await sendEmail({
+    to: recipients,
+    type: "invoice",
+    data: {
+      name: invoice.customerName || invoice.vendorOrClient || "Customer",
+      clientName: invoice.customerName || invoice.vendorOrClient || "Customer",
+      invoiceNumber: invoice.invoiceNumber,
+      items: invoice.items || [],
+      subtotal: invoice.subtotal || 0,
+      tax: invoice.tax || 0,
+      totalAmount: invoice.total || 0,
+      dueDate: invoice.dueDate || "",
+      invoiceUrl: `${process.env.FRONTEND_URL || "https://app.nidotech.com"}/sales/invoices/${invoice._id}`,
+    },
+    async: false,
+  });
+};
+
 router.get("/", async (req, res) => {
   try {
     const { orderId, status, type } = req.query;
@@ -112,6 +137,7 @@ router.post("/", async (req, res) => {
     });
 
     await invoice.save();
+    await sendInvoiceNotification(invoice);
     res.status(201).json({ success: true, data: invoice });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -138,6 +164,10 @@ router.patch("/:id", async (req, res) => {
 
     if (!invoice) {
       return res.status(404).json({ success: false, error: "Invoice not found" });
+    }
+
+    if (invoice.status === "SENT" || invoice.paymentStatus === "UNPAID") {
+      await sendInvoiceNotification(invoice);
     }
 
     res.json({ success: true, data: invoice });

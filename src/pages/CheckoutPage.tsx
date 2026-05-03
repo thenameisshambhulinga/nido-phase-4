@@ -34,7 +34,6 @@ import {
   nextSequentialCode,
   normalizeOrderCode,
 } from "@/lib/documentNumbering";
-import { emailTemplates, sendEmail } from "@/lib/emailService";
 import { apiRequest } from "@/lib/api";
 import {
   isValidEmail,
@@ -306,7 +305,7 @@ export default function CheckoutPage() {
       const createProcureOrderPayload = (generatedOrderId: string) => ({
         orderNumber: generatedOrderId,
         clientId: user?.id || "shop-client",
-        companyId: user?.organization || "nido-tech",
+        companyId: user?.companyId || user?.organization || "nido-tech",
         vendorId: "",
         orderDate: new Date().toISOString(),
         requesterEmail: normalizeEmail(shipping.email),
@@ -318,7 +317,7 @@ export default function CheckoutPage() {
           ? "OWNER"
           : user?.role === "client_admin"
             ? "CLIENT_ADMIN"
-            : user?.role === "client_employee"
+            : user?.role === "client_employee" || user?.role === "client_user"
               ? "CLIENT_USER"
               : "INTERNAL_EMPLOYEE",
         status:
@@ -397,56 +396,12 @@ export default function CheckoutPage() {
       }
 
       if (!createdOrder) {
-        console.warn("[checkout] falling back to local order creation");
-        const fallbackOrder = {
-          id: `local-${Date.now()}`,
-          ...createProcureOrderPayload(orderID),
-          slaStartTime: new Date().toISOString(),
-          slaStatus: "within_sla" as const,
-        };
-        const existingLocal = safeReadJson<any[]>("nido_orders_v2", []);
-        localStorage.setItem(
-          "nido_orders_v2",
-          JSON.stringify([fallbackOrder, ...existingLocal]),
-        );
-        createdOrder = fallbackOrder;
+        throw new Error(createError || "Failed to create order in backend");
       }
 
       const persistedOrderId = createdOrder.orderNumber || orderID;
       console.log("[checkout] created order", createdOrder);
       confirmationOrder.id = persistedOrderId;
-
-      if (
-        canConfigureOwnerNotification &&
-        sendOwnerNotification &&
-        ownerNotificationEmail.trim()
-      ) {
-        try {
-          await sendEmail(
-            ownerNotificationEmail.trim(),
-            emailTemplates.orderReceivedForOwner({
-              id: persistedOrderId,
-              orderDate: todayIso,
-              shippingInfo: {
-                email: normalizeEmail(shipping.email),
-                fullName: shipping.fullName,
-                companyName: shipping.companyName,
-              },
-              items: items.map((item) => ({
-                name: item.name,
-                quantity: item.quantity,
-                price: item.price,
-                category: item.category,
-              })),
-              total,
-              paymentMethod,
-              shippingMethod,
-            }),
-          );
-        } catch (emailError) {
-          console.error("Owner notification email failed:", emailError);
-        }
-      }
 
       // Add audit entry
       addAuditEntry({

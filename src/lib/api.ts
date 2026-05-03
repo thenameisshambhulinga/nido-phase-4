@@ -1,19 +1,11 @@
 const getAPIBase = (): string => {
-  // Development: use localhost backend
-  if (
-    typeof window !== "undefined" &&
-    ["localhost", "127.0.0.1"].includes(window.location.hostname)
-  ) {
-    return "http://localhost:5000/api";
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/+$/, "");
   }
-
-  // Environment variables
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   if (import.meta.env.VITE_API_BASE_URL)
-    return import.meta.env.VITE_API_BASE_URL;
+    return import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, "");
 
-  // Production
-  return "https://nido-backend-iztc.onrender.com/api";
+  return "/api";
 };
 
 const API_BASE = getAPIBase();

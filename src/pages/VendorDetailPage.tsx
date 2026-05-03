@@ -597,7 +597,6 @@ export default function VendorDetailPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="scorecard">Scorecard</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="product-catalog">Product Catalog</TabsTrigger>
@@ -615,14 +614,14 @@ export default function VendorDetailPage() {
                   prefix: "$",
                   icon: TrendingUp,
                   color: "text-success",
-                  onClick: () => setActiveTab("orders"),
+                  onClick: () => navigate(`/vendors/orders?vendor=${id}`),
                 },
                 {
                   title: "Open Orders",
                   value: openOrders,
                   icon: ShoppingCart,
                   color: "text-info",
-                  onClick: () => setActiveTab("orders"),
+                  onClick: () => navigate(`/vendors/orders?vendor=${id}`),
                 },
                 {
                   title: "Overdue Orders",
@@ -632,7 +631,7 @@ export default function VendorDetailPage() {
                     overdueOrders > 0
                       ? "text-destructive"
                       : "text-muted-foreground",
-                  onClick: () => setActiveTab("orders"),
+                  onClick: () => navigate(`/vendors/orders?vendor=${id}`),
                 },
               ].map((kpi) => (
                 <Card
@@ -986,85 +985,6 @@ export default function VendorDetailPage() {
           </TabsContent>
 
           {/* Orders Tab */}
-          <TabsContent value="orders" className="space-y-4">
-            <Card className="rounded-2xl shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">
-                  All Orders from {vendor.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Order ID</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Requesting User</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>SLA</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {vendorOrders.map((o) => (
-                      <TableRow
-                        key={o.id}
-                        className="cursor-pointer"
-                        onClick={() =>
-                          navigate(
-                            `/procure/orders/${o.id}?vendorId=${vendor.id}`,
-                          )
-                        }
-                      >
-                        <TableCell className="font-medium text-primary">
-                          {o.orderNumber}
-                        </TableCell>
-                        <TableCell>{o.orderDate}</TableCell>
-                        <TableCell>{o.requestingUser}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            style={{
-                              borderColor: STATUS_COLORS[o.status],
-                              color: STATUS_COLORS[o.status],
-                            }}
-                          >
-                            {o.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            className={
-                              o.slaStatus === "within_sla"
-                                ? "bg-success text-success-foreground"
-                                : o.slaStatus === "at_risk"
-                                  ? "bg-warning text-warning-foreground"
-                                  : "bg-destructive text-destructive-foreground"
-                            }
-                          >
-                            {o.slaStatus.replace("_", " ")}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ${o.totalAmount.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {vendorOrders.length === 0 && (
-                      <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="text-center py-8 text-muted-foreground"
-                        >
-                          No orders found.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           {/* Profile Tab */}
           <TabsContent value="profile" className="space-y-6">

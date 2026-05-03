@@ -28,6 +28,14 @@ import {
 } from "lucide-react";
 import { isValidEmail, normalizeEmail } from "@/lib/validation";
 
+const isLocalhost = Boolean(
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname.includes("localhost") ||
+    window.location.hostname === "::1"),
+);
+
 const WORKFLOW_STEPS = [
   {
     icon: ShoppingCart,
@@ -71,9 +79,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [mounted, setMounted] = useState(false);
-  const isLocalhost =
-    typeof window !== "undefined" &&
-    ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
   useEffect(() => {
     setMounted(true);

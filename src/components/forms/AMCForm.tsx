@@ -55,7 +55,7 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
     // Section 6 - AMC Duration (mandatory)
     startDate: "",
     endDate: "",
-    // Section 10 - Client Authorization (mandatory)
+    // Section 10 - orization (mandatory)
     authorizedName: "",
     authorizedDesignation: "",
     authorizationDate: "",
@@ -126,7 +126,7 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
       {/* Section 1 - Client Information */}
       <Card>
         <CardHeader>
-          <CardTitle>01 Client Information *</CardTitle>
+          <CardTitle>01: Client Information *</CardTitle>;
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -225,7 +225,7 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
       {/* Section 2 - AMC Type */}
       <Card>
         <CardHeader>
-          <CardTitle>02 AMC Type *</CardTitle>
+          <CardTitle>02: AMC Type *</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4 items-center">
@@ -286,7 +286,7 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
       {/* Section 3 - AMC Category */}
       <Card>
         <CardHeader>
-          <CardTitle>03 AMC Category *</CardTitle>
+          <CardTitle>03: AMC Category *</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-3 flex-wrap">
@@ -372,7 +372,7 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
       {/* Section 5 - Common AMC Scope */}
       <Card>
         <CardHeader>
-          <CardTitle>05 Common AMC Scope *</CardTitle>
+          <CardTitle>04: Common AMC Scope *</CardTitle>
         </CardHeader>
         <CardContent>
           <Label>Detailed Scope / Notes *</Label>
@@ -389,7 +389,7 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
       {/* Section 6 - AMC Duration */}
       <Card>
         <CardHeader>
-          <CardTitle>06 AMC Duration *</CardTitle>
+          <CardTitle>05: AMC Duration *</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -424,7 +424,7 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
       {/* Section 10 - Client Authorization */}
       <Card>
         <CardHeader>
-          <CardTitle>10 Client Authorization *</CardTitle>
+          <CardTitle>06: Client Authorization *</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

@@ -25,6 +25,8 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  username?: string;
+  companyId?: string;
   avatar?: string;
   organization?: string;
   status: "active" | "inactive" | "suspended";
@@ -32,6 +34,7 @@ export interface User {
   modules?: string[];
   jobTitle?: string;
   department?: string;
+  mustResetPassword?: boolean;
 }
 
 interface AuthContextType {
@@ -48,6 +51,8 @@ interface AuthContextType {
       email: string;
       temporaryPassword: string;
     };
+    setupToken?: string;
+    setupLink?: string;
   } | null>;
   updateUser: (id: string, data: Partial<User>) => Promise<boolean>;
   deleteUser: (id: string) => Promise<boolean>;
@@ -56,76 +61,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const DEFAULT_USERS: User[] = [
-  {
-    id: "owner-1",
-    email: "owner@nidotech.com",
-    name: "System Owner",
-    role: "owner",
-    organization: "Nido Tech",
-    status: "active",
-    createdAt: "2025-01-01",
-    modules: ["all"],
-  },
-  {
-    id: "admin-1",
-    email: "admin@nidotech.com",
-    name: "Mark Adams",
-    role: "admin",
-    organization: "Nido Tech",
-    status: "active",
-    createdAt: "2025-02-01",
-    modules: [
-      "dashboard",
-      "shop",
-      "vendors",
-      "procure",
-      "reports",
-      "configuration",
-    ],
-  },
-  {
-    id: "pm-1",
-    email: "procurement@nidotech.com",
-    name: "Jane Smith",
-    role: "procurement_manager",
-    organization: "Nido Tech",
-    status: "active",
-    createdAt: "2025-03-01",
-    modules: ["dashboard", "shop", "vendors", "procure"],
-  },
-  {
-    id: "ap-1",
-    email: "ap@nidotech.com",
-    name: "David Chen",
-    role: "accounts_payable",
-    organization: "Nido Tech",
-    status: "active",
-    createdAt: "2025-03-15",
-    modules: ["dashboard", "clients", "reports"],
-  },
-  {
-    id: "vendor-1",
-    email: "vendor@apex.com",
-    name: "Vendor User",
-    role: "vendor",
-    organization: "Apex Tech Solutions",
-    status: "active",
-    createdAt: "2025-04-01",
-    modules: ["dashboard", "vendors"],
-  },
-  {
-    id: "client-admin-1",
-    email: "clientadmin@corp.com",
-    name: "Client Admin",
-    role: "client_admin",
-    organization: "Apex Tech Solutions",
-    status: "active",
-    createdAt: "2025-04-15",
-    modules: ["dashboard", "shop", "procure"],
-  },
-];
 
 const ROLE_PERMISSIONS: Record<UserRole, Record<string, string[]>> = {
   owner: { all: ["view", "edit", "delete", "approve", "configure"] },
@@ -193,6 +128,8 @@ const toFrontendUser = (user: any): User => ({
   email: String(user.email || ""),
   name: String(user.name || user.fullName || ""),
   role: toFrontendRole(user.role),
+  username: user.username,
+  companyId: user.companyId ? String(user.companyId) : undefined,
   avatar: user.avatar,
   organization: user.organization || user.companyId || "",
   status: String(user.status || "active").toLowerCase() as User["status"],
@@ -200,14 +137,21 @@ const toFrontendUser = (user: any): User => ({
   modules: user.modules,
   jobTitle: user.jobTitle,
   department: user.department,
+  mustResetPassword: Boolean(user.mustResetPassword),
 });
 
 const toBackendRole = (role?: string) => {
   const normalized = String(role || "employee").toLowerCase();
   if (normalized === "owner") return "OWNER";
   if (normalized === "admin") return "INTERNAL_EMPLOYEE";
+  if (normalized === "procurement_manager") return "INTERNAL_EMPLOYEE";
+  if (normalized === "accounts_payable") return "INTERNAL_EMPLOYEE";
   if (normalized === "client_admin") return "CLIENT_ADMIN";
+  if (normalized === "client_user") return "CLIENT_USER";
   if (normalized === "client_employee") return "CLIENT_USER";
+  if (normalized === "vendor_user") return "VENDOR";
+  if (normalized === "vendor_admin") return "VENDOR";
+  if (normalized === "vendor") return "VENDOR";
   return "INTERNAL_EMPLOYEE";
 };
 
@@ -224,8 +168,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [users, setUsers] = useState<User[]>(() => {
-    const parsed = safeReadJson<User[]>("nido_users", DEFAULT_USERS);
-    return Array.isArray(parsed) ? parsed : DEFAULT_USERS;
+    const parsed = safeReadJson<User[]>("nido_users", []);
+    return Array.isArray(parsed) ? parsed : [];
   });
 
   useEffect(() => {
@@ -236,6 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (!token) {
       localStorage.removeItem("nido_auth_token");
+      setUsers([]);
       return;
     }
     localStorage.setItem("nido_auth_token", token);
@@ -346,7 +291,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
+    setUsers([]);
     localStorage.removeItem("nido_auth_token");
+    localStorage.removeItem("nido_user");
+    localStorage.removeItem("nido_users");
   }, []);
 
   const createUser = useCallback(async (data: Partial<User>) => {
@@ -361,15 +309,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           name: data.name,
           role: toBackendRole(data.role),
           companyId: data.organization,
+          organization: data.organization,
           permissions: {},
           email: normalizeEmail(data.email),
+          phone: data.phone,
+          jobTitle: data.jobTitle,
+          department: data.department,
         },
       });
       if (response?.user) {
-        setUsers((prev) => [...prev, toFrontendUser(response.user)]);
+        setUsers((prev) => {
+          const nextUser = toFrontendUser(response.user);
+          return [nextUser, ...prev.filter((entry) => entry.id !== nextUser.id)];
+        });
         return {
           user: toFrontendUser(response.user),
           credentials: response.credentials,
+          setupToken: response.setupToken,
+          setupLink: response.setupLink,
         };
       }
       return null;
@@ -387,12 +344,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           name: data.name,
           role: data.role ? toBackendRole(data.role) : undefined,
           companyId: data.organization,
+          organization: data.organization,
           permissions: data.modules ? { modules: data.modules } : undefined,
           status: data.status,
+          phone: data.phone,
+          jobTitle: data.jobTitle,
+          department: data.department,
         },
       });
-      if (response?.data) {
-        const updated = toFrontendUser(response.data);
+      if (response) {
+        const updated = toFrontendUser(response);
         setUsers((prev) => prev.map((u) => (u.id === id ? updated : u)));
         setUser((prev) => (prev && prev.id === id ? updated : prev));
       }

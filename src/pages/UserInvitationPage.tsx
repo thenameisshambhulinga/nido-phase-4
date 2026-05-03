@@ -50,8 +50,14 @@ import {
 import { toast } from "@/hooks/use-toast";
 
 export default function UserInvitationPage() {
-  const { inviteUser, getInvitations, resendInvitation, departments, users } =
-    useEnhancedAuth();
+  const {
+    inviteUser,
+    getInvitations,
+    resendInvitation,
+    departments,
+    users,
+    isOwner,
+  } = useEnhancedAuth();
 
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [inviteName, setInviteName] = useState("");
@@ -243,14 +249,15 @@ export default function UserInvitationPage() {
 
         {/* Send Invitation */}
         <div className="flex justify-end">
-          <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Mail className="h-4 w-4" />
-                Send Invitation
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+          {isOwner && (
+            <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Mail className="h-4 w-4" />
+                  Send Invitation
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Send User Invitation</DialogTitle>
               </DialogHeader>
@@ -370,17 +377,18 @@ export default function UserInvitationPage() {
                 </Card>
               </div>
 
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowInviteDialog(false)}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleSendInvite}>Send Invitation</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowInviteDialog(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSendInvite}>Send Invitation</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         {/* Tabs */}

@@ -1,24 +1,22 @@
-/**
- * Production-Grade Email Sending Service
- * Features: Retry logic, async sending, comprehensive logging
- */
-
 import nodemailer from "nodemailer";
 import { generateEmailTemplate } from "./emailTemplateGenerator.js";
 
 const MAX_RETRIES = 3;
-const RETRY_DELAY = 2000; // ms
-
-/**
- * Email sending queue for async processing
- */
+const RETRY_DELAY = 2000;
 const emailQueue = [];
 let isProcessing = false;
 
-/**
- * Initialize mail transporter
- */
 function createTransporter() {
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    return nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+  }
+
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
   const user = process.env.SMTP_USER;
@@ -30,58 +28,25 @@ function createTransporter() {
       port,
       secure: port === 465,
       auth: { user, pass },
-      pool: {
-        maxConnections: 5,
-        maxMessages: 100,
-        rateDelta: 4000,
-        rateLimit: 14,
-      },
     });
   }
 
-  // Fallback: Ethereal email for demo/testing
   return nodemailer.createTransport({
-    host: "smtp.ethereal.email",
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.ETHEREAL_USER || "test@ethereal.email",
-      pass: process.env.ETHEREAL_PASS || "test_password",
-    },
+    jsonTransport: true,
   });
 }
 
 const transporter = createTransporter();
 
-/**
- * Delay utility
- */
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Log email activity
- */
 function logEmail(status, to, subject, details = "") {
   const timestamp = new Date().toISOString();
-  const icon =
-    {
-      SENDING: "📤",
-      SUCCESS: "✅",
-      FAILED: "❌",
-      QUEUED: "📋",
-      RETRY: "🔄",
-    }[status] || "ℹ️";
-
-  console.log(
-    `${icon} [EMAIL ${status}] ${timestamp} | To: ${to} | Subject: ${subject} ${details}`,
-  );
+  console.log(`[EMAIL ${status}] ${timestamp} | To: ${to} | Subject: ${subject} ${details}`);
 }
 
-/**
- * Send email with retry logic
- */
 async function sendEmailWithRetry(mailOptions, retryCount = 0) {
   try {
     logEmail(
@@ -103,6 +68,7 @@ async function sendEmailWithRetry(mailOptions, retryCount = 0) {
     return {
       success: true,
       messageId: info.messageId,
+      envelope: info.envelope,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
@@ -125,18 +91,12 @@ async function sendEmailWithRetry(mailOptions, retryCount = 0) {
   }
 }
 
-/**
- * Queue email for async processing
- */
 function queueEmail(mailOptions) {
   emailQueue.push(mailOptions);
   logEmail("QUEUED", mailOptions.to, mailOptions.subject);
   processQueue();
 }
 
-/**
- * Process email queue in background
- */
 async function processQueue() {
   if (isProcessing || emailQueue.length === 0) return;
 
@@ -146,24 +106,23 @@ async function processQueue() {
     try {
       await sendEmailWithRetry(mailOptions);
     } catch (error) {
-      console.error(`Failed to send email after all retries:`, error);
+      console.error("Failed to send email after all retries:", error);
     }
-    // Stagger sends to avoid rate limiting
     await delay(500);
   }
   isProcessing = false;
 }
 
-/**
- * Main email sender function
- */
 export async function sendEmail(options) {
   const {
     to,
     type,
     data,
     templateId,
-    from = process.env.EMAIL_FROM || "noreply@nidotech.com",
+    subject,
+    html,
+    text,
+    from = process.env.EMAIL_FROM || "no-reply@nido.com",
     async: isAsync = true,
   } = options;
 
@@ -172,14 +131,20 @@ export async function sendEmail(options) {
   try {
     let template;
 
-    if (type && data) {
-      // Generate from template type
+    if (subject && html) {
+      template = {
+        subject,
+        html,
+        text: text || "",
+      };
+    } else if (type && data) {
       template = generateEmailTemplate(type, data);
     } else if (templateId) {
-      // Custom template (if supported)
       throw new Error("Custom templates not yet supported");
     } else {
-      throw new Error("Either 'type + data' or 'templateId' is required");
+      throw new Error(
+        "Either 'subject + html' or 'type + data' or 'templateId' is required",
+      );
     }
 
     const mailOptions = {
@@ -187,7 +152,7 @@ export async function sendEmail(options) {
       to: Array.isArray(to) ? to.join(", ") : to,
       subject: template.subject,
       html: template.html,
-      text: template.text,
+      text: template.text || "",
       headers: {
         "X-Priority": "3",
         "X-MSMail-Priority": "Normal",
@@ -196,7 +161,6 @@ export async function sendEmail(options) {
     };
 
     if (isAsync) {
-      // Queue for background processing
       queueEmail(mailOptions);
       return {
         success: true,
@@ -204,7 +168,6 @@ export async function sendEmail(options) {
         message: "Email queued for delivery",
       };
     } else {
-      // Send immediately and wait
       return await sendEmailWithRetry(mailOptions);
     }
   } catch (error) {
@@ -218,16 +181,15 @@ export async function sendEmail(options) {
   }
 }
 
-/**
- * Health check for email service
- */
 export async function verifyEmailService() {
   try {
+    if (transporter.options?.jsonTransport) {
+      return true;
+    }
     await transporter.verify();
-    console.log("✅ Email service verified successfully");
     return true;
   } catch (error) {
-    console.error("❌ Email service verification failed:", error.message);
+    console.error("Email service verification failed:", error.message);
     return false;
   }
 }

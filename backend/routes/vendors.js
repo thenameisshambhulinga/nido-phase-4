@@ -1,6 +1,8 @@
 import express from "express";
 import mongoose from "mongoose";
+import Order from "../models/Order.js";
 import Vendor from "../models/Vendor.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 import { ensureBusinessId } from "../utils/businessIds.js";
 
 const router = express.Router();
@@ -32,6 +34,23 @@ const emptyAnalytics = {
     completed: 0,
   },
 };
+
+router.get("/orders", authMiddleware, async (req, res) => {
+  try {
+    const companyId = String(req.user?.companyId || "");
+    const organization = String(req.user?.organization || "");
+    const clauses = [
+      companyId ? { vendorId: companyId } : null,
+      organization ? { vendorName: organization } : null,
+    ].filter(Boolean);
+    const query = clauses.length ? { $or: clauses } : { _id: null };
+
+    const orders = await Order.find(query).sort({ createdAt: -1 });
+    res.json({ success: true, data: orders });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // GET vendor analytics by ID
 router.get("/:id/analytics", async (req, res) => {

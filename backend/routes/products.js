@@ -1,15 +1,34 @@
 import express from "express";
 import mongoose from "mongoose";
 import Product from "../models/Product.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import { roleMiddleware } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+router.use(authMiddleware);
+
 // GET all products
 router.get("/", async (req, res) => {
   try {
-    const products = await Product.find().sort({ createdAt: -1 });
+    const role = String(req.user?.role || "").toUpperCase();
+    const companyId = String(req.user?.companyId || "");
+
+    const query =
+      role === "OWNER" || role === "INTERNAL_EMPLOYEE"
+        ? {}
+        : {
+            $or: [
+              { assignedClients: { $size: 0 } },
+              companyId && isValidObjectId(companyId)
+                ? { assignedClients: companyId }
+                : null,
+            ].filter(Boolean),
+          };
+
+    const products = await Product.find(query).sort({ createdAt: -1 });
     res.json({ success: true, data: products });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -37,10 +56,11 @@ router.get("/:id", async (req, res) => {
 });
 
 // POST create new product
-router.post("/", async (req, res) => {
+router.post("/", roleMiddleware(["OWNER", "INTERNAL_EMPLOYEE"]), async (req, res) => {
   try {
     const productData = {
       ...req.body,
+      name: req.body?.name || req.body?.productName,
       updatedAt: new Date(),
     };
     const product = new Product(productData);
@@ -52,7 +72,7 @@ router.post("/", async (req, res) => {
 });
 
 // PUT update product
-router.put("/:id", async (req, res) => {
+router.put("/:id", roleMiddleware(["OWNER", "INTERNAL_EMPLOYEE"]), async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) {
       return res
@@ -76,7 +96,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // PATCH update product (backward compatible)
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", roleMiddleware(["OWNER", "INTERNAL_EMPLOYEE"]), async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) {
       return res
@@ -100,7 +120,7 @@ router.patch("/:id", async (req, res) => {
 });
 
 // DELETE product
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", roleMiddleware(["OWNER", "INTERNAL_EMPLOYEE"]), async (req, res) => {
   try {
     if (!isValidObjectId(req.params.id)) {
       return res

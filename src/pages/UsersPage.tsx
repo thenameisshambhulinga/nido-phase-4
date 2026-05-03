@@ -168,23 +168,25 @@ export default function UsersPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          <Dialog open={showCreate} onOpenChange={setShowCreate}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus /> Add User
-              </Button>
-            </DialogTrigger>
+          {isOwner && (
+            <Dialog open={showCreate} onOpenChange={setShowCreate}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus /> Add User
+                </Button>
+              </DialogTrigger>
 
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create User</DialogTitle>
-              </DialogHeader>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create User</DialogTitle>
+                </DialogHeader>
 
-              <FormFields form={form} setForm={setForm} />
+                <FormFields form={form} setForm={setForm} />
 
-              <Button onClick={() => void handleCreate()}>Create</Button>
-            </DialogContent>
-          </Dialog>
+                <Button onClick={() => void handleCreate()}>Create</Button>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         <Card>
@@ -214,15 +216,19 @@ export default function UsersPage() {
                     </TableCell>
 
                     <TableCell className="flex gap-2">
-                      <Button size="icon" onClick={() => handleEdit(u)}>
-                        <Pencil />
-                      </Button>
-                      <Button
-                        size="icon"
-                        onClick={() => setDeleteTargetId(u.id)}
-                      >
-                        <Trash2 />
-                      </Button>
+                      {isOwner && (
+                        <>
+                          <Button size="icon" onClick={() => handleEdit(u)}>
+                            <Pencil />
+                          </Button>
+                          <Button
+                            size="icon"
+                            onClick={() => setDeleteTargetId(u.id)}
+                          >
+                            <Trash2 />
+                          </Button>
+                        </>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

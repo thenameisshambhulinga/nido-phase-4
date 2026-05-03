@@ -29,7 +29,7 @@ export const createUserExample = async () => {
   //     temporaryPassword: "TempPwd123!@#",
   //     createdBy: "System Owner",
   //     userType: "Client Admin",
-  //     loginUrl: "http://localhost:8080/login"
+  //     loginUrl: "https://app.nidotech.com/login"
   //   },
   //   async: true
   // });

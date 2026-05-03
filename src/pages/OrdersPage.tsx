@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { emailTemplates, sendEmail } from "@/lib/emailService";
 import { normalizeOrderCode } from "@/lib/documentNumbering";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import {
@@ -97,12 +96,12 @@ export default function OrdersPage() {
           totalAmount: computedTotal,
           statusLabel:
             normalizedStatus === "pending"
-              ? "New"
-              : normalizedStatus === "approved"
-                ? "Processing"
+              ? "Pending"
+              : normalizedStatus === "pending approval"
+                ? "Pending Approval"
                 : normalizedStatus === "cancelled"
-                  ? "Rejected"
-                  : order.status || "New",
+                  ? "Cancelled"
+                  : order.status || "Pending",
         };
       }),
     [orders],
@@ -129,10 +128,16 @@ export default function OrdersPage() {
   const orderStats = useMemo(() => {
     const total = normalizedOrders.length;
     const newCount = normalizedOrders.filter(
-      (order) => order.statusLabel.toLowerCase() === "new",
+      (order) =>
+        ["pending", "pending approval"].includes(
+          order.statusLabel.toLowerCase(),
+        ),
     ).length;
     const processingCount = normalizedOrders.filter(
-      (order) => order.statusLabel.toLowerCase() === "processing",
+      (order) =>
+        ["approved", "confirmed", "assigned", "processing"].includes(
+          order.statusLabel.toLowerCase(),
+        ),
     ).length;
     const riskCount = normalizedOrders.filter(
       (order) =>
@@ -161,50 +166,6 @@ export default function OrdersPage() {
     setSelected(filteredOrders.map((order) => order.id));
   };
 
-  const getRecipientEmail = (orderNumber: string, organization: string) => {
-    const company = organization
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "")
-      .slice(0, 18);
-    return company
-      ? `procurement@${company}.com`
-      : `order-${orderNumber}@client.com`;
-  };
-
-  const notifyClient = async (
-    kind: "approved" | "rejected",
-    order: (typeof normalizedOrders)[number],
-    reason?: string,
-  ) => {
-    const recipient = getRecipientEmail(order.orderNumber, order.organization);
-    if (kind === "approved") {
-      await sendEmail(
-        recipient,
-        emailTemplates.orderApproved({
-          id: order.orderNumber,
-          shippingInfo: {
-            email: recipient,
-            fullName: order.requestingUser,
-          },
-          total: order.totalAmount,
-        }),
-      );
-      return;
-    }
-
-    await sendEmail(
-      recipient,
-      emailTemplates.orderRejected({
-        id: order.orderNumber,
-        shippingInfo: {
-          email: recipient,
-          fullName: order.requestingUser,
-        },
-        rejectionReason: reason,
-      }),
-    );
-  };
-
   const handleApprove = async (orderId: string) => {
     const order = normalizedOrders.find((entry) => entry.id === orderId);
     if (!order) return;
@@ -224,8 +185,6 @@ export default function OrdersPage() {
         },
       ],
     });
-
-    await notifyClient("approved", order);
     addAuditEntry({
       module: "Procure",
       action: "Order Approved",
@@ -258,7 +217,6 @@ export default function OrdersPage() {
       ],
     });
 
-    await notifyClient("rejected", order, reason);
     addAuditEntry({
       module: "Procure",
       action: "Order Rejected",

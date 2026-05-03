@@ -84,6 +84,7 @@ import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 import ShopPage from "@/pages/ShopPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 import OrderConfirmationPage from "@/pages/OrderConfirmationPage";
+import UserOnboardingPage from "@/pages/UserOnboardingPage";
 
 const queryClient = new QueryClient();
 
@@ -113,6 +114,7 @@ function AppRoutes() {
           )
         }
       />
+      <Route path="/onboarding/:token" element={<UserOnboardingPage />} />
       <Route path="/support/track/:ticketId" element={<TicketTrackingPage />} />
       <Route
         path="/"

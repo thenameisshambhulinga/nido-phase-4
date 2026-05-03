@@ -71,6 +71,7 @@ export default function EnhancedUsersPage() {
     createUser,
     updateUser,
     deleteUser,
+    resetPassword,
     departments,
     credentials,
     setCredentials,
@@ -170,11 +171,19 @@ export default function EnhancedUsersPage() {
 
   // Handle reset password
   const handleResetPassword = async (userId: string) => {
-    // This would call resetPassword from context
-    toast({
-      title: "Password Reset",
-      description: "Temporary password sent to user",
-    });
+    const result = await resetPassword(userId);
+    if (result.success) {
+      toast({
+        title: "Password Reset",
+        description: "Temporary password reissued and emailed to the user.",
+      });
+    } else {
+      toast({
+        title: "Password Reset Failed",
+        description: "Unable to generate a new setup password.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Handle delete user
@@ -286,6 +295,14 @@ export default function EnhancedUsersPage() {
           </Card>
         </div>
 
+        {!isOwner && (
+          <Card>
+            <CardContent className="pt-6 text-sm text-muted-foreground">
+              Only owner accounts can create, invite, reset, or delete users.
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tabs */}
         <Tabs
           value={activeTab}
@@ -353,17 +370,18 @@ export default function EnhancedUsersPage() {
                 </Select>
               </div>
 
-              <Dialog
-                open={showCreateDialog}
-                onOpenChange={setShowCreateDialog}
-              >
-                <DialogTrigger asChild>
-                  <Button className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add User
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+              {isOwner && (
+                <Dialog
+                  open={showCreateDialog}
+                  onOpenChange={setShowCreateDialog}
+                >
+                  <DialogTrigger asChild>
+                    <Button className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Add User
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
                   <DialogHeader>
                     <DialogTitle>Create New User</DialogTitle>
                   </DialogHeader>
@@ -469,20 +487,21 @@ export default function EnhancedUsersPage() {
                     </div>
                   </div>
 
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowCreateDialog(false);
-                        resetForm();
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button onClick={handleCreateUser}>Create User</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowCreateDialog(false);
+                          resetForm();
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button onClick={handleCreateUser}>Create User</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
 
             {/* Users Table */}
@@ -566,22 +585,26 @@ export default function EnhancedUsersPage() {
                             </DialogContent>
                           </Dialog>
 
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleResetPassword(user.id)}
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
+                          {isOwner && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleResetPassword(user.id)}
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </Button>
 
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

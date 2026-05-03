@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useEffect,
 } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { safeReadJson } from "@/lib/storage";
 import { apiBaseUrl, apiRequest } from "@/lib/api";
 import {
@@ -23,6 +24,7 @@ import type {
 export interface Order {
   id: string;
   clientId?: string;
+  companyId?: string;
   orderNumber: string;
   orderDate: string;
   organization: string;
@@ -2573,19 +2575,17 @@ const computeSalesTotals = (
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const { isAuthenticated } = useAuth();
   const [isCoreDataLoading, setIsCoreDataLoading] = useState(true);
   const [coreDataError, setCoreDataError] = useState<string | null>(null);
-  const [orders, setOrders] = usePersistedState(
-    "nido_orders_v2",
-    DEFAULT_ORDERS,
-  );
+  const [orders, setOrders] = usePersistedState("nido_orders_v2", [] as Order[]);
   const [vendors, setVendors] = usePersistedState(
     "nido_vendors_v2",
-    DEFAULT_VENDORS,
+    [] as Vendor[],
   );
   const [clients, setClients] = usePersistedState(
     "nido_clients_v2",
-    DEFAULT_CLIENTS,
+    [] as Client[],
   );
   const [locations, setLocations] = usePersistedState(
     "nido_locations",
@@ -2681,7 +2681,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const toFrontendOrderStatus = (status?: string) => {
     const normalized = (status || "").toLowerCase();
-    if (normalized === "pending") return "New";
+    if (normalized === "pending") return "Pending";
+    if (normalized === "pending_approval") return "Pending Approval";
+    if (normalized === "approved") return "Approved";
+    if (normalized === "confirmed") return "Confirmed";
     if (normalized === "assigned") return "Assigned";
     if (normalized === "processing") return "Processing";
     if (normalized === "completed") return "Completed";
@@ -2693,10 +2696,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const toApiOrderStatus = (status?: string) => {
     const normalized = (status || "").toLowerCase();
     if (normalized === "new" || normalized === "pending") return "pending";
+    if (normalized === "pending approval") return "pending_approval";
+    if (normalized === "approved") return "approved";
+    if (normalized === "confirmed") return "confirmed";
     if (normalized === "assigned") return "assigned";
-    if (normalized === "processing" || normalized === "approved") {
-      return "processing";
-    }
+    if (normalized === "processing") return "processing";
     if (normalized === "completed" || normalized === "delivered") {
       return "completed";
     }
@@ -2841,6 +2845,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     return {
       id: order._id || order.id || `ord-${Date.now()}`,
       clientId: order.clientId || "",
+      companyId: order.companyId || "",
       orderNumber: order.orderNumber || `ORD-${Date.now()}`,
       orderDate: normalizedDate,
       organization: order.organization || "Client Order",
@@ -3051,6 +3056,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   // Fetch clients, vendors, products, and orders from backend
   useEffect(() => {
     const fetchData = async () => {
+      if (!isAuthenticated) {
+        setIsCoreDataLoading(false);
+        setCoreDataError(null);
+        return;
+      }
+
       setIsCoreDataLoading(true);
       setCoreDataError(null);
       try {
@@ -3130,9 +3141,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
 
-    fetchData();
+    void fetchData();
   }, [
     API_BASE,
+    isAuthenticated,
     setClients,
     setInvoices,
     setMasterCatalogItems,

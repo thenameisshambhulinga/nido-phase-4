@@ -31,27 +31,14 @@ router.post("/send", async (req, res) => {
         success: true,
         data: result,
       });
-    } else if (subject && (html || text || plainText)) {
-      // Raw HTML/text email (legacy support)
-      const nodemailer = (await import("nodemailer")).default;
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || "smtp.ethereal.email",
-        port: process.env.SMTP_PORT || 587,
-        secure: process.env.SMTP_PORT == 465,
-        auth: {
-          user: process.env.SMTP_USER || process.env.ETHEREAL_USER,
-          pass: process.env.SMTP_PASS || process.env.ETHEREAL_PASS,
-        },
-      });
-
-      const info = await transporter.sendMail({
-        from: `"Nido Tech" <${process.env.EMAIL_FROM || "noreply@nidotech.com"}>`,
-        to: Array.isArray(to) ? to.join(", ") : to,
+    } else if (subject && html) {
+      const info = await sendEmail({
+        to,
         subject,
-        html: html || "",
+        html,
         text: text || plainText || "",
+        async: false,
       });
-
       return res.json({
         success: true,
         data: {
