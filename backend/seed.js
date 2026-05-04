@@ -6,21 +6,21 @@ import Client from "./models/Client.js";
 import Vendor from "./models/Vendor.js";
 import Product from "./models/Product.js";
 import { ensureBusinessId } from "./utils/businessIds.js";
+import { connectToMongo, resolveMongoUriFromEnv } from "./utils/mongoConnection.js";
 
 dotenv.config();
 
-const { MONGODB_URI } = process.env;
+const MONGODB_URI = resolveMongoUriFromEnv();
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const dataDir = path.join(__dirname, "data");
 
 async function seedDatabase() {
   try {
     if (!MONGODB_URI) {
-      throw new Error("MONGODB_URI is required for seeding");
+      throw new Error("MONGODB_URI or MONGO_URI is required for seeding");
     }
 
-    // Connect to MongoDB
-    await mongoose.connect(MONGODB_URI);
+    await connectToMongo(MONGODB_URI);
     console.log("✅ Connected to MongoDB");
 
     // Read JSON files

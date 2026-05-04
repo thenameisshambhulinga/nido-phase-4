@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import mongoose from "mongoose";
 import dotenv from "dotenv";
 
 import clientRoutes from "./routes/clients.js";
@@ -11,17 +10,18 @@ import invoiceRoutes from "./routes/invoices.js";
 import emailRoutes from "./routes/email.js";
 import authRoutes, { ensureDefaultOwnerAccount } from "./routes/auth.js";
 import amcRoutes from "./routes/amc.js";
+import { connectToMongo, resolveMongoUriFromEnv } from "./utils/mongoConnection.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const { MONGODB_URI } = process.env;
+const MONGODB_URI = resolveMongoUriFromEnv();
 const CLIENT_ORIGIN = process.env.FRONTEND_URL || "*";
 
 if (!MONGODB_URI) {
   console.error(
-    "❌ MONGODB_URI is required. Server will not start without it.",
+    "❌ MONGODB_URI or MONGO_URI is required. Server will not start without it.",
   );
   process.exit(1);
 }
@@ -82,8 +82,7 @@ app.use((req, res) => {
 });
 
 /* ================= DB + SERVER ================= */
-mongoose
-  .connect(MONGODB_URI)
+connectToMongo(MONGODB_URI)
   .then(() => {
     console.log("✅ Connected to MongoDB successfully");
     return ensureDefaultOwnerAccount().then(() => {
@@ -103,6 +102,6 @@ mongoose
     });
   })
   .catch((error) => {
-    console.error("❌ MongoDB connection error:", error);
+    console.error("❌ MongoDB connection error:", error.message);
     process.exit(1);
   });

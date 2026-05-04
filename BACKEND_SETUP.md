@@ -125,11 +125,15 @@ backend/
 
 ## 🚦 Running the System
 
-### Terminal 1: MongoDB
+### Terminal 1: MongoDB (Optional)
 
 ```bash
 mongod --dbpath /tmp/nido_db
 ```
+
+If `backend/.env` points to `mongodb://localhost:27017/...` or
+`mongodb://127.0.0.1:27017/...`, `npm run dev` now auto-starts a local
+`mongod` when MongoDB is not already running.
 
 ### Terminal 2: Backend Server
 
