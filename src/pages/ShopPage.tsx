@@ -283,6 +283,7 @@ export default function ShopPage() {
       category: product.category,
       price: product.price,
       emoji: product.emoji,
+      image: product.image,
     });
     toast.success(`${product.name} added to cart`);
   };
@@ -310,7 +311,7 @@ export default function ShopPage() {
             </div>
 
             <Button
-              className="h-11 gap-2 rounded-full bg-slate-900 px-5 text-white hover:bg-slate-800"
+              className="fixed right-6 top-6 z-50 h-11 gap-2 rounded-full bg-slate-900 px-5 text-white shadow-xl hover:bg-slate-800 lg:right-8 lg:top-8"
               onClick={() => navigate("/shop/cart")}
             >
               <ShoppingCart className="h-4 w-4" />

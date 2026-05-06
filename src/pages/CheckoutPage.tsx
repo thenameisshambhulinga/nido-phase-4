@@ -40,6 +40,7 @@ import {
   isValidPhoneNumber,
   normalizeEmail,
 } from "@/lib/validation";
+import { sendEmail, emailTemplates } from "@/lib/emailService";
 
 interface ShippingInfo {
   fullName: string;
@@ -428,6 +429,60 @@ export default function CheckoutPage() {
           "nido_saved_cards",
           JSON.stringify([maskedCard, ...savedCards]),
         );
+      }
+
+      // Send order confirmation email to customer
+      try {
+        const customerEmailTemplate = emailTemplates.orderConfirmation({
+          id: persistedOrderId,
+          shippingInfo: {
+            email: shipping.email,
+            fullName: shipping.fullName,
+          },
+          items: items.map((i) => ({ name: i.name, quantity: i.quantity })),
+          total,
+          orderDate: todayIso,
+        });
+        await sendEmail(shipping.email, customerEmailTemplate);
+      } catch (emailErr) {
+        console.warn("[checkout] Customer email failed:", emailErr);
+      }
+
+      // Send order notification to owner/admin
+      try {
+        const ownerEmailTemplate = emailTemplates.orderReceivedForOwner({
+          id: persistedOrderId,
+          orderDate: todayIso,
+          shippingInfo: {
+            email: shipping.email,
+            fullName: shipping.fullName,
+            companyName: shipping.companyName,
+          },
+          items: items.map((i) => ({
+            name: i.name,
+            quantity: i.quantity,
+            category: i.category,
+          })),
+          total,
+          paymentMethod:
+            paymentMethod === "card"
+              ? "Credit Card"
+              : paymentMethod === "bank"
+                ? "Bank Transfer"
+                : `Purchase Order (${payment.purchaseOrderNumber})`,
+          shippingMethod:
+            shippingMethod === "express" ? "Express Air" : "Standard Ground",
+        });
+        await sendEmail(
+          Array.isArray(ownerNotificationEmail)
+            ? ownerNotificationEmail
+            : ownerNotificationEmail
+              ? [ownerNotificationEmail]
+              : [],
+          ownerEmailTemplate,
+        );
+      } catch (emailErr) {
+        console.warn("[checkout] Owner email failed:", emailErr);
       }
 
       clearCart();

@@ -7,8 +7,7 @@
 // EMAIL VALIDATION (RFC Standard)
 // =============================================================================
 
-const EMAIL_REGEX =
-  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
 
 export function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -25,8 +24,7 @@ export function isValidEmail(value: string): boolean {
 
 export function isValidPhoneNumber(value: string): boolean {
   if (!value || typeof value !== "string") return false;
-  const digits = value.replace(/\D/g, "");
-  return digits.length === 10 && /^\d{10}$/.test(digits);
+  return /^[6-9]\d{9}$/.test(value.replace(/\s/g, ""));
 }
 
 export function normalizePhoneNumber(value: string): string {
@@ -117,14 +115,7 @@ export function normalizeCardNumber(value: string): string {
 // GST Format: 15 characters
 // State code (2 digits) + PAN (10 chars) + Entity number (3 chars) + Z (1 char) + Check sum (1 char)
 // Example: 27AAECS1234F1Z1
-const GST_REGEX =
-  /^([0-9]{2})([A-Z]{5}[A-Z0-9]{4})([0-9]{4})([A-Z]{1})([0-9]{1})$/i;
-
-export function isValidGSTNumber(value: string): boolean {
-  if (!value || typeof value !== "string") return false;
-  const cleanValue = value.replace(/\s/g, "").toUpperCase();
-  return GST_REGEX.test(cleanValue);
-}
+// GST validation already exists - keeping existing
 
 export function normalizeGSTNumber(value: string): string {
   if (!value || typeof value !== "string") return "";
@@ -209,10 +200,38 @@ export function isValidUsername(value: string): boolean {
 
 const PASSWORD_MIN_LENGTH = 8;
 
+export const PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$/;
+
 export function isValidPassword(value: string): boolean {
   if (!value || typeof value !== "string") return false;
-  if (value.length < PASSWORD_MIN_LENGTH) return false;
-  return true;
+  return PASSWORD_REGEX.test(value);
+}
+
+export const GST_REGEX =
+  /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
+
+export function isValidGST(value: string): boolean {
+  return GST_REGEX.test(
+    String(value || "")
+      .trim()
+      .toUpperCase(),
+  );
+}
+
+export function validateCardFull(
+  cardNumber: string,
+  month: string,
+  year: string,
+  cvv: string,
+): boolean {
+  const cleanCard = cardNumber.replace(/\\D/g, "");
+  return (
+    cleanCard.length === 16 &&
+    luhnCheck(cleanCard) &&
+    isValidCVV(cvv) &&
+    isValidCardExpiry(month, year)
+  );
 }
 
 // =============================================================================
@@ -275,7 +294,7 @@ export function validateClientForm(data: {
     errors.phone = "Phone must be exactly 10 digits";
   }
 
-  if (data.gst && !isValidGSTNumber(data.gst)) {
+  if (data.gst && !isValidGST(data.gst)) {
     errors.gst = "Invalid GST number format";
   }
 

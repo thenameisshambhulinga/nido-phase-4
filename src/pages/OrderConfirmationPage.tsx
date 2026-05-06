@@ -22,8 +22,6 @@ import {
   FilePlus2,
 } from "lucide-react";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { normalizeOrderCode } from "@/lib/documentNumbering";
 import { apiRequest } from "@/lib/api";
 
@@ -220,145 +218,156 @@ export default function OrderConfirmationPage() {
     return user.id === order.clientId;
   }, [order, user]);
 
-  const downloadInvoice = () => {
+  const downloadInvoice = async () => {
     if (!order) return;
     if (!canDownloadInvoice) {
       toast.error("You are not authorized to download this invoice.");
       return;
     }
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const pageWidth = doc.internal.pageSize.getWidth();
+    try {
+      const jsPDF = (await import("jspdf")).jsPDF;
+      const autoTable = (await import("jspdf-autotable")).default;
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, 110, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(24);
-    doc.text("Nido Tech", 44, 48);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text("Corporate Essentials Invoice", 44, 68);
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, pageWidth, 110, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(24);
+      doc.text("Nido Tech", 44, 48);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.text("Corporate Essentials Invoice", 44, 68);
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("INVOICE", pageWidth - 140, 48);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Invoice #: ${order.id}`, pageWidth - 190, 66);
-    doc.text(
-      `Date: ${new Date(order.orderDate).toLocaleDateString()}`,
-      pageWidth - 190,
-      82,
-    );
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("INVOICE", pageWidth - 140, 48);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text(`Invoice #: ${order.id}`, pageWidth - 190, 66);
+      doc.text(
+        `Date: ${new Date(order.orderDate).toLocaleDateString()}`,
+        pageWidth - 190,
+        82,
+      );
 
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("Bill To", 44, 144);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const addressLines = [
-      order.shippingInfo.fullName,
-      order.shippingInfo.companyName || "N/A",
-      order.shippingInfo.address,
-      `${order.shippingInfo.city}, ${order.shippingInfo.state} ${order.shippingInfo.zipCode}`,
-      order.shippingInfo.phone,
-      order.shippingInfo.email,
-    ];
-    let y = 162;
-    addressLines.forEach((line) => {
-      doc.text(line, 44, y);
-      y += 14;
-    });
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("Bill To", 44, 144);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const addressLines = [
+        order.shippingInfo.fullName,
+        order.shippingInfo.companyName || "N/A",
+        order.shippingInfo.address,
+        `${order.shippingInfo.city}, ${order.shippingInfo.state} ${order.shippingInfo.zipCode}`,
+        order.shippingInfo.phone,
+        order.shippingInfo.email,
+      ];
+      let y = 162;
+      addressLines.forEach((line) => {
+        doc.text(line, 44, y);
+        y += 14;
+      });
 
-    doc.setFont("helvetica", "bold");
-    doc.text("Payment", pageWidth - 190, 144);
-    doc.setFont("helvetica", "normal");
-    doc.text(order.paymentMethod.toUpperCase(), pageWidth - 190, 162);
-    doc.text(
-      `Delivery: ${
-        order.shippingMethod === "express" ? "Express" : "Standard"
-      }`,
-      pageWidth - 190,
-      178,
-    );
+      doc.setFont("helvetica", "bold");
+      doc.text("Payment", pageWidth - 190, 144);
+      doc.setFont("helvetica", "normal");
+      doc.text(order.paymentMethod.toUpperCase(), pageWidth - 190, 162);
+      doc.text(
+        `Delivery: ${
+          order.shippingMethod === "express" ? "Express" : "Standard"
+        }`,
+        pageWidth - 190,
+        178,
+      );
 
-    autoTable(doc, {
-      startY: 242,
-      margin: { left: 44, right: 44 },
-      head: [["Item", "Category", "Qty", "Unit Price", "Amount"]],
-      body: order.items.map((item) => [
-        item.name,
-        item.category,
-        String(item.quantity),
-        `₹${item.price.toLocaleString()}`,
-        `₹${item.total.toLocaleString()}`,
-      ]),
-      headStyles: {
-        fillColor: [30, 41, 59],
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-      },
-      styles: {
-        fontSize: 9,
-        cellPadding: 7,
-        lineColor: [226, 232, 240],
-        lineWidth: 0.5,
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
-    });
+      autoTable(doc, {
+        startY: 242,
+        margin: { left: 44, right: 44 },
+        head: [["Item", "Category", "Qty", "Unit Price", "Amount"]],
+        body: order.items.map((item) => [
+          item.name,
+          item.category,
+          String(item.quantity),
+          `₹${item.price.toLocaleString()}`,
+          `₹${item.total.toLocaleString()}`,
+        ]),
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 7,
+          lineColor: [226, 232, 240],
+          lineWidth: 0.5,
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+      });
 
-    const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } })
-      .lastAutoTable?.finalY;
-    const totalsY = (finalY || 360) + 28;
+      const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } })
+        .lastAutoTable?.finalY;
+      const totalsY = (finalY || 360) + 28;
 
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(pageWidth - 232, totalsY - 16, 188, 104, 8, 8, "F");
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text("Subtotal", pageWidth - 216, totalsY + 8);
-    doc.text(
-      `₹${order.subtotal.toLocaleString()}`,
-      pageWidth - 56,
-      totalsY + 8,
-      {
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(pageWidth - 232, totalsY - 16, 188, 104, 8, 8, "F");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.text("Subtotal", pageWidth - 216, totalsY + 8);
+      doc.text(
+        `₹${order.subtotal.toLocaleString()}`,
+        pageWidth - 56,
+        totalsY + 8,
+        {
+          align: "right",
+        },
+      );
+      doc.text("Tax", pageWidth - 216, totalsY + 26);
+      doc.text(`₹${order.tax.toLocaleString()}`, pageWidth - 56, totalsY + 26, {
         align: "right",
-      },
-    );
-    doc.text("Tax", pageWidth - 216, totalsY + 26);
-    doc.text(`₹${order.tax.toLocaleString()}`, pageWidth - 56, totalsY + 26, {
-      align: "right",
-    });
-    doc.text("Shipping", pageWidth - 216, totalsY + 44);
-    doc.text(
-      `₹${order.shippingCost.toLocaleString()}`,
-      pageWidth - 56,
-      totalsY + 44,
-      {
-        align: "right",
-      },
-    );
-    doc.setFont("helvetica", "bold");
-    doc.text("Grand Total", pageWidth - 216, totalsY + 70);
-    doc.text(`₹${order.total.toLocaleString()}`, pageWidth - 56, totalsY + 70, {
-      align: "right",
-    });
+      });
+      doc.text("Shipping", pageWidth - 216, totalsY + 44);
+      doc.text(
+        `₹${order.shippingCost.toLocaleString()}`,
+        pageWidth - 56,
+        totalsY + 44,
+        {
+          align: "right",
+        },
+      );
+      doc.setFont("helvetica", "bold");
+      doc.text("Grand Total", pageWidth - 216, totalsY + 70);
+      doc.text(
+        `₹${order.total.toLocaleString()}`,
+        pageWidth - 56,
+        totalsY + 70,
+        {
+          align: "right",
+        },
+      );
 
-    doc.setDrawColor(226, 232, 240);
-    doc.line(44, 792, pageWidth - 44, 792);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139);
-    doc.text(
-      "Thank you for shopping with Nido Tech. This is a computer-generated invoice.",
-      44,
-      810,
-    );
+      doc.setDrawColor(226, 232, 240);
+      doc.line(44, 792, pageWidth - 44, 792);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(
+        "Thank you for shopping with Nido Tech. This is a computer-generated invoice.",
+        44,
+        810,
+      );
 
-    doc.save(`invoice-${order.id}.pdf`);
-    toast.success("Invoice downloaded");
+      doc.save(`invoice-${order.id}.pdf`);
+      toast.success("Invoice downloaded");
+    } catch (error) {
+      toast.error("PDF generation failed");
+    }
   };
 
   const convertToInvoice = () => {

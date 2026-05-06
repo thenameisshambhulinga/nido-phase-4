@@ -504,24 +504,34 @@ export default function UserProfilePage() {
                             label: "Email",
                             value: profileUser.email,
                           },
-                          { icon: Phone, label: "Phone", value: userPhone },
+                          { icon: Phone, label: "Phone Number", value: userPhone },
                           {
-                            icon: ShieldCheck,
-                            label: "Status",
-                            value: profileStatusLabel,
+                            icon: Calendar,
+                            label: "Date of Birth",
+                            value: "Not provided",
                           },
                           {
                             icon: Building2,
-                            label: "Organization",
-                            value: client.name,
+                            label: "Company Name",
+                            value: client.companyName || client.name,
+                          },
+                          {
+                            icon: MapPin,
+                            label: "Location",
+                            value: locationLabel,
+                          },
+                          {
+                            icon: Clock3,
+                            label: "Time Zone",
+                            value: "IST (UTC+5:30)",
                           },
                         ].map((item) => (
                           <div
                             key={item.label}
                             className="flex items-center gap-3"
                           >
-                            <item.icon className="h-4 w-4 text-primary" />
-                            <div className="min-w-0">
+                            <item.icon className="h-4 w-4 text-primary flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
                               <p className="text-xs text-slate-500">
                                 {item.label}
                               </p>
@@ -564,14 +574,32 @@ export default function UserProfilePage() {
                         <p className="text-slate-500">
                           Logged in from {locationLabel}
                         </p>
-                        <Button
-                          variant="outline"
-                          className="h-9 w-full justify-between rounded-xl border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                          onClick={() => setProfileEditOpen(true)}
-                        >
-                          <span>{humanizedRole}</span>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <p className="text-slate-500">
+                          Time Zone: IST (UTC+5:30)
+                        </p>
+                        <div className="flex flex-col gap-2 pt-1">
+                          <Button
+                            variant="outline"
+                            className="h-9 w-full justify-between rounded-xl border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                            onClick={() => setProfileEditOpen(true)}
+                          >
+                            <span>{humanizedRole}</span>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="h-9 w-full justify-between rounded-xl border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                            onClick={() => {
+                              const manager = client?.contactPerson || "System Owner";
+                              toast({ title: `Manager: ${manager}`, description: "Reporting structure" });
+                            }}
+                          >
+                            <span>Manager</span>
+                            <Badge className="rounded-full bg-blue-100 text-blue-700 text-xs">
+                              {client?.contactPerson || "System Owner"}
+                            </Badge>
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

@@ -369,7 +369,7 @@ export interface ServiceTierPolicy {
 }
 
 export interface GlobalSearchResult {
-  group: "Users" | "Orders" | "Vendors" | "Clients" | "Invoices";
+  group: "Users" | "Orders" | "Vendors" | "Clients" | "Invoices" | "Products";
   title: string;
   subtitle: string;
   badge: string;
@@ -2578,7 +2578,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const { isAuthenticated } = useAuth();
   const [isCoreDataLoading, setIsCoreDataLoading] = useState(true);
   const [coreDataError, setCoreDataError] = useState<string | null>(null);
-  const [orders, setOrders] = usePersistedState("nido_orders_v2", [] as Order[]);
+  const [orders, setOrders] = usePersistedState(
+    "nido_orders_v2",
+    [] as Order[],
+  );
   const [vendors, setVendors] = usePersistedState(
     "nido_vendors_v2",
     [] as Vendor[],
@@ -3066,26 +3069,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       setCoreDataError(null);
       try {
         const results = await Promise.allSettled([
-          apiRequest<any[]>("/clients"),
-          apiRequest<any[]>("/vendors"),
-          apiRequest<any[]>("/products"),
-          apiRequest<any[]>("/orders"),
-          apiRequest<any[]>("/invoices"),
+          apiRequest<any[]>("/api/clients"),
+          apiRequest<any[]>("/api/vendors"),
+          apiRequest<any[]>("/api/products"),
+          apiRequest<any[]>("/api/orders"),
         ]);
 
-        const [
-          clientsResult,
-          vendorsResult,
-          productsResult,
-          ordersResult,
-          invoicesResult,
-        ] = results;
+        const [clientsResult, vendorsResult, productsResult, ordersResult] =
+          results;
         const errors: string[] = [];
 
         if (clientsResult.status === "fulfilled") {
           const mapped = clientsResult.value.map(mapApiClientToFrontend);
+          console.log("✅ Clients loaded:", mapped.length);
           setClients(mapped);
         } else {
+          console.error("❌ CLIENTS FETCH ERROR:", clientsResult.reason);
           errors.push(`clients: ${clientsResult.reason?.message || "failed"}`);
         }
 
@@ -3115,14 +3114,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           errors.push(`orders: ${ordersResult.reason?.message || "failed"}`);
         }
 
-        if (invoicesResult.status === "fulfilled") {
-          const mapped = invoicesResult.value.map(mapApiInvoiceToFrontend);
-          setInvoices(mapped);
-        } else {
-          errors.push(
-            `invoices: ${invoicesResult.reason?.message || "failed"}`,
-          );
-        }
+        // Invoices fetched via order relations
 
         if (errors.length > 0) {
           setCoreDataError(
@@ -3130,11 +3122,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           );
         }
       } catch (error) {
-        console.error("Error fetching data from backend:", error);
+        console.error("🚨 CRITICAL: Backend data fetch failed", error);
+        console.error("API_BASE:", apiBaseUrl);
+        console.error("Auth status:", isAuthenticated);
         setCoreDataError(
-          error instanceof Error
-            ? error.message
-            : "Failed to load core business data from backend.",
+          `Backend error: ${error instanceof Error ? error.message : String(error)}. Check console.`,
         );
       } finally {
         setIsCoreDataLoading(false);
@@ -3143,7 +3135,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
     void fetchData();
   }, [
-    API_BASE,
     isAuthenticated,
     setClients,
     setInvoices,
@@ -5211,6 +5202,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       > = {
         Users: [],
         Orders: [],
+        Products: [],
         Vendors: [],
         Clients: [],
         Invoices: [],
@@ -5328,6 +5320,49 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         });
       });
 
+      // Search Products from master catalog
+      const derivedCategories = Array.from(
+        new Set(masterCatalogItems.map((item: any) => item.category).filter(Boolean)),
+      );
+      derivedCategories.forEach((catName) => {
+        const score = collectBestScore([catName]);
+        if (!score) return;
+        const count = masterCatalogItems.filter((item: any) => item.category === catName).length;
+        groupedResults.Products.push({
+          group: "Products",
+          title: catName,
+          subtitle: `Category • ${count} item${count !== 1 ? "s" : ""}`,
+          badge: "Category",
+          path: `/categories?search=${encodeURIComponent(catName)}`,
+          id: `cat-${catName}`,
+          score: Math.min(score, 75),
+        });
+      });
+
+      masterCatalogItems.forEach((product: any) => {
+        const score = collectBestScore([
+          product.name,
+          product.productCode,
+          product.category,
+          product.subCategory,
+          product.description,
+        ]);
+        if (!score) return;
+        groupedResults.Products.push({
+          group: "Products",
+          title: product.name,
+          subtitle: [product.category, product.productCode ? `SKU: ${product.productCode}` : ""]
+            .filter(Boolean)
+            .join(" • "),
+          badge: product.stock !== undefined
+            ? product.stock > 0 ? "In Stock" : "Out of Stock"
+            : product.status || "Active",
+          path: `/categories?search=${encodeURIComponent(product.name)}`,
+          id: product.id,
+          score,
+        });
+      });
+
       clients.forEach((client) => {
         const score = collectBestScore([
           client.name,
@@ -5398,7 +5433,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           .slice(0, 10),
       );
     },
-    [appUsers, clients, invoices, orders, vendors],
+    [appUsers, clients, invoices, orders, vendors, masterCatalogItems],
   );
 
   const computeOrderPricing = useCallback(

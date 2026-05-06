@@ -5,7 +5,7 @@ const getAPIBase = (): string => {
   if (import.meta.env.VITE_API_BASE_URL)
     return import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, "");
 
-  return "/api";
+  return "http://localhost:5000";
 };
 
 const API_BASE = getAPIBase();
@@ -21,11 +21,18 @@ export async function apiRequest<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const { body, headers, ...rest } = options;
+  const normalizedPath = path.startsWith("http")
+    ? path
+    : path.startsWith("/api/")
+      ? path
+      : path.startsWith("/")
+        ? `/api${path}`
+        : `/api/${path}`;
   const authToken =
     typeof localStorage !== "undefined"
       ? localStorage.getItem("nido_auth_token")
       : null;
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${API_BASE}${normalizedPath}`, {
     ...rest,
     headers: {
       "Content-Type": "application/json",

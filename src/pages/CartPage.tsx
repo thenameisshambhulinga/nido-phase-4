@@ -118,56 +118,180 @@ export default function CartPage() {
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-3">
           {items.map((item) => (
-            <Card key={item.id} className="border-border/60">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="text-4xl w-14 h-14 flex items-center justify-center bg-muted rounded-xl shrink-0">
-                  {item.emoji}
+            <Card key={item.id} className="border-border/60 overflow-hidden">
+              <CardContent className="p-0">
+                {/* Desktop & Tablet: table-like row */}
+                <div className="hidden sm:flex items-center gap-0">
+                  {/* Image column */}
+                  <div className="w-20 h-20 shrink-0 bg-muted flex items-center justify-center overflow-hidden rounded-l-xl">
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                        }}
+                      />
+                    ) : null}
+                    <span className={item.image ? "hidden text-3xl" : "text-3xl"}>
+                      {item.emoji}
+                    </span>
+                  </div>
+
+                  {/* Name + Category column */}
+                  <div className="flex-1 min-w-0 px-4 py-4">
+                    <h3 className="font-semibold text-foreground truncate text-sm">
+                      {item.name}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {item.category}
+                    </p>
+                    <p className="text-sm font-bold text-primary mt-1">
+                      ${item.price.toLocaleString()}
+                    </p>
+                  </div>
+
+                  {/* Quantity column */}
+                  <div className="flex items-center gap-1.5 px-4 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() =>
+                        updateQuantity(item.id, Math.max(1, item.quantity - 1))
+                      }
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </Button>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={item.stock || 999}
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val) && val >= 1) {
+                          updateQuantity(item.id, Math.min(val, item.stock || 999));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (isNaN(val) || val < 1) {
+                          updateQuantity(item.id, 1);
+                        }
+                      }}
+                      className="w-14 h-8 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() =>
+                        updateQuantity(
+                          item.id,
+                          Math.min(item.quantity + 1, item.stock || 999),
+                        )
+                      }
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+
+                  {/* Total column */}
+                  <div className="text-right px-4 min-w-[90px] shrink-0">
+                    <p className="text-xs text-muted-foreground mb-1">Total</p>
+                    <p className="font-bold text-foreground text-sm">
+                      ${(item.price * item.quantity).toLocaleString()}
+                    </p>
+                  </div>
+
+                  {/* Delete column */}
+                  <div className="pr-4 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => removeFromCart(item.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-foreground truncate">
-                    {item.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {item.category}
-                  </p>
-                  <p className="text-sm font-bold text-primary mt-1">
-                    ${item.price.toLocaleString()}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
+
+                {/* Mobile: stacked layout */}
+                <div className="flex sm:hidden items-center gap-3 p-4">
+                  <div className="w-16 h-16 shrink-0 bg-muted rounded-xl flex items-center justify-center overflow-hidden">
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          e.currentTarget.nextElementSibling?.classList.remove("hidden");
+                        }}
+                      />
+                    ) : null}
+                    <span className={item.image ? "hidden text-2xl" : "text-2xl"}>
+                      {item.emoji}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-foreground truncate text-sm">
+                      {item.name}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      ${item.price.toLocaleString()} × {item.quantity}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() =>
+                        updateQuantity(item.id, Math.max(1, item.quantity - 1))
+                      }
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <span className="w-8 text-center text-sm font-medium">
+                      {item.quantity}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() =>
+                        updateQuantity(
+                          item.id,
+                          Math.min(item.quantity + 1, item.stock || 999),
+                        )
+                      }
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
-                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                    className="h-7 w-7 text-destructive/70 hover:text-destructive"
+                    onClick={() => removeFromCart(item.id)}
                   >
-                    <Minus className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
-                  <span className="w-8 text-center font-semibold text-sm">
-                    {item.quantity}
+                </div>
+                {/* Mobile total */}
+                <div className="flex sm:hidden justify-between items-center px-4 pb-4 pt-0">
+                  <span className="text-xs text-muted-foreground">
+                    Stock: {item.stock || "unlimited"}
                   </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                <div className="text-right min-w-[80px]">
-                  <p className="font-bold text-foreground">
+                  <p className="font-bold text-foreground text-sm">
                     ${(item.price * item.quantity).toLocaleString()}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={() => removeFromCart(item.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </CardContent>
             </Card>
           ))}

@@ -13,7 +13,9 @@ export interface CartItem {
   category: string;
   price: number;
   emoji: string;
+  image?: string;
   quantity: number;
+  stock?: number;
 }
 
 interface CartContextType {
@@ -24,6 +26,8 @@ interface CartContextType {
     category: string;
     price: number;
     emoji: string;
+    image?: string;
+    stock?: number;
   }) => void;
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
@@ -52,6 +56,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
       category: string;
       price: number;
       emoji: string;
+      image?: string;
+      stock?: number;
     }) => {
       setItems((prev) => {
         const existing = prev.find((i) => i.id === product.id);
@@ -70,11 +76,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const updateQuantity = useCallback((id: string, quantity: number) => {
-    if (quantity <= 0) {
+    const qty = Math.max(1, Math.floor(Number(quantity) || 0));
+    if (qty <= 0) {
       setItems((prev) => prev.filter((i) => i.id !== id));
       return;
     }
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, quantity } : i)));
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, quantity: qty } : i)),
+    );
   }, []);
 
   const clearCart = useCallback(() => setItems([]), []);

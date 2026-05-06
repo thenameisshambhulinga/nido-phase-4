@@ -1,34 +1,36 @@
-# Nido Backend MongoDB Fix - COMPLETE ✅
+# Nido Phase 3 Enhancement Plan
 
-## Issue Fixed
+## Status: ✅ Phase 1 Complete - ClientsPage fixed + error UI
 
-**Original Problem:** Backend crash - `MongooseServerSelectionError: connect ECONNREFUSED 127.0.0.1:27017`
+### 🔴 Phase 1: Fix Clients Loading (✅ DONE)
 
-- MongoDB v8.0.5 installed but **service not running**
-- Fixed by: `sudo service mongod start`
+- [x] Added error logging to DataContext fetches
+- [x] Added loading/error UI to ClientsPage + Retry button
+- [x] Fixed JSX syntax (duplicate Popover removed)
+- [x] API_BASE → localhost:5000 direct
+- [x] Build passes
 
-## Current Status
+### 🔴 Phase 2: User Credentials (Backend Ready)
 
-```
-MongoDB: Active (running) PID 30703, port 27017 ✓
-Backend Server: Port 5000, "✅ Connected to MongoDB successfully" ✓
-Health Check: curl localhost:5000/api/health → {"success":true,"data":{"status":"ok"}} ✓
-nodemon: Running with auto-restart (ignore port conflict messages - normal)
+- [ ] Verify CredentialsModal (open tab)
+- [ ] Test owner→user creation flow
 
-Dev terminals active - server ready!
-```
+### 🔴 Phase 3: Order Flow
 
-## Verification Commands
+- [ ] Frontend approve button
+- [ ] Test PENDING→APPROVED→CONFIRMED
 
-```bash
-# Backend health
-curl http://localhost:5000/api/health
+### 🔴 Phase 5: Homepage UI (Next)
 
-# MongoDB status
-sudo service mongod status
+- [ ] Nido-Tech highlight styling
+- [ ] Remove Shop by Category/sections
 
-# Test auth route
-curl http://localhost:5000/api/auth/health
-```
+### 🔴 Remaining Phases
 
-**Backend fully operational.** Frontend can now connect without crashes. Primary task resolved.
+- [ ] Phase 4: Persistence
+- [ ] Phase 6: Cart fixes
+- [ ] Phase 7: Vendor flow
+- [ ] Phase 8: Bundle opt
+- [ ] Phase 9: Full validation
+
+**Next: Phase 5 HomePage.tsx cleanup → test backend data**

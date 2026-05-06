@@ -1,8 +1,14 @@
-const BASE_URL =
-  (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "/api").replace(
-    /\/+$/,
-    "",
-  );
+const normalizeApiBase = (value) => {
+  const trimmed = String(value || "").replace(/\/+$/, "");
+  if (!trimmed) return "http://localhost:5000/api";
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+};
+
+const BASE_URL = normalizeApiBase(
+  import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:5000",
+);
 
 const handleResponse = async (res) => {
   const data = await res.json();

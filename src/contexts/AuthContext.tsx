@@ -194,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!token) return;
     void (async () => {
       try {
-        const current = await apiRequest<any>("/auth/me");
+        const current = await apiRequest<any>("/api/auth/me");
         setUser(toFrontendUser(current));
         const remoteUsers = await apiRequest<any[]>("/auth/users");
         setUsers(remoteUsers.map(toFrontendUser));
@@ -218,7 +218,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       console.log("[Auth] Attempting login to", `${apiBaseUrl}/auth/login`);
 
-      const response = await fetch(`${apiBaseUrl}/auth/login`, {
+      const response = await fetch(`${apiBaseUrl}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: normalizedEmail, password }),
@@ -303,7 +303,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     try {
-      const response = await apiRequest<any>("/auth/users", {
+      const response = await apiRequest<any>("/api/auth/users", {
         method: "POST",
         body: {
           name: data.name,
@@ -320,7 +320,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (response?.user) {
         setUsers((prev) => {
           const nextUser = toFrontendUser(response.user);
-          return [nextUser, ...prev.filter((entry) => entry.id !== nextUser.id)];
+          return [
+            nextUser,
+            ...prev.filter((entry) => entry.id !== nextUser.id),
+          ];
         });
         return {
           user: toFrontendUser(response.user),

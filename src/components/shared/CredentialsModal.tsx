@@ -14,7 +14,6 @@ import { Copy, Download, Check, Mail } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { sendEmail, emailTemplates } from "@/lib/emailService";
 import { useEnhancedAuth } from "@/contexts/EnhancedAuthContext";
-import jsPDF from "jspdf";
 
 interface Credentials {
   username: string;
@@ -61,32 +60,45 @@ export default function CredentialsModal({
     }, 2000);
   };
 
-  const downloadCredentials = () => {
+  const downloadCredentials = async () => {
     if (!credentials || !user) return;
 
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text("User Credentials", 20, 20);
-    doc.setFontSize(12);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 35);
-    doc.text(`Created by: ${user.fullName}`, 20, 45);
-    doc.text(`User Type: ${userType.replace("_", " ").toUpperCase()}`, 20, 55);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text("User Credentials", 20, 20);
+      doc.setFontSize(12);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 35);
+      doc.text(`Created by: ${user.fullName}`, 20, 45);
+      doc.text(
+        `User Type: ${userType.replace("_", " ").toUpperCase()}`,
+        20,
+        55,
+      );
 
-    doc.text("─".repeat(40), 20, 70);
-    doc.text("LOGIN DETAILS", 20, 80);
-    doc.text(`Username: ${credentials.username}`, 20, 90);
-    doc.text(`Email: ${credentials.email}`, 20, 100);
-    doc.text(`Temp Password: ${credentials.temporaryPassword}`, 20, 110);
+      doc.text("─".repeat(40), 20, 70);
+      doc.text("LOGIN DETAILS", 20, 80);
+      doc.text(`Username: ${credentials.username}`, 20, 90);
+      doc.text(`Email: ${credentials.email}`, 20, 100);
+      doc.text(`Temp Password: ${credentials.temporaryPassword}`, 20, 110);
 
-    doc.text("─".repeat(40), 20, 130);
-    doc.text("IMPORTANT", 20, 140);
-    doc.text("• User must change password on first login", 20, 150);
-    doc.text("• Password expires in 24 hours", 20, 160);
-    doc.text("• Contact IT if login issues", 20, 170);
+      doc.text("─".repeat(40), 20, 130);
+      doc.text("IMPORTANT", 20, 140);
+      doc.text("• User must change password on first login", 20, 150);
+      doc.text("• Password expires in 24 hours", 20, 160);
+      doc.text("• Contact IT if login issues", 20, 170);
 
-    const filename = `credentials-${credentials.username}-${Date.now()}.pdf`;
-    doc.save(filename);
-    toast({ title: "Downloaded!", description: filename });
+      const filename = `credentials-${credentials.username}-${Date.now()}.pdf`;
+      doc.save(filename);
+      toast({ title: "Downloaded!", description: filename });
+    } catch (error) {
+      toast({
+        title: "PDF Error",
+        description: "Download failed. Please copy manually.",
+        variant: "destructive",
+      });
+    }
   };
 
   const sendCredentialsEmail = async () => {
@@ -207,10 +219,8 @@ export default function CredentialsModal({
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
-                  <code className="font-mono text-sm bg-muted/50 px-2 py-1 rounded">
-                    {credentials.temporaryPassword
-                      .replace(/./g, "*")
-                      .slice(0, -3) + credentials.temporaryPassword.slice(-3)}
+                  <code className="font-mono text-sm bg-muted/50 px-2 py-1 rounded select-all">
+                    {credentials.temporaryPassword}
                   </code>
                   <Button
                     size="icon"
@@ -228,7 +238,7 @@ export default function CredentialsModal({
                   </Button>
                 </div>
                 <p className="text-xs text-amber-700 mt-1">
-                  Password masked. Click copy to reveal.
+                  Share this password securely with the user.
                 </p>
               </CardContent>
             </Card>

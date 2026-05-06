@@ -1,6 +1,9 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import clientRoutes from "./routes/clients.js";
 import vendorRoutes from "./routes/vendors.js";
@@ -10,7 +13,10 @@ import invoiceRoutes from "./routes/invoices.js";
 import emailRoutes from "./routes/email.js";
 import authRoutes, { ensureDefaultOwnerAccount } from "./routes/auth.js";
 import amcRoutes from "./routes/amc.js";
-import { connectToMongo, resolveMongoUriFromEnv } from "./utils/mongoConnection.js";
+import {
+  connectToMongo,
+  resolveMongoUriFromEnv,
+} from "./utils/mongoConnection.js";
 
 dotenv.config();
 
@@ -18,6 +24,19 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = resolveMongoUriFromEnv();
 const CLIENT_ORIGIN = process.env.FRONTEND_URL || "*";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const possibleFrontendDirs = [
+  path.resolve(__dirname, "../frontend/dist"),
+  path.resolve(__dirname, "../client/dist"),
+  path.resolve(__dirname, "../dist"),
+];
+
+const frontendBuildDir = possibleFrontendDirs.find((dir) =>
+  fs.existsSync(path.join(dir, "index.html")),
+);
 
 if (!MONGODB_URI) {
   console.error(
@@ -33,15 +52,39 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+
+if (frontendBuildDir) {
+  app.use(express.static(frontendBuildDir));
+}
 
 /* ================= ROOT ROUTE ================= */
 app.get("/", (req, res) => {
-  res.json({
-    success: true,
-    message: "Nido Backend Running 🚀",
-  });
+  if (frontendBuildDir) {
+    return res.sendFile(path.join(frontendBuildDir, "index.html"));
+  }
+
+  return res.status(200).send(`
+    <html>
+      <head>
+        <title>Nido Backend</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; background: #f6f7fb; }
+          .box { background: white; padding: 24px; border-radius: 12px; max-width: 600px; }
+          h1 { margin: 0 0 12px; }
+          p { margin: 8px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="box">
+          <h1>Nido Backend Running 🚀</h1>
+          <p>Backend server is active.</p>
+          <p>Health check: <a href="/api/health">/api/health</a></p>
+        </div>
+      </body>
+    </html>
+  `);
 });
 
 /* ================= HEALTH ================= */
@@ -53,7 +96,6 @@ app.get("/api/health", (req, res) => {
 });
 
 /* ================= ROUTES ================= */
-/* ✅ ONLY USE /api PREFIX (STANDARD) */
 app.use("/api/clients", clientRoutes);
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/vendor", vendorRoutes);
@@ -63,6 +105,13 @@ app.use("/api/invoices", invoiceRoutes);
 app.use("/api/email", emailRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/amc", amcRoutes);
+
+/* SPA fallback */
+if (frontendBuildDir) {
+  app.get(/^\/(?!api\/).*/, (req, res) => {
+    res.sendFile(path.join(frontendBuildDir, "index.html"));
+  });
+}
 
 /* ================= ERROR HANDLER ================= */
 app.use((err, req, res, next) => {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
+import FloatingCartButton from "./FloatingCartButton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ export default function AppLayout() {
         <div className="animate-fade-in">
           <Outlet />
         </div>
+        <FloatingCartButton />
       </main>
     </div>
   );

@@ -1,4 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { apiRequest } from "@/lib/api";
+import {
+  isValidEmail,
+  isValidPhoneNumber,
+  isValidGST,
+  isValidPANNumber,
+  isValidName,
+} from "@/lib/validation";
 import { useData } from "@/contexts/DataContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -14,10 +22,47 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Trash2 } from "lucide-react";
+
+interface AssetRow {
+  id: string;
+  assetType: string;
+  brand: string;
+  model: string;
+  serialNo: string;
+  quantity: string;
+  osConfig: string;
+  location: string;
+}
 
 interface AMCFormProps {
   onSubmit?: (payload: any) => void;
 }
+
+const createEmptyAssetRow = (): AssetRow => ({
+  id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  assetType: "",
+  brand: "",
+  model: "",
+  serialNo: "",
+  quantity: "1",
+  osConfig: "",
+  location: "",
+});
+
+const SERVICE_OPTIONS = [
+  "Preventive Maintenance",
+  "Breakdown Support",
+  "Network Support",
+  "Data Backup Support",
+  "Security / Antivirus",
+  "Helpdesk Support",
+  "On-site Support",
+  "Remote Support",
+  "Parts Replacement",
+  "Annual Service",
+];
 
 export default function AMCForm({ onSubmit }: AMCFormProps) {
   const { clients } = useData();
@@ -48,14 +93,17 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
     amcExpiry: "",
     // Section 3 - Category (mandatory)
     amcCategory: "it",
-    assetDetails: "",
+    // Asset rows for the table
+    assetRows: [createEmptyAssetRow()] as AssetRow[],
+    // Services included
     servicesRequired: [] as string[],
+    serviceNotes: "",
     // Section 5 - Common AMC Scope (mandatory)
     scopeNotes: "",
     // Section 6 - AMC Duration (mandatory)
     startDate: "",
     endDate: "",
-    // Section 10 - orization (mandatory)
+    // Section 10 - Authorization (mandatory)
     authorizedName: "",
     authorizedDesignation: "",
     authorizationDate: "",
@@ -70,14 +118,40 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
     });
   };
 
+  const addAssetRow = () => {
+    setState((s) => ({
+      ...s,
+      assetRows: [...s.assetRows, createEmptyAssetRow()],
+    }));
+  };
+
+  const removeAssetRow = (id: string) => {
+    setState((s) => ({
+      ...s,
+      assetRows: s.assetRows.filter((r) => r.id !== id),
+    }));
+  };
+
+  const updateAssetRow = (id: string, field: keyof AssetRow, value: string) => {
+    setState((s) => ({
+      ...s,
+      assetRows: s.assetRows.map((r) =>
+        r.id === id ? { ...r, [field]: value } : r,
+      ),
+    }));
+  };
+
   const validate = () => {
     // Required sections: 1,2,3,5,6,10
     if (!state.companyId) return "Please select Company Name";
     if (!state.registeredAddress) return "Registered address is required";
-    if (!state.gstNumber) return "GST number is required";
-    if (!state.contactPerson) return "Contact person name is required";
-    if (!state.mobile) return "Mobile number is required";
-    if (!state.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(state.email))
+    if (!state.gstNumber || !isValidGST(state.gstNumber))
+      return "Valid GST number is required";
+    if (!state.contactPerson || !isValidName(state.contactPerson))
+      return "Valid contact person name is required";
+    if (!state.mobile || !isValidPhoneNumber(state.mobile))
+      return "Valid 10-digit mobile number is required";
+    if (!state.email || !isValidEmail(state.email))
       return "Valid email is required";
 
     if (!state.amcType) return "Select AMC type";
@@ -89,26 +163,67 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
     if (!state.startDate || !state.endDate)
       return "Start and end dates are required";
 
-    if (!state.authorizedName) return "Authorized signatory name is required";
+    if (!state.authorizedName || !isValidName(state.authorizedName))
+      return "Authorized signatory name is required";
     if (!state.authorizedDesignation)
       return "Authorized designation is required";
     if (!state.authorizationDate) return "Authorization date is required";
 
+    if (state.pan && !isValidPANNumber(state.pan)) return "Invalid PAN format";
+
     return null;
   };
 
-  const submit = () => {
+  // Auto-fill company details when companyId changes
+  useEffect(() => {
+    let mounted = true;
+    const fetchClient = async (id: string) => {
+      try {
+        const data: any = await apiRequest(`/clients/${id}`);
+        if (!mounted || !data) return;
+        setState((s) => ({
+          ...s,
+          registeredAddress: data.address || s.registeredAddress,
+          gstNumber: data.gstNumber || s.gstNumber || data.gst || "",
+          pan: data.pan || s.pan || "",
+          contactPerson:
+            data.contactPerson || s.contactPerson || data.contactName || "",
+          mobile: data.phone || s.mobile || data.mobile || "",
+          email: data.email || s.email || "",
+        }));
+      } catch (err) {
+        // ignore - keep current state
+      }
+    };
+
+    if (state.companyId) fetchClient(state.companyId);
+    return () => {
+      mounted = false;
+    };
+  }, [state.companyId]);
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
     const err = validate();
     if (err) {
       toast.error(err);
       return;
     }
     const payload = { ...state };
-    if (onSubmit) onSubmit(payload);
-    else {
-      // fallback: console.log and toast
-      console.log("AMC Form submit", payload);
-      toast.success("AMC form submitted (draft)");
+    setSubmitting(true);
+    try {
+      if (onSubmit) {
+        await onSubmit(payload);
+      } else {
+        // fallback: log and keep as draft (no fake success)
+        console.log("AMC Form submit", payload);
+      }
+      toast.success("AMC form saved");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to submit AMC form");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -204,9 +319,11 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
                 onChange={(e) =>
                   setState((s) => ({
                     ...s,
-                    mobile: e.target.value.replace(/\D/g, "").slice(0, 15),
+                    mobile: e.target.value.replace(/\D/g, "").slice(0, 10),
                   }))
                 }
+                maxLength={10}
+                inputMode="tel"
               />
             </div>
             <div>
@@ -283,23 +400,28 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
         </CardContent>
       </Card>
 
-      {/* Section 3 - AMC Category */}
+      {/* Section 3 - AMC Category — EXACT REFERENCE MATCH */}
       <Card>
         <CardHeader>
-          <CardTitle>03: AMC Category *</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>03: AMC Category *</span>
+            <span className="text-sm font-normal text-muted-foreground">Select One</span>
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-3 flex-wrap">
-            <label className="flex items-center gap-2">
+        <CardContent className="space-y-4">
+          {/* Radio Options — same line, evenly spaced */}
+          <div className="flex gap-6 items-center flex-wrap border-b pb-3">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 name="amcCat"
                 checked={state.amcCategory === "it"}
                 onChange={() => setState((s) => ({ ...s, amcCategory: "it" }))}
-              />{" "}
-              IT AMC
+                className="accent-primary"
+              />
+              <span className="text-sm font-medium">IT AMC</span>
             </label>
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 name="amcCat"
@@ -307,10 +429,11 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
                 onChange={() =>
                   setState((s) => ({ ...s, amcCategory: "facility" }))
                 }
-              />{" "}
-              Facility AMC
+                className="accent-primary"
+              />
+              <span className="text-sm font-medium">Facility AMC</span>
             </label>
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 name="amcCat"
@@ -318,10 +441,11 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
                 onChange={() =>
                   setState((s) => ({ ...s, amcCategory: "equipment" }))
                 }
-              />{" "}
-              Equipment AMC
+                className="accent-primary"
+              />
+              <span className="text-sm font-medium">Equipment AMC</span>
             </label>
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
                 name="amcCat"
@@ -329,43 +453,170 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
                 onChange={() =>
                   setState((s) => ({ ...s, amcCategory: "software" }))
                 }
-              />{" "}
-              Software AMC
+                className="accent-primary"
+              />
+              <span className="text-sm font-medium">Software AMC</span>
             </label>
           </div>
 
-          <div className="mt-4">
-            <Label>Asset Details (optional)</Label>
-            <Textarea
-              value={state.assetDetails}
-              onChange={(e) =>
-                setState((s) => ({ ...s, assetDetails: e.target.value }))
-              }
-              rows={4}
-            />
-          </div>
+          {/* Tabs */}
+          <Tabs defaultValue="asset-details" className="w-full">
+            <TabsList className="mb-3">
+              <TabsTrigger value="asset-details">Asset Details</TabsTrigger>
+              <TabsTrigger value="services">Services Included</TabsTrigger>
+            </TabsList>
 
-          <div className="mt-4">
-            <Label>Services Required (select all that apply)</Label>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              {[
-                "Preventive Maintenance",
-                "Breakdown Support",
-                "Network Support",
-                "Data Backup Support",
-                "Security / Antivirus",
-                "Helpdesk Support",
-              ].map((s) => (
-                <label key={s} className="flex items-center gap-2">
-                  <Checkbox
-                    checked={state.servicesRequired.includes(s)}
-                    onCheckedChange={() => toggleService(s)}
-                  />{" "}
-                  {s}
-                </label>
-              ))}
-            </div>
-          </div>
+            {/* Asset Details Tab */}
+            <TabsContent value="asset-details" className="space-y-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="text-left p-2 border font-semibold text-foreground whitespace-nowrap">Sl. No.</th>
+                      <th className="text-left p-2 border font-semibold text-foreground whitespace-nowrap">Asset Type</th>
+                      <th className="text-left p-2 border font-semibold text-foreground whitespace-nowrap">Brand</th>
+                      <th className="text-left p-2 border font-semibold text-foreground whitespace-nowrap">Model</th>
+                      <th className="text-left p-2 border font-semibold text-foreground whitespace-nowrap">Serial No.</th>
+                      <th className="text-left p-2 border font-semibold text-foreground whitespace-nowrap">Quantity</th>
+                      <th className="text-left p-2 border font-semibold text-foreground whitespace-nowrap">OS / Configuration</th>
+                      <th className="text-left p-2 border font-semibold text-foreground whitespace-nowrap">Location</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {state.assetRows.map((row, index) => (
+                      <tr key={row.id} className="hover:bg-muted/20">
+                        <td className="p-1 border text-center text-muted-foreground">{index + 1}</td>
+                        <td className="p-1 border">
+                          <Input
+                            value={row.assetType}
+                            onChange={(e) =>
+                              updateAssetRow(row.id, "assetType", e.target.value)
+                            }
+                            placeholder="Desktop / Laptop / Server"
+                            className="h-7 text-xs border-transparent bg-transparent focus:bg-background focus:border-input"
+                          />
+                        </td>
+                        <td className="p-1 border">
+                          <Input
+                            value={row.brand}
+                            onChange={(e) =>
+                              updateAssetRow(row.id, "brand", e.target.value)
+                            }
+                            placeholder="Dell / HP / Lenovo"
+                            className="h-7 text-xs border-transparent bg-transparent focus:bg-background focus:border-input"
+                          />
+                        </td>
+                        <td className="p-1 border">
+                          <Input
+                            value={row.model}
+                            onChange={(e) =>
+                              updateAssetRow(row.id, "model", e.target.value)
+                            }
+                            placeholder="Model name"
+                            className="h-7 text-xs border-transparent bg-transparent focus:bg-background focus:border-input"
+                          />
+                        </td>
+                        <td className="p-1 border">
+                          <Input
+                            value={row.serialNo}
+                            onChange={(e) =>
+                              updateAssetRow(row.id, "serialNo", e.target.value)
+                            }
+                            placeholder="Serial No."
+                            className="h-7 text-xs border-transparent bg-transparent focus:bg-background focus:border-input"
+                          />
+                        </td>
+                        <td className="p-1 border w-16">
+                          <Input
+                            type="number"
+                            value={row.quantity}
+                            onChange={(e) =>
+                              updateAssetRow(row.id, "quantity", e.target.value)
+                            }
+                            min="1"
+                            placeholder="1"
+                            className="h-7 text-xs border-transparent bg-transparent focus:bg-background focus:border-input text-center"
+                          />
+                        </td>
+                        <td className="p-1 border">
+                          <Input
+                            value={row.osConfig}
+                            onChange={(e) =>
+                              updateAssetRow(row.id, "osConfig", e.target.value)
+                            }
+                            placeholder="Win 11 / 8GB RAM"
+                            className="h-7 text-xs border-transparent bg-transparent focus:bg-background focus:border-input"
+                          />
+                        </td>
+                        <td className="p-1 border">
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={row.location}
+                              onChange={(e) =>
+                                updateAssetRow(row.id, "location", e.target.value)
+                              }
+                              placeholder="Location"
+                              className="h-7 text-xs border-transparent bg-transparent focus:bg-background focus:border-input flex-1"
+                            />
+                            {state.assetRows.length > 1 && (
+                              <button
+                                onClick={() => removeAssetRow(row.id)}
+                                className="text-red-500 hover:text-red-700 flex-shrink-0"
+                                type="button"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addAssetRow}
+                className="gap-1.5 mt-2"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Row
+              </Button>
+            </TabsContent>
+
+            {/* Services Included Tab */}
+            <TabsContent value="services" className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium mb-2 block">
+                  Services Required (select all that apply)
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SERVICE_OPTIONS.map((s) => (
+                    <label key={s} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={state.servicesRequired.includes(s)}
+                        onCheckedChange={() => toggleService(s)}
+                      />
+                      <span className="text-sm">{s}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Additional Notes</Label>
+                <Textarea
+                  value={state.serviceNotes}
+                  onChange={(e) =>
+                    setState((s) => ({ ...s, serviceNotes: e.target.value }))
+                  }
+                  placeholder="Any additional service requirements or notes..."
+                  rows={3}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -470,8 +721,8 @@ export default function AMCForm({ onSubmit }: AMCFormProps) {
         >
           Save Draft
         </Button>
-        <Button onClick={submit} className="bg-primary text-white">
-          Submit
+        <Button onClick={submit} disabled={submitting} className="bg-primary text-white">
+          {submitting ? "Submitting..." : "Submit"}
         </Button>
       </div>
     </div>
