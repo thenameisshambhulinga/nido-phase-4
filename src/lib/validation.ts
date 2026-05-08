@@ -13,9 +13,11 @@ export function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
+import { isValidEmailStrict } from "@/lib/emailStrictValidation";
+
 export function isValidEmail(value: string): boolean {
   if (!value || typeof value !== "string") return false;
-  return EMAIL_REGEX.test(normalizeEmail(value));
+  return isValidEmailStrict(value);
 }
 
 // =============================================================================

@@ -19,6 +19,37 @@ router.post("/send", async (req, res) => {
       });
     }
 
+    const recipients = Array.isArray(to) ? to : [to];
+
+    // Strict email validation: reject any invalid recipient
+    // (must NEVER accept invalid email IDs)
+    for (const recipient of recipients) {
+      if (typeof recipient !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid recipient email address",
+        });
+      }
+
+      const normalized = recipient.trim().toLowerCase();
+      const isValid =
+        /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalized) &&
+        // Reject local-part that looks like a domain: name.com@gmail.com
+        !/\.(com|org|net|io|co|in|gov|edu|ac|ai|ml|tk|ga|cf|gq|xyz|top|link)$/i.test(
+          normalized.split("@")[0] || "",
+        );
+
+      if (!isValid) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid recipient email address",
+        });
+      }
+    }
+
+    // Ensure downstream receives original array (not mutated)
+    req.body.to = recipients;
+
     // Handle template-based emails
     if (type && data) {
       const result = await sendEmail({
@@ -68,7 +99,7 @@ router.post("/send", async (req, res) => {
 router.get("/verify", async (req, res) => {
   try {
     const isValid = await verifyEmailService();
-    res.json({
+    res.json({;
       success: isValid,
       message: isValid
         ? "Email service is operational"

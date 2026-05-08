@@ -451,8 +451,22 @@ export default function ClientDetailPage() {
     name: "",
     email: "",
     role: "employee" as UserRole,
+    phone: "",
+    alternatePhone: "",
+    employeeId: "",
     jobTitle: "",
     department: "",
+    manager: "",
+    timezone: "Asia/Kolkata",
+    address: "",
+    city: "",
+    state: "",
+    country: "India",
+    postalCode: "",
+    dob: "",
+    joiningDate: "",
+    emergencyContact: "",
+    notes: "",
     status: "active" as "active" | "inactive" | "suspended",
   });
   const [createdCredentials, setCreatedCredentials] = useState<{
@@ -1533,8 +1547,22 @@ export default function ClientDetailPage() {
         name: "",
         email: "",
         role: "employee",
+        phone: "",
+        alternatePhone: "",
+        employeeId: "",
         jobTitle: "",
         department: "",
+        manager: "",
+        timezone: "Asia/Kolkata",
+        address: "",
+        city: "",
+        state: "",
+        country: "India",
+        postalCode: "",
+        dob: "",
+        joiningDate: "",
+        emergencyContact: "",
+        notes: "",
         status: "active",
       });
       setUserDialogOpen(true);
@@ -1549,8 +1577,22 @@ export default function ClientDetailPage() {
       name: selectedUser.name,
       email: selectedUser.email,
       role: selectedUser.role,
+      phone: selectedUser.phone || "",
+      alternatePhone: "",
+      employeeId: "",
       jobTitle: selectedUser.jobTitle || "",
       department: selectedUser.department || "",
+      manager: "",
+      timezone: "Asia/Kolkata",
+      address: "",
+      city: "",
+      state: "",
+      country: "India",
+      postalCode: "",
+      dob: "",
+      joiningDate: "",
+      emergencyContact: "",
+      notes: "",
       status: selectedUser.status,
     });
     setUserDialogOpen(true);
@@ -1576,6 +1618,7 @@ export default function ClientDetailPage() {
       email: normalizeEmail(userForm.email),
       role: userRole.toLowerCase() as UserRole,
       organization: client.name,
+      phone: userForm.phone,
       jobTitle: userForm.jobTitle,
       department: userForm.department,
       status: userForm.status,
@@ -5407,6 +5450,30 @@ export default function ClientDetailPage() {
             />
             <Input value={client.name} disabled />
             <Input
+              placeholder="Phone"
+              value={userForm.phone}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, phone: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Alternate Phone"
+              value={userForm.alternatePhone}
+              onChange={(e) =>
+                setUserForm((prev) => ({
+                  ...prev,
+                  alternatePhone: e.target.value,
+                }))
+              }
+            />
+            <Input
+              placeholder="Employee ID"
+              value={userForm.employeeId}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, employeeId: e.target.value }))
+              }
+            />
+            <Input
               placeholder="Job Title"
               value={userForm.jobTitle}
               onChange={(e) =>
@@ -5418,6 +5485,91 @@ export default function ClientDetailPage() {
               value={userForm.department}
               onChange={(e) =>
                 setUserForm((prev) => ({ ...prev, department: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Manager"
+              value={userForm.manager}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, manager: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Timezone"
+              value={userForm.timezone}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, timezone: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Address"
+              value={userForm.address}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, address: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="City"
+              value={userForm.city}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, city: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="State"
+              value={userForm.state}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, state: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Country"
+              value={userForm.country}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, country: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Postal Code"
+              value={userForm.postalCode}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, postalCode: e.target.value }))
+              }
+            />
+            <Input
+              type="date"
+              placeholder="DOB"
+              value={userForm.dob}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, dob: e.target.value }))
+              }
+            />
+            <Input
+              type="date"
+              placeholder="Joining Date"
+              value={userForm.joiningDate}
+              onChange={(e) =>
+                setUserForm((prev) => ({
+                  ...prev,
+                  joiningDate: e.target.value,
+                }))
+              }
+            />
+            <Input
+              placeholder="Emergency Contact"
+              value={userForm.emergencyContact}
+              onChange={(e) =>
+                setUserForm((prev) => ({
+                  ...prev,
+                  emergencyContact: e.target.value,
+                }))
+              }
+            />
+            <Textarea
+              placeholder="Notes"
+              value={userForm.notes}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, notes: e.target.value }))
               }
             />
             <Select

@@ -103,11 +103,14 @@ const DepartmentsPage = lazy(() => import("@/pages/DepartmentsPage"));
 const UserInvitationPage = lazy(() => import("@/pages/UserInvitationPage"));
 const AuditLogPage = lazy(() => import("@/pages/AuditLogPage"));
 const ShopPage = lazy(() => import("@/pages/ShopPage"));
+const ProductDetailPage = lazy(() => import("@/pages/ProductDetailPage"));
+const ProductEnquiryPage = lazy(() => import("@/pages/ProductEnquiryPage"));
 const CheckoutPage = lazy(() => import("@/pages/CheckoutPage"));
 const OrderConfirmationPage = lazy(
   () => import("@/pages/OrderConfirmationPage"),
 );
 const UserOnboardingPage = lazy(() => import("@/pages/UserOnboardingPage"));
+const NidoUserProfilePage = lazy(() => import("@/pages/NidoUserProfilePage"));
 
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
@@ -140,6 +143,10 @@ function AppRoutes() {
         <Route
           path="/support/track/:ticketId"
           element={<TicketTrackingPage />}
+        />
+        <Route
+          path="/shop/product/:productId/enquire"
+          element={<ProductEnquiryPage />}
         />
         <Route
           path="/"
@@ -252,6 +259,17 @@ function AppRoutes() {
             }
           />
           <Route
+            path="configuration/nido-users/users/:userId/profile"
+            element={
+              <PageErrorBoundary
+                title="Nido user profile failed to load"
+                resetKey={location.pathname}
+              >
+                <NidoUserProfilePage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
             path="users/roles"
             element={
               <PageErrorBoundary
@@ -348,6 +366,17 @@ function AppRoutes() {
                 resetKey={location.pathname}
               >
                 <CartPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="shop/product/:productId"
+            element={
+              <PageErrorBoundary
+                title="Product detail failed to load"
+                resetKey={location.pathname}
+              >
+                <ProductDetailPage />
               </PageErrorBoundary>
             }
           />

@@ -34,6 +34,7 @@ export interface OrderItem {
   price: number;
   total: number;
   emoji: string;
+  image?: string;
   category: string;
 }
 
@@ -119,6 +120,7 @@ export default function OrderConfirmationPage() {
                 Number(item.totalCost) ||
                 (Number(item.quantity) || 0) * (Number(item.pricePerItem) || 0),
               emoji: "📦",
+              image: item.image,
               category: item.category || "General",
             })),
             shippingInfo: {
@@ -311,7 +313,7 @@ export default function OrderConfirmationPage() {
         },
       });
 
-      const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } })
+      const finalY = (doc as { lastAutoTable?: { finalY: number } })
         .lastAutoTable?.finalY;
       const totalsY = (finalY || 360) + 28;
 
@@ -622,7 +624,18 @@ export default function OrderConfirmationPage() {
                     className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
                   >
                     <div className="flex items-center gap-3 flex-1">
-                      <span className="text-2xl">{item.emoji}</span>
+                      {item.image ? (
+                        <div className="h-10 w-10 overflow-hidden rounded-lg border border-border bg-background p-1">
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="h-full w-full object-contain"
+                            loading="lazy"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-2xl">{item.emoji}</span>
+                      )}
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-foreground truncate">
                           {item.name}

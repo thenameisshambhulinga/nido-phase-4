@@ -24,6 +24,8 @@ import {
   Workflow,
   LogOut,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
@@ -196,9 +198,16 @@ const isClientAccount = (role?: string) =>
 interface SidebarProps {
   onClose?: () => void;
   isMobile?: boolean;
+  collapsed?: boolean;
+  onCollapseChange?: (collapsed: boolean) => void;
 }
 
-export default function Sidebar({ onClose, isMobile }: SidebarProps) {
+export default function Sidebar({
+  onClose,
+  isMobile,
+  collapsed = false,
+  onCollapseChange,
+}: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission } = useAuth();
@@ -234,14 +243,27 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
   };
 
   return (
-    <aside className="w-60 h-screen bg-sidebar text-sidebar-foreground flex flex-col">
-      <div className="p-5 border-b border-sidebar-border flex items-center justify-between">
+    <aside
+      className={cn(
+        "h-screen bg-sidebar text-sidebar-foreground flex flex-col transition-all duration-300",
+        collapsed ? "w-16" : "w-60",
+      )}
+    >
+      <div
+        className={cn(
+          "border-b border-sidebar-border flex items-center",
+          collapsed ? "justify-center p-3" : "justify-between p-5",
+        )}
+      >
         <div>
           {branding?.companyLogo ? (
             <img
               src={branding.companyLogo}
               alt={branding.companyName || "Company logo"}
-              className="h-10 w-36 rounded object-contain object-left"
+              className={cn(
+                "rounded object-contain object-left transition-all duration-300",
+                collapsed ? "h-8 w-8" : "h-10 w-36",
+              )}
             />
           ) : (
             <>
@@ -257,6 +279,20 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
             </>
           )}
         </div>
+        {!isMobile && onCollapseChange && (
+          <button
+            onClick={() => onCollapseChange(!collapsed)}
+            className="ml-2 h-8 w-8 rounded-lg flex items-center justify-center hover:bg-sidebar-accent transition-colors active:scale-95"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-4 w-4 text-sidebar-foreground" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4 text-sidebar-foreground" />
+            )}
+          </button>
+        )}
         {isMobile && (
           <button
             onClick={onClose}
@@ -267,7 +303,12 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto scrollbar-thin py-2">
+      <nav
+        className={cn(
+          "flex-1 overflow-y-auto scrollbar-thin py-2",
+          collapsed && "px-2",
+        )}
+      >
         {NAV_ITEMS.map((item) => {
           if (item.module === "procure" && isClientAccount(user?.role)) {
             return null;
@@ -356,7 +397,10 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
                   else if (item.path) handleNavigate(item.path);
                 }}
                 className={cn(
-                  "w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-all duration-200 hover:bg-sidebar-accent group",
+                  "w-full flex items-center transition-all duration-200 hover:bg-sidebar-accent group",
+                  collapsed
+                    ? "justify-center gap-0 rounded-xl px-2 py-3"
+                    : "gap-3 px-5 py-2.5 text-sm",
                   (parentActive || active) &&
                     "bg-sidebar-accent text-sidebar-primary border-l-2 border-sidebar-primary",
                   !parentActive && !active && "border-l-2 border-transparent",
@@ -368,8 +412,10 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
                     (parentActive || active) && "text-sidebar-primary",
                   )}
                 />
-                <span className="flex-1 text-left">{item.label}</span>
-                {item.children && (
+                {!collapsed && (
+                  <span className="flex-1 text-left">{item.label}</span>
+                )}
+                {!collapsed && item.children && (
                   <ChevronDown
                     className={cn(
                       "h-3.5 w-3.5 transition-transform duration-200",
@@ -381,7 +427,7 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
               <div
                 className={cn(
                   "ml-9 border-l border-sidebar-border overflow-hidden transition-all duration-200",
-                  item.children && expanded
+                  item.children && expanded && !collapsed
                     ? "max-h-96 opacity-100"
                     : "max-h-0 opacity-0",
                 )}
@@ -393,25 +439,41 @@ export default function Sidebar({ onClose, isMobile }: SidebarProps) {
         })}
       </nav>
 
-      <div className="border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-3 mb-3">
+      <div
+        className={cn(
+          "border-t border-sidebar-border",
+          collapsed ? "p-3" : "p-4",
+        )}
+      >
+        <div
+          className={cn(
+            "mb-3 flex items-center",
+            collapsed ? "justify-center" : "gap-3",
+          )}
+        >
           <div className="h-8 w-8 rounded-full bg-sidebar-primary flex items-center justify-center text-xs font-bold text-sidebar-primary-foreground">
             {user?.name?.charAt(0) || "U"}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate">
-              {user?.name || "User"}
-            </p>
-            <p className="text-[10px] text-sidebar-foreground/60 truncate capitalize">
-              {user?.role?.replace("_", " ")}
-            </p>
-          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium truncate">
+                {user?.name || "User"}
+              </p>
+              <p className="text-[10px] text-sidebar-foreground/60 truncate capitalize">
+                {user?.role?.replace("_", " ")}
+              </p>
+            </div>
+          )}
         </div>
         <button
           onClick={logout}
-          className="flex items-center gap-2 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors w-full active:scale-[0.98]"
+          className={cn(
+            "flex items-center text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors w-full active:scale-[0.98]",
+            collapsed ? "justify-center gap-0" : "gap-2",
+          )}
         >
-          <LogOut className="h-3.5 w-3.5" /> Sign Out
+          <LogOut className="h-3.5 w-3.5" />
+          {!collapsed && "Sign Out"}
         </button>
       </div>
     </aside>

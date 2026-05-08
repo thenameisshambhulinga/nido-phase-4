@@ -39,10 +39,18 @@ export default function CredentialsModal({
   onClose,
   credentials,
   userType = "CLIENT_USER",
-}: CredentialsModalProps) {
+  // allow backward-compatible prop `isOpen` if callers pass it
+  ...rest
+}: CredentialsModalProps & { [key: string]: any }) {
   const [copiedFields, setCopiedFields] = useState<Set<string>>(new Set());
   const [sendingEmail, setSendingEmail] = useState(false);
   const { user } = useEnhancedAuth();
+
+  const modalOpen = (() => {
+    if (typeof open !== "undefined") return open;
+    if (rest && typeof rest.isOpen !== "undefined") return rest.isOpen;
+    return false;
+  })();
 
   const copyToClipboard = async (text: string, field: string) => {
     await navigator.clipboard.writeText(text);
@@ -142,7 +150,7 @@ export default function CredentialsModal({
   if (!credentials) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={modalOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

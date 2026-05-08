@@ -1,36 +1,36 @@
-# Nido Phase 3 Enhancement Plan
+# TODO - Nido-Tech Enterprise Platform (Phase Implementation Tracker)
 
-## Status: ✅ Phase 1 Complete - ClientsPage fixed + error UI
+## Phase A — AMC Category section rebuild + enterprise form UX (approved)
 
-### 🔴 Phase 1: Fix Clients Loading (✅ DONE)
+- [x] Step A1: Backup current AMC form component (AMCForm.tsx)
+- [ ] Step A2: Rebuild AMC Category section to match required exact ordering and include:
+  - [ ] radio selections
+  - [ ] asset details table (responsive)
+  - [ ] services included tabs
+  - [ ] specification rows
+  - [ ] SLA section
+  - [ ] maintenance scope section
+  - [ ] commercial details
+  - [ ] payment terms
+  - [ ] exclusions
+  - [ ] special terms
+  - [ ] attachments
+  - [ ] authorization area
 
-- [x] Added error logging to DataContext fetches
-- [x] Added loading/error UI to ClientsPage + Retry button
-- [x] Fixed JSX syntax (duplicate Popover removed)
-- [x] API_BASE → localhost:5000 direct
-- [x] Build passes
+- [ ] Step A3: Implement enterprise form UX:
+  - [ ] floating validation
+  - [ ] inline error handling
+  - [ ] meaningful placeholders
+  - [ ] autosave draft (where appropriate)
+- [ ] Step A4: Ensure company selection auto-fetch fills GST/address/contact person/designation/email/mobile.
+- [ ] Step A5: Ensure validation blocks invalid email/mobile/GST and submit cannot proceed.
+- [ ] Step A6: Ensure Tabs work properly and inputs persist.
+- [ ] Step A7: Run targeted validation pass + basic runtime checks (no console errors).
 
-### 🔴 Phase 2: User Credentials (Backend Ready)
+## Phase B onward (not started yet)
 
-- [ ] Verify CredentialsModal (open tab)
-- [ ] Test owner→user creation flow
-
-### 🔴 Phase 3: Order Flow
-
-- [ ] Frontend approve button
-- [ ] Test PENDING→APPROVED→CONFIRMED
-
-### 🔴 Phase 5: Homepage UI (Next)
-
-- [ ] Nido-Tech highlight styling
-- [ ] Remove Shop by Category/sections
-
-### 🔴 Remaining Phases
-
-- [ ] Phase 4: Persistence
-- [ ] Phase 6: Cart fixes
-- [ ] Phase 7: Vendor flow
-- [ ] Phase 8: Bundle opt
-- [ ] Phase 9: Full validation
-
-**Next: Phase 5 HomePage.tsx cleanup → test backend data**
+- [ ] Phase B: centralized strict email validation across all flows
+- [ ] Phase C: backend email system hardening + templates + delivery logging
+- [ ] Phase D: restore enterprise search
+- [ ] Phase E: product card/overview/image/cart corrections
+- [ ] Phase F: profile systems identical to references

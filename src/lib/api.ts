@@ -10,7 +10,7 @@ const getAPIBase = (): string => {
 
 const API_BASE = getAPIBase();
 
-type RequestOptions = RequestInit & {
+type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
 };
 

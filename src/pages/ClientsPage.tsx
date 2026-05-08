@@ -57,9 +57,29 @@ export default function ClientsPage() {
   const [userForm, setUserForm] = useState({
     name: "",
     email: "",
+    phone: "",
+    alternatePhone: "",
     jobTitle: "",
     department: "",
     organization: "",
+    employeeId: "",
+    manager: "",
+    timezone: "Asia/Kolkata",
+    address: "",
+    city: "",
+    state: "",
+    country: "India",
+    postalCode: "",
+    dob: "",
+    joiningDate: "",
+    emergencyContact: "",
+    notes: "",
+    permissionGroup: "Default",
+    systemAccessLevel: "Standard",
+    internalRole: "Client User",
+    teams: "",
+    approvalAuthority: "No",
+    reportingStructure: "Client Lead",
     role: "client_user",
   });
 
@@ -119,11 +139,31 @@ export default function ClientsPage() {
       const result = await createUser({
         name: userForm.name,
         email: userForm.email,
+        phone: userForm.phone,
+        alternatePhone: userForm.alternatePhone,
         jobTitle: userForm.jobTitle,
         department: userForm.department,
         organization: userForm.organization || "Nido Tech",
+        employeeId: userForm.employeeId,
+        manager: userForm.manager,
+        timezone: userForm.timezone,
+        address: userForm.address,
+        city: userForm.city,
+        state: userForm.state,
+        country: userForm.country,
+        postalCode: userForm.postalCode,
+        dob: userForm.dob,
+        joiningDate: userForm.joiningDate,
+        emergencyContact: userForm.emergencyContact,
+        notes: userForm.notes,
+        permissionGroup: userForm.permissionGroup,
+        systemAccessLevel: userForm.systemAccessLevel,
+        internalRole: userForm.internalRole,
+        teams: userForm.teams,
+        approvalAuthority: userForm.approvalAuthority,
+        reportingStructure: userForm.reportingStructure,
         role: userForm.role as any,
-      });
+      } as any);
 
       if (result?.credentials) {
         setNewUserCredentials(result.credentials);
@@ -463,70 +503,398 @@ export default function ClientsPage() {
           open={showCreateUserDialog}
           onOpenChange={setShowCreateUserDialog}
         >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Client User</DialogTitle>
-              <DialogDescription>
-                Create an account and show credentials immediately.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input
-                  value={userForm.name}
-                  onChange={(e) =>
-                    setUserForm((prev) => ({ ...prev, name: e.target.value }))
-                  }
-                />
+          <DialogContent className="p-0">
+            <div className="flex h-full flex-col">
+              <div className="border-b border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-900 px-6 py-5 text-white">
+                <DialogHeader className="space-y-1 text-left">
+                  <DialogTitle className="text-2xl text-white">
+                    Create Client User
+                  </DialogTitle>
+                  <DialogDescription className="text-white/70">
+                    Create an account and show credentials immediately.
+                  </DialogDescription>
+                </DialogHeader>
               </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  value={userForm.email}
-                  onChange={(e) =>
-                    setUserForm((prev) => ({ ...prev, email: e.target.value }))
-                  }
-                />
+
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                  <div className="space-y-6">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Identity
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Name</Label>
+                          <Input
+                            value={userForm.name}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                name: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Email</Label>
+                          <Input
+                            value={userForm.email}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                email: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Employee ID</Label>
+                          <Input
+                            value={userForm.employeeId}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                employeeId: e.target.value,
+                              }))
+                            }
+                            placeholder="EMP-2001"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Phone</Label>
+                          <Input
+                            value={userForm.phone}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                phone: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Alternate Phone</Label>
+                          <Input
+                            value={userForm.alternatePhone}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                alternatePhone: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Access & Organization
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Organization</Label>
+                          <Input
+                            value={userForm.organization}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                organization: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Role</Label>
+                          <Select
+                            value={userForm.role}
+                            onValueChange={(value) =>
+                              setUserForm((prev) => ({ ...prev, role: value }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="client_user">
+                                Client User
+                              </SelectItem>
+                              <SelectItem value="client_admin">
+                                Client Admin
+                              </SelectItem>
+                              <SelectItem value="vendor_user">
+                                Vendor User
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Job Title</Label>
+                          <Input
+                            value={userForm.jobTitle}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                jobTitle: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Department</Label>
+                          <Input
+                            value={userForm.department}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                department: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Manager</Label>
+                          <Input
+                            value={userForm.manager}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                manager: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Timezone</Label>
+                          <Input
+                            value={userForm.timezone}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                timezone: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Location & Governance
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Address</Label>
+                          <Input
+                            value={userForm.address}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                address: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>City</Label>
+                          <Input
+                            value={userForm.city}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                city: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>State</Label>
+                          <Input
+                            value={userForm.state}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                state: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Country</Label>
+                          <Input
+                            value={userForm.country}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                country: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Postal Code</Label>
+                          <Input
+                            value={userForm.postalCode}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                postalCode: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Date of Birth</Label>
+                          <Input
+                            type="date"
+                            value={userForm.dob}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                dob: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Joining Date</Label>
+                          <Input
+                            type="date"
+                            value={userForm.joiningDate}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                joiningDate: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Emergency Contact</Label>
+                          <Input
+                            value={userForm.emergencyContact}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                emergencyContact: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Internal Role</Label>
+                          <Input
+                            value={userForm.internalRole}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                internalRole: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Teams</Label>
+                          <Input
+                            value={userForm.teams}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                teams: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Approval Authority</Label>
+                          <Input
+                            value={userForm.approvalAuthority}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                approvalAuthority: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Notes</Label>
+                          <textarea
+                            value={userForm.notes}
+                            onChange={(e) =>
+                              setUserForm((prev) => ({
+                                ...prev,
+                                notes: e.target.value,
+                              }))
+                            }
+                            rows={4}
+                            className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            placeholder="Optional notes or onboarding checklist"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm">
+                      <p className="text-[10px] uppercase tracking-[0.24em] text-white/60">
+                        Preview
+                      </p>
+                      <h3 className="mt-2 text-xl font-semibold">
+                        {userForm.name || "New Client User"}
+                      </h3>
+                      <p className="text-sm text-white/70">
+                        {userForm.jobTitle || "Role and title summary"}
+                      </p>
+                      <div className="mt-5 space-y-3 text-sm text-white/80">
+                        <div className="rounded-xl bg-white/5 px-4 py-3">
+                          <span className="block text-[10px] uppercase tracking-[0.18em] text-white/50">
+                            Organization
+                          </span>
+                          <span>
+                            {userForm.organization || "No organization set"}
+                          </span>
+                        </div>
+                        <div className="rounded-xl bg-white/5 px-4 py-3">
+                          <span className="block text-[10px] uppercase tracking-[0.18em] text-white/50">
+                            Department
+                          </span>
+                          <span>{userForm.department || "General"}</span>
+                        </div>
+                        <div className="rounded-xl bg-white/5 px-4 py-3">
+                          <span className="block text-[10px] uppercase tracking-[0.18em] text-white/50">
+                            Access Role
+                          </span>
+                          <span>{userForm.role.replace(/_/g, " ")}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Quick Actions
+                      </h3>
+                      <p className="mt-3 text-sm text-slate-600">
+                        Credentials will be generated immediately after saving
+                        and can be shared from the credential panel.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Organization</Label>
-                <Input
-                  value={userForm.organization}
-                  onChange={(e) =>
-                    setUserForm((prev) => ({
-                      ...prev,
-                      organization: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Role</Label>
-                <Select
-                  value={userForm.role}
-                  onValueChange={(value) =>
-                    setUserForm((prev) => ({ ...prev, role: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="client_user">Client User</SelectItem>
-                    <SelectItem value="client_admin">Client Admin</SelectItem>
-                    <SelectItem value="vendor_user">Vendor User</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCreateUserDialog(false)}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleCreateUser}>Create</Button>
+
+              <div className="border-t border-slate-200 px-6 py-4">
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCreateUserDialog(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateUser}>Create</Button>
+                </div>
               </div>
             </div>
           </DialogContent>

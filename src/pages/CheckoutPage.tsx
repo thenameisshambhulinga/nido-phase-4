@@ -292,6 +292,7 @@ export default function CheckoutPage() {
           price: i.price,
           total: i.price * i.quantity,
           emoji: i.emoji,
+          image: i.image,
           category: i.category,
         })),
         shippingInfo: shipping,
@@ -332,6 +333,7 @@ export default function CheckoutPage() {
           description: `${i.category} item from shop checkout`,
           sku: `SHOP-${i.id}`,
           category: i.category,
+          image: i.image,
           quantity: i.quantity,
           pricePerItem: i.price,
           totalCost: i.price * i.quantity,
@@ -1205,7 +1207,18 @@ export default function CheckoutPage() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <span className="text-lg">{item.emoji}</span>
+                        {item.image ? (
+                          <div className="h-9 w-9 overflow-hidden rounded-md border border-border bg-white p-1">
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="h-full w-full object-contain"
+                              loading="lazy"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-lg">{item.emoji}</span>
+                        )}
                         <div className="min-w-0">
                           <p className="font-medium text-foreground truncate">
                             {item.name}

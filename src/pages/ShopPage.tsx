@@ -1,13 +1,29 @@
-import { useMemo, useState } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "@/contexts/CartContext";
-import { useData } from "@/contexts/DataContext";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ImageOff,
+  PackageCheck,
+  Search,
+  ShieldCheck,
+  ShoppingCart,
+  Sparkles,
+  Truck,
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -15,21 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Search,
-  ShoppingCart,
-  Star,
-  ArrowRight,
-  Sparkles,
-  ImageOff,
-  Layers3,
-} from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { useCart } from "@/contexts/CartContext";
+import { useData } from "@/contexts/DataContext";
+import { cn } from "@/lib/utils";
+import { getProductEmoji, resolveProductImage } from "@/lib/catalogMedia";
 
 interface ShopProduct {
   id: string;
@@ -42,33 +48,53 @@ interface ShopProduct {
   emoji: string;
   image: string;
   description: string;
-  specification: string;
   warranty: string;
-  primaryVendor: string;
   leadTime: string;
   status: "In Stock" | "Out of Stock";
 }
 
-const statusLabel = (status: string) =>
-  status === "Out of Stock" ? "Out of Stock" : "In Stock";
-
-const toDataUri = (productName: string, emoji: string) => {
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='1000' height='700' viewBox='0 0 1000 700'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='#0f172a' offset='0'/><stop stop-color='#1d4ed8' offset='1'/></linearGradient></defs><rect width='1000' height='700' fill='url(#g)'/><circle cx='860' cy='120' r='140' fill='rgba(255,255,255,0.12)'/><circle cx='120' cy='580' r='190' fill='rgba(34,197,94,0.16)'/><text x='500' y='320' text-anchor='middle' fill='white' font-size='110'>${emoji}</text><text x='500' y='410' text-anchor='middle' fill='white' font-size='32' font-family='Arial, sans-serif'>${productName}</text></svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-};
+const PAGE_SIZE = 12;
 
 function ProductImage({ product }: { product: ShopProduct }) {
   const [failed, setFailed] = useState(false);
-  const src = failed ? toDataUri(product.name, product.emoji) : product.image;
+  const src = failed
+    ? resolveProductImage({
+        name: product.name,
+        category: product.category,
+        brand: product.brand,
+        emoji: product.emoji,
+      })
+    : product.image;
 
   return (
     <img
       src={src}
       alt={product.name}
       loading="lazy"
+      decoding="async"
       onError={() => setFailed(true)}
-      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+      className="h-full w-full object-contain transition duration-700 group-hover:scale-[1.03]"
     />
+  );
+}
+
+function CardSkeleton() {
+  return (
+    <Card className="overflow-hidden rounded-[28px] border-border/60 bg-white/90 shadow-sm">
+      <div className="h-[270px] animate-pulse bg-gradient-to-br from-slate-100 via-slate-50 to-cyan-50" />
+      <CardContent className="space-y-4 p-5">
+        <div className="h-3 w-24 rounded-full bg-slate-200" />
+        <div className="h-5 w-3/4 rounded-full bg-slate-200" />
+        <div className="h-3 w-full rounded-full bg-slate-200" />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="h-10 rounded-2xl bg-slate-100" />
+          <div className="h-10 rounded-2xl bg-slate-100" />
+          <div className="h-10 rounded-2xl bg-slate-100" />
+          <div className="h-10 rounded-2xl bg-slate-100" />
+        </div>
+        <div className="h-14 rounded-2xl bg-slate-100" />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -76,86 +102,142 @@ function ProductCard({
   product,
   onAdd,
   onView,
+  onEnquire,
 }: {
   product: ShopProduct;
   onAdd: (product: ShopProduct) => void;
   onView: (product: ShopProduct) => void;
+  onEnquire: (product: ShopProduct) => void;
 }) {
-  const stock = statusLabel(product.status);
+  const isInStock = product.status === "In Stock";
 
   return (
-    <Card className="group overflow-hidden border-border/70 bg-card/80 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
-      <div className="relative h-44 overflow-hidden bg-slate-100">
+    <Card className="group flex h-full flex-col overflow-hidden rounded-[28px] border-border/60 bg-white/90 shadow-[0_12px_35px_-24px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_30px_70px_-32px_rgba(15,23,42,0.5)]">
+      <div className="relative h-[270px] overflow-hidden bg-gradient-to-br from-slate-50 via-white to-cyan-50 p-5">
         <ProductImage product={product} />
-        <div className="pointer-events-none absolute inset-x-3 bottom-3 translate-y-4 rounded-xl border border-white/30 bg-slate-950/75 p-2.5 text-[11px] text-white opacity-0 shadow-lg backdrop-blur-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-          <p className="font-semibold">Quick Overview</p>
-          <p className="mt-0.5 line-clamp-1 text-white/85">
-            {product.specification}
-          </p>
-          <div className="mt-1.5 flex items-center justify-between text-[10px] text-white/80">
-            <span>{product.primaryVendor}</span>
-            <span>{product.leadTime}</span>
+
+        <div className="pointer-events-none absolute inset-x-4 top-4 flex items-start justify-between gap-2">
+          <Badge className="rounded-full border border-white/60 bg-white/90 px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm backdrop-blur">
+            {product.category}
+          </Badge>
+          <Badge
+            className={cn(
+              "rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm",
+              isInStock
+                ? "bg-emerald-600 text-white"
+                : "bg-rose-600 text-white",
+            )}
+          >
+            {isInStock ? "In Stock" : "Out of Stock"}
+          </Badge>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-3xl border border-white/70 bg-white/90 p-3 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.4)] backdrop-blur-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Enterprise ready
+              </p>
+              <p className="mt-1 line-clamp-1 text-sm font-medium text-slate-700">
+                MOQ 1 unit • {product.leadTime}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-slate-950 px-3 py-2 text-right text-white shadow-sm">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-white/70">
+                Price
+              </p>
+              <p className="text-base font-semibold">
+                ₹{product.price.toLocaleString()}
+              </p>
+            </div>
           </div>
         </div>
-        <Badge
-          className={cn(
-            "absolute right-3 top-3 text-[11px]",
-            stock === "In Stock"
-              ? "bg-emerald-600 text-white"
-              : "bg-destructive text-white",
-          )}
-        >
-          {stock}
-        </Badge>
       </div>
 
-      <CardContent className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              {product.sku}
-            </p>
-            <h3 className="line-clamp-1 text-base font-semibold text-foreground">
-              {product.name}
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              {product.category} • {product.subCategory}
-            </p>
+      <CardContent className="flex flex-1 flex-col p-5">
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                {product.sku}
+              </p>
+              <h3 className="mt-1 line-clamp-2 text-[1.02rem] font-semibold leading-6 text-slate-950">
+                {product.name}
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                {product.category} • {product.subCategory}
+              </p>
+            </div>
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-lg text-white shadow-sm">
+              {product.emoji}
+            </span>
           </div>
-          <span className="text-2xl">{product.emoji}</span>
-        </div>
 
-        <p className="line-clamp-2 text-sm text-muted-foreground">
-          {product.description}
-        </p>
+          <p className="line-clamp-2 min-h-[44px] text-sm leading-6 text-slate-600">
+            {product.description}
+          </p>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-          <span>4.8</span>
-          <span>•</span>
-          <span>{product.brand}</span>
-        </div>
-
-        <div className="flex items-end justify-between pt-1">
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Price
-            </p>
-            <p className="text-2xl font-bold text-primary">
-              ₹{product.price.toLocaleString()}
-            </p>
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <ShieldCheck className="h-3.5 w-3.5 text-sky-600" />
+            <span>{product.brand}</span>
+            <span>•</span>
+            <Truck className="h-3.5 w-3.5 text-sky-600" />
+            <span>{product.leadTime}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => onView(product)}>
-              Details
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => onAdd(product)}
-              disabled={stock === "Out of Stock"}
-            >
-              Add
-            </Button>
+
+          <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50 px-3 py-2">
+              <p className="font-medium text-slate-900">MOQ 1</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">Minimum order</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50 px-3 py-2">
+              <p className="font-medium text-slate-900">{product.warranty}</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">Warranty</p>
+            </div>
+          </div>
+
+          <Separator className="my-1 bg-slate-200" />
+
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Enterprise pricing
+              </p>
+              <p className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+                ₹{product.price.toLocaleString()}
+              </p>
+              <p className="text-xs text-slate-500">
+                Excluding taxes and freight
+              </p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onView(product)}
+                  className="h-9 flex-1 rounded-full border-slate-300 px-3 text-[12px]"
+                >
+                  Details
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => onAdd(product)}
+                  disabled={!isInStock}
+                  className="h-9 flex-1 rounded-full bg-slate-950 px-3 text-[12px] text-white hover:bg-slate-800"
+                >
+                  Add
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEnquire(product)}
+                className="h-9 w-full rounded-full border-sky-300 px-3 text-[12px] text-sky-700 hover:bg-sky-50"
+              >
+                Enquire
+              </Button>
+            </div>
           </div>
         </div>
       </CardContent>
@@ -163,57 +245,25 @@ function ProductCard({
   );
 }
 
-function ProductOverview({
-  product,
-  onAdd,
+function PaginationButton({
+  children,
+  onClick,
+  disabled,
 }: {
-  product: ShopProduct;
-  onAdd: (product: ShopProduct) => void;
+  children: ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="space-y-5">
-      <DialogHeader>
-        <DialogTitle className="flex items-center justify-between gap-3 text-2xl">
-          <span>{product.name}</span>
-          <Badge variant="outline">{statusLabel(product.status)}</Badge>
-        </DialogTitle>
-      </DialogHeader>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="h-64 overflow-hidden rounded-xl border bg-muted">
-          <ProductImage product={product} />
-        </div>
-
-        <div className="space-y-3 rounded-xl border bg-background p-4">
-          <p className="text-sm text-muted-foreground">{product.description}</p>
-          <p className="text-sm">
-            <span className="font-semibold">Specification:</span>{" "}
-            {product.specification}
-          </p>
-          <p className="text-sm">
-            <span className="font-semibold">Warranty:</span> {product.warranty}
-          </p>
-          <p className="text-sm">
-            <span className="font-semibold">Vendor:</span>{" "}
-            {product.primaryVendor}
-          </p>
-          <p className="text-sm">
-            <span className="font-semibold">Lead Time:</span> {product.leadTime}
-          </p>
-
-          <div className="pt-2">
-            <Button
-              className="w-full"
-              onClick={() => onAdd(product)}
-              disabled={statusLabel(product.status) === "Out of Stock"}
-            >
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              Add To Cart
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      disabled={disabled}
+      className="h-10 rounded-full border-slate-300 px-4"
+    >
+      {children}
+    </Button>
   );
 }
 
@@ -224,57 +274,112 @@ export default function ShopPage() {
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
-  const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(
-    null,
-  );
+  const [page, setPage] = useState(1);
+  const deferredSearch = useDeferredValue(search);
 
   const products = useMemo<ShopProduct[]>(() => {
-    const fromCatalog = masterCatalogItems
+    return masterCatalogItems
       .filter((item) => !!item.name && !!item.category)
-      .map((item, idx) => ({
-        id: item.id || item.masterProductId || `prd-${idx}`,
-        sku: item.productCode || `SKU-${idx + 1000}`,
+      .map((item, index) => ({
+        id: item.id || item.masterProductId || `prd-${index}`,
+        sku: item.productCode || `SKU-${index + 1000}`,
         name: item.name,
         category: item.category,
         subCategory: item.subCategory || "General",
         brand: item.brand || "Nido",
         price: Number(item.price) || 0,
-        emoji: item.category.toLowerCase().includes("hardware")
-          ? "💻"
-          : item.category.toLowerCase().includes("stationery")
-            ? "📄"
-            : "📦",
-        image: item.image || toDataUri(item.name, "📦"),
-        description:
-          item.description?.trim() ||
-          `${item.name} is optimized for business procurement with dependable pricing and delivery planning.`,
-        specification:
-          item.specification || "Detailed specification available.",
+        emoji: item.emoji || getProductEmoji(item.category, item.name),
+        image: resolveProductImage({
+          name: item.name,
+          category: item.category,
+          brand: item.brand,
+          image: item.image,
+          emoji: item.emoji,
+        }),
+        description: item.description || "",
         warranty: item.warranty || "Standard warranty",
-        primaryVendor: item.primaryVendor || "Preferred vendor network",
         leadTime: item.leadTime || "5-7 Days",
-        status: statusLabel(item.status) as "In Stock" | "Out of Stock",
+        status: (item.status as "In Stock" | "Out of Stock") || "In Stock",
       }));
-
-    return fromCatalog;
   }, [masterCatalogItems]);
 
   const categories = useMemo(() => {
-    const keys = Array.from(new Set(products.map((p) => p.category)));
-    return ["all", ...keys];
+    return Array.from(
+      new Set(products.map((product) => product.category).filter(Boolean)),
+    ).sort((left, right) => left.localeCompare(right));
   }, [products]);
 
+  const categoryCounts = useMemo(
+    () =>
+      ["all", ...categories].map((name) => ({
+        name,
+        count:
+          name === "all"
+            ? products.length
+            : products.filter((product) => product.category === name).length,
+      })),
+    [categories, products],
+  );
+
   const filtered = useMemo(() => {
+    const term = deferredSearch.trim().toLowerCase();
     return products.filter((product) => {
       const searchMatch =
-        !search ||
-        product.name.toLowerCase().includes(search.toLowerCase()) ||
-        product.sku.toLowerCase().includes(search.toLowerCase()) ||
-        product.description.toLowerCase().includes(search.toLowerCase());
+        !term ||
+        product.name.toLowerCase().includes(term) ||
+        product.sku.toLowerCase().includes(term) ||
+        product.category.toLowerCase().includes(term) ||
+        product.subCategory.toLowerCase().includes(term) ||
+        product.description.toLowerCase().includes(term);
       const categoryMatch = category === "all" || product.category === category;
       return searchMatch && categoryMatch;
     });
-  }, [products, search, category]);
+  }, [products, deferredSearch, category]);
+
+  const suggestions = useMemo(() => {
+    const term = deferredSearch.trim().toLowerCase();
+    if (!term) return [];
+
+    return products
+      .map((product) => {
+        const haystack = [
+          product.name,
+          product.sku,
+          product.category,
+          product.subCategory,
+          product.brand,
+          product.description,
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        let score = 0;
+        if (product.name.toLowerCase().startsWith(term)) score += 50;
+        if (product.category.toLowerCase().startsWith(term)) score += 35;
+        if (product.brand.toLowerCase().includes(term)) score += 15;
+        if (haystack.includes(term)) score += 20;
+        return { product, score };
+      })
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map((entry) => entry.product);
+  }, [products, deferredSearch]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [deferredSearch, category]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   const handleAddToCart = (product: ShopProduct) => {
     addToCart({
@@ -290,119 +395,258 @@ export default function ShopPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <section className="relative overflow-hidden rounded-3xl border border-blue-200/60 bg-gradient-to-br from-slate-100 via-blue-50 to-cyan-100 p-6 md:p-8">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-blue-400/20 blur-2xl" />
-        <div className="pointer-events-none absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-cyan-500/20 blur-2xl" />
+      <section className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-[linear-gradient(135deg,#eff6ff_0%,#f8fafc_48%,#ecfeff_100%)] p-6 shadow-[0_24px_80px_-50px_rgba(15,23,42,0.45)] md:p-8">
+        <div className="pointer-events-none absolute -right-24 -top-20 h-64 w-64 rounded-full bg-sky-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-14 bottom-0 h-52 w-52 rounded-full bg-cyan-400/15 blur-3xl" />
 
-        <div className="relative space-y-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="mb-2 inline-flex items-center gap-2 rounded-full border border-blue-300/60 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.15em] text-blue-700">
-                <Sparkles className="h-3.5 w-3.5" />
-                Smart Commerce Hub
-              </p>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">
+        <div className="relative grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-end">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-700 shadow-sm">
+              <Sparkles className="h-3.5 w-3.5" />
+              Curated enterprise catalogue
+            </div>
+            <div className="space-y-3">
+              <h1 className="text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
                 Shop Catalog
               </h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600 md:text-base">
-                Explore enterprise-ready products with strong descriptions,
-                accurate visibility and a modern buying experience.
+              <p className="max-w-2xl text-sm leading-7 text-slate-600 md:text-[15px]">
+                Explore enterprise-ready products with premium product cards,
+                smarter search suggestions, category intelligence, and a faster
+                procurement flow.
               </p>
             </div>
 
-            <Button
-              className="fixed right-6 top-6 z-50 h-11 gap-2 rounded-full bg-slate-900 px-5 text-white shadow-xl hover:bg-slate-800 lg:right-8 lg:top-8"
-              onClick={() => navigate("/shop/cart")}
-            >
-              <ShoppingCart className="h-4 w-4" />
-              Cart
-              <Badge className="bg-white text-slate-900">{totalItems}</Badge>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {categoryCounts.slice(0, 4).map((entry) => (
+                <button
+                  key={entry.name}
+                  onClick={() => setCategory(entry.name)}
+                  className="rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
+                >
+                  {entry.name} · {entry.count}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-sky-600" />
+                Verified procurement data
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5">
+                <Truck className="h-3.5 w-3.5 text-sky-600" />
+                Delivery aware pricing
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5">
+                <PackageCheck className="h-3.5 w-3.5 text-sky-600" />
+                MOQ visibility
+              </span>
+            </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-[1fr_220px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search products by name, SKU, description"
-                className="h-11 rounded-xl border-white/80 bg-white/90 pl-10"
-              />
-            </div>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="h-11 rounded-xl border-white/80 bg-white/90">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((item) => (
-                  <SelectItem value={item} key={item}>
-                    {item === "all" ? "All Categories" : item}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Card className="border-white/80 bg-white/80 shadow-[0_24px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur">
+            <CardContent className="space-y-4 p-4 md:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Search and filter
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Fast keyword matching with curated category filtering.
+                  </p>
+                </div>
+                <Button
+                  className="h-11 rounded-full bg-slate-950 px-5 text-white hover:bg-slate-800"
+                  onClick={() => navigate("/shop/cart")}
+                >
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Cart
+                  <Badge className="ml-3 bg-white text-slate-950">
+                    {totalItems}
+                  </Badge>
+                </Button>
+              </div>
+
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search products, categories, vendors, keywords"
+                  className="h-12 rounded-2xl border-slate-200 bg-white pl-11 text-[15px] shadow-sm"
+                />
+              </div>
+
+              {suggestions.length > 0 && (
+                <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-2">
+                  <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-700">
+                    Smart suggestions
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestions.map((product) => (
+                      <button
+                        key={product.id}
+                        onClick={() => setSearch(product.name)}
+                        className="rounded-full border border-sky-100 bg-white px-3 py-2 text-left text-xs font-medium text-slate-700 shadow-sm transition hover:border-sky-200 hover:text-slate-950"
+                      >
+                        {product.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid gap-3 md:grid-cols-[1fr_230px]">
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="h-12 rounded-2xl border-slate-200 bg-white shadow-sm">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((item) => (
+                      <SelectItem value={item} key={item}>
+                        {item === "all" ? "All Categories" : item}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Result count
+                    </p>
+                    <p className="text-sm font-medium text-slate-900">
+                      {filtered.length} item{filtered.length === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Page
+                    </p>
+                    <p className="text-sm font-medium text-slate-900">
+                      {page} / {totalPages}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {filtered.length} product{filtered.length === 1 ? "" : "s"}
-          </p>
-          <p className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            <Layers3 className="h-3.5 w-3.5" />
-            Professional procurement view
-          </p>
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-slate-900">
+              Showing {filtered.length} product
+              {filtered.length === 1 ? "" : "s"}
+            </p>
+            <p className="text-sm text-slate-500">
+              {isCoreDataLoading
+                ? "Loading catalogue records..."
+                : "Premium catalog cards with consistent image scaling and spacing."}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 rounded-full border-slate-300 px-4"
+            onClick={() => navigate("/shop/cart")}
+          >
+            Go to cart
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
         </div>
 
-        {filtered.length === 0 ? (
-          <Card className="border-dashed">
+        {isCoreDataLoading ? (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <CardSkeleton key={index} />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <Card className="border-dashed border-slate-300 bg-white/80">
             <CardContent className="py-16 text-center">
-              <ImageOff className="mx-auto mb-2 h-10 w-10 text-muted-foreground" />
-              <p className="text-base font-medium">
-                {isCoreDataLoading
-                  ? "Loading products..."
-                  : "No products found"}
+              <ImageOff className="mx-auto mb-3 h-10 w-10 text-slate-400" />
+              <p className="text-lg font-medium text-slate-900">
+                No products found
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="mx-auto mt-1 max-w-xl text-sm text-slate-500">
                 {coreDataError
                   ? coreDataError
-                  : "No data available. Product inventory is loaded from the backend."}
+                  : "Try adjusting the search keyword or category filter to surface products from the master catalogue."}
               </p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {filtered.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onAdd={handleAddToCart}
-                onView={setSelectedProduct}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {paginated.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAdd={handleAddToCart}
+                  onView={(item) => navigate(`/shop/product/${item.id}`)}
+                  onEnquire={(item) =>
+                    navigate(`/shop/product/${item.id}/enquire`)
+                  }
+                />
+              ))}
+            </div>
+
+            <div className="flex flex-col items-center justify-between gap-3 rounded-[28px] border border-slate-200 bg-white/85 px-4 py-4 shadow-sm md:flex-row">
+              <p className="text-sm text-slate-600">
+                Page {page} of {totalPages} · {filtered.length} total results
+              </p>
+              <div className="flex items-center gap-2">
+                <PaginationButton
+                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="mr-2 h-4 w-4" />
+                  Previous
+                </PaginationButton>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }).map(
+                    (_, index) => {
+                      const pageNumber = index + 1;
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => setPage(pageNumber)}
+                          className={cn(
+                            "h-10 min-w-10 rounded-full px-3 text-sm font-medium transition",
+                            page === pageNumber
+                              ? "bg-slate-950 text-white"
+                              : "border border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-950",
+                          )}
+                        >
+                          {pageNumber}
+                        </button>
+                      );
+                    },
+                  )}
+                </div>
+                <PaginationButton
+                  onClick={() =>
+                    setPage((value) => Math.min(totalPages, value + 1))
+                  }
+                  disabled={page === totalPages}
+                >
+                  Next
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </PaginationButton>
+              </div>
+            </div>
+          </>
         )}
       </section>
 
-      <Dialog
-        open={!!selectedProduct}
-        onOpenChange={(open) => !open && setSelectedProduct(null)}
-      >
-        <DialogContent className="max-w-4xl">
-          {selectedProduct ? (
-            <ProductOverview
-              product={selectedProduct}
-              onAdd={handleAddToCart}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
       <div className="flex justify-end">
-        <Button variant="outline" onClick={() => navigate("/shop/cart")}>
+        <Button
+          variant="outline"
+          className="h-11 rounded-full border-slate-300 px-5"
+          onClick={() => navigate("/shop/cart")}
+        >
           Proceed to Cart
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>

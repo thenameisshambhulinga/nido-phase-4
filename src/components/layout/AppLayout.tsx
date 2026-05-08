@@ -11,6 +11,7 @@ import { applyBrandTheme } from "@/lib/theme";
 export default function AppLayout() {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { organizations, generalSettings } = useData();
 
   useEffect(() => {
@@ -40,14 +41,19 @@ export default function AppLayout() {
             : "translate-x-0",
         )}
       >
-        <Sidebar onClose={() => setSidebarOpen(false)} isMobile={isMobile} />
+        <Sidebar
+          onClose={() => setSidebarOpen(false)}
+          isMobile={isMobile}
+          collapsed={sidebarCollapsed}
+          onCollapseChange={setSidebarCollapsed}
+        />
       </div>
 
       {/* Main content */}
       <main
         className={cn(
           "relative z-10 flex-1 transition-[margin] duration-300 ease-out",
-          isMobile ? "ml-0" : "ml-60",
+          isMobile ? "ml-0" : sidebarCollapsed ? "ml-16" : "ml-60",
         )}
       >
         {/* Mobile hamburger */}

@@ -18,13 +18,8 @@ const config = {
     },
     extend: {
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', "system-ui", "sans-serif"],
-        display: [
-          '"DM Sans"',
-          '"Plus Jakarta Sans"',
-          "system-ui",
-          "sans-serif",
-        ],
+        sans: ["Inter", "system-ui", "sans-serif"],
+        display: ["Poppins", "Inter", "system-ui", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -60,18 +55,32 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        /* Enterprise palette (strict) */
+        primary: {
+          DEFAULT: "#2563EB",
+          hover: "#1D4ED8",
+          light: "#DBEAFE",
+          foreground: "#FFFFFF",
+        },
+        background: "#F8FAFC",
+        card: "#FFFFFF",
+        border: "#E5E7EB",
+        divider: "#F1F5F9",
+        "text-primary": "#111827",
+        "text-secondary": "#6B7280",
+        "text-muted": "#9CA3AF",
         success: {
-          DEFAULT: "hsl(var(--success))",
-          foreground: "hsl(var(--success-foreground))",
+          DEFAULT: "#16A34A",
+          light: "#DCFCE7",
+          foreground: "#065F46",
         },
         warning: {
-          DEFAULT: "hsl(var(--warning))",
-          foreground: "hsl(var(--warning-foreground))",
+          DEFAULT: "#F59E0B",
+          light: "#FEF3C7",
+          foreground: "#92400E",
         },
-        info: {
-          DEFAULT: "hsl(var(--info))",
-          foreground: "hsl(var(--info-foreground))",
-        },
+        error: { DEFAULT: "#DC2626", light: "#FEE2E2", foreground: "#7F1D1D" },
+        info: { DEFAULT: "#0EA5E9", light: "#E0F2FE", foreground: "#055E8A" },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -84,9 +93,21 @@ const config = {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "12px",
+        md: "8px",
+        sm: "6px",
+        DEFAULT: "12px",
+      },
+      spacing: {
+        1: "4px",
+        2: "8px",
+        3: "12px",
+        4: "16px",
+        5: "20px",
+        6: "24px",
+        8: "32px",
+        10: "40px",
+        12: "48px",
       },
       keyframes: {
         "accordion-down": {

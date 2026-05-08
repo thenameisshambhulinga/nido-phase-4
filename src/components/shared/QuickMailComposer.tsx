@@ -24,7 +24,10 @@ import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import ValidationAlert from "@/components/shared/ValidationAlert";
 import { apiRequest } from "@/lib/api";
-import { isValidEmail, normalizeEmail } from "@/lib/validation";
+import {
+  isValidEmailStrict,
+  normalizeEmail,
+} from "@/lib/emailStrictValidation";
 
 interface QuickMailComposerProps {
   open: boolean;
@@ -61,6 +64,7 @@ const TEMPLATES = [
 export default function QuickMailComposer({
   open,
   onClose,
+
   recipientType = "all",
   defaultTo = "",
   defaultSubject = "",
@@ -121,13 +125,15 @@ export default function QuickMailComposer({
       });
       return;
     }
-    if (!isValidEmail(to)) {
+    if (!isValidEmailStrict(to)) {
       setValidationError({
         open: true,
         message: "Please select a valid recipient email address.",
       });
+
       return;
     }
+
     if (!subject.trim()) {
       setValidationError({
         open: true,

@@ -58,6 +58,14 @@ interface SpecificationAttribute {
   value: string;
 }
 
+interface VendorInventoryEntry {
+  id: string;
+  vendorName: string;
+  unitsAvailable: number;
+  vendorPrice: number;
+  lastUpdated: string;
+}
+
 interface CatalogItem {
   id: string;
   name: string;
@@ -469,6 +477,13 @@ export default function MasterCataloguePage() {
   const [specCategoryInput, setSpecCategoryInput] = useState("");
   const [specAttributeInput, setSpecAttributeInput] = useState("");
   const [specValueInput, setSpecValueInput] = useState("");
+  const [vendorInventoryEntries, setVendorInventoryEntries] = useState<
+    VendorInventoryEntry[]
+  >([]);
+  const [vendorSortKey, setVendorSortKey] = useState<
+    "vendorName" | "units" | "price" | "total" | "none"
+  >("none");
+  const [vendorSortAsc, setVendorSortAsc] = useState(true);
 
   const canManageSemanticSpecs =
     isOwner ||
@@ -556,6 +571,7 @@ export default function MasterCataloguePage() {
     setSpecValueInput("");
     setAutoProductCode(false);
     setAutoSku(false);
+    setVendorInventoryEntries([]);
     setAddDialogOpen(true);
   };
 
@@ -568,8 +584,39 @@ export default function MasterCataloguePage() {
     setSpecValueInput("");
     setAutoProductCode(false);
     setAutoSku(false);
+    setVendorInventoryEntries(
+      ((item as any).vendorInventoryEntries as VendorInventoryEntry[]) || [],
+    );
     setAddDialogOpen(true);
   };
+
+  const totalVendorStock = vendorInventoryEntries.reduce(
+    (sum, row) =>
+      sum + (Number.isFinite(row.unitsAvailable) ? row.unitsAvailable : 0),
+    0,
+  );
+
+  const lowestVendor =
+    vendorInventoryEntries.length > 0
+      ? vendorInventoryEntries.reduce((min, row) =>
+          row.vendorPrice < min.vendorPrice ? row : min,
+        )
+      : null;
+
+  const preferredVendor =
+    vendorInventoryEntries.length > 0
+      ? vendorInventoryEntries.reduce((best, row) => {
+          const bestScore =
+            best.unitsAvailable > 0
+              ? best.vendorPrice / best.unitsAvailable
+              : Number.POSITIVE_INFINITY;
+          const rowScore =
+            row.unitsAvailable > 0
+              ? row.vendorPrice / row.unitsAvailable
+              : Number.POSITIVE_INFINITY;
+          return rowScore < bestScore ? row : best;
+        })
+      : null;
 
   const addSemanticSpecificationAttribute = () => {
     if (!canManageSemanticSpecs) {
@@ -621,7 +668,22 @@ export default function MasterCataloguePage() {
       sku,
       specification,
       image: productImages[0] || undefined,
+      initialStock: totalVendorStock > 0 ? totalVendorStock : form.initialStock,
+      primaryVendor: preferredVendor?.vendorName || form.primaryVendor,
     };
+
+    const vendorInventorySpecRows = vendorInventoryEntries.map((entry) => ({
+      category: "Vendor Inventory",
+      attribute: entry.vendorName,
+      value: `${entry.unitsAvailable} units | ₹${entry.vendorPrice} | ${entry.lastUpdated}`,
+    }));
+
+    newItem.specAttributes = [
+      ...(newItem.specAttributes || []).filter(
+        (spec) => spec.category !== "Vendor Inventory",
+      ),
+      ...vendorInventorySpecRows,
+    ];
 
     if (editingItem) {
       updateMasterCatalogItem(editingItem.id, {
@@ -832,6 +894,30 @@ export default function MasterCataloguePage() {
       setAddingPhysicalType(false);
       toast.success("Physical type added");
     }
+  };
+
+  const parseVendorInventory = (item?: CatalogItem) => {
+    const rows: {
+      vendorName: string;
+      units: number;
+      price: number;
+      total: number;
+    }[] = [];
+    if (!item?.specAttributes) return { rows, total: 0, totalValue: 0 };
+    const vendorSpecs = item.specAttributes.filter(
+      (s) => s.category === "Vendor Inventory",
+    );
+    for (const spec of vendorSpecs) {
+      const vendorName = spec.attribute || "Unknown";
+      const parts = (spec.value || "").split("|").map((p) => p.trim());
+      const units = parseInt(parts[0]) || 0;
+      const price = Number((parts[1] || "").replace(/[^\d.-]/g, "")) || 0;
+      const total = units * price;
+      rows.push({ vendorName, units, price, total });
+    }
+    const total = rows.reduce((s, r) => s + r.units, 0);
+    const totalValue = rows.reduce((s, r) => s + r.total, 0);
+    return { rows, total, totalValue };
   };
 
   return (
@@ -1484,6 +1570,154 @@ export default function MasterCataloguePage() {
                               </p>
                             )}
                           </div>
+                          {/* General Specifications table and Vendor Inventory (enterprise view) */}
+                          <div className="mt-4">
+                            <Card className="overflow-hidden border">
+                              <CardHeader>
+                                <CardTitle>General Specifications</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                {(viewItem.specAttributes || []).filter(
+                                  (s) => s.category !== "Vendor Inventory",
+                                ).length > 0 ? (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Attribute</TableHead>
+                                        <TableHead>Value</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {(viewItem.specAttributes || [])
+                                        .filter(
+                                          (s) =>
+                                            s.category !== "Vendor Inventory",
+                                        )
+                                        .map((s, i) => (
+                                          <TableRow key={i}>
+                                            <TableCell className="font-medium">
+                                              {s.attribute}
+                                            </TableCell>
+                                            <TableCell>{s.value}</TableCell>
+                                          </TableRow>
+                                        ))}
+                                    </TableBody>
+                                  </Table>
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">
+                                    No general specifications available.
+                                  </p>
+                                )}
+                              </CardContent>
+                            </Card>
+
+                            {/* Vendor Inventory */}
+                            {(() => {
+                              const parsed = parseVendorInventory(viewItem);
+                              const rows = parsed.rows.slice();
+                              if (vendorSortKey !== "none") {
+                                rows.sort((a, b) => {
+                                  const k = vendorSortKey;
+                                  if (a[k] < b[k])
+                                    return vendorSortAsc ? -1 : 1;
+                                  if (a[k] > b[k])
+                                    return vendorSortAsc ? 1 : -1;
+                                  return 0;
+                                });
+                              }
+                              return (
+                                <Card className="mt-4 overflow-hidden border">
+                                  <CardHeader>
+                                    <CardTitle>Vendor Inventory</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="mb-3 text-sm">
+                                      <span className="font-medium">
+                                        Total Available Quantity:
+                                      </span>{" "}
+                                      {parsed.total} Units
+                                    </div>
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead
+                                            className="cursor-pointer"
+                                            onClick={() => {
+                                              setVendorSortKey("vendorName");
+                                              setVendorSortAsc(
+                                                vendorSortKey === "vendorName"
+                                                  ? !vendorSortAsc
+                                                  : true,
+                                              );
+                                            }}
+                                          >
+                                            Vendor Name
+                                          </TableHead>
+                                          <TableHead
+                                            className="cursor-pointer"
+                                            onClick={() => {
+                                              setVendorSortKey("units");
+                                              setVendorSortAsc(
+                                                vendorSortKey === "units"
+                                                  ? !vendorSortAsc
+                                                  : true,
+                                              );
+                                            }}
+                                          >
+                                            Available Qty
+                                          </TableHead>
+                                          <TableHead
+                                            className="cursor-pointer"
+                                            onClick={() => {
+                                              setVendorSortKey("price");
+                                              setVendorSortAsc(
+                                                vendorSortKey === "price"
+                                                  ? !vendorSortAsc
+                                                  : true,
+                                              );
+                                            }}
+                                          >
+                                            Price / Unit
+                                          </TableHead>
+                                          <TableHead
+                                            className="cursor-pointer"
+                                            onClick={() => {
+                                              setVendorSortKey("total");
+                                              setVendorSortAsc(
+                                                vendorSortKey === "total"
+                                                  ? !vendorSortAsc
+                                                  : true,
+                                              );
+                                            }}
+                                          >
+                                            Total Value
+                                          </TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {rows.map((r, i) => (
+                                          <TableRow key={i}>
+                                            <TableCell className="font-medium">
+                                              {r.vendorName}
+                                            </TableCell>
+                                            <TableCell>{r.units}</TableCell>
+                                            <TableCell>₹{r.price}</TableCell>
+                                            <TableCell>
+                                              ₹{r.total.toLocaleString()}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                    <div className="mt-3 text-sm text-muted-foreground">
+                                      Total Value: ₹
+                                      {parsed.totalValue.toLocaleString()}
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              );
+                            })()}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1885,144 +2119,54 @@ export default function MasterCataloguePage() {
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Logistics & Customs
+                {/* Pricing & Inventory */}
+                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+                  <h3 className="font-semibold text-sm text-slate-950 border-b pb-2">
+                    Pricing & Inventory
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Price (₹)</Label>
+                      <Input
+                        type="number"
+                        placeholder="0.00"
+                        value={form.price || ""}
+                        onChange={(e) =>
+                          updateForm({ price: parseFloat(e.target.value) || 0 })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Discount Price (₹)</Label>
+                      <Input
+                        type="number"
+                        placeholder="Optional"
+                        value={form.discountPrice || ""}
+                        onChange={(e) =>
+                          updateForm({
+                            discountPrice: parseFloat(e.target.value) || undefined,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
                       <Label>HSN/SAC Code</Label>
                       <Input
-                        placeholder="e.g., 84713010"
+                        placeholder="e.g., 84713020"
                         value={form.hsnCode || ""}
                         onChange={(e) =>
                           updateForm({ hsnCode: e.target.value })
                         }
                       />
                     </div>
-                    <div className="md:col-span-2">
-                      <Label>Dimensions</Label>
-                      <div className="grid grid-cols-[1fr_1fr_1fr_96px] gap-2">
-                        <Input
-                          placeholder="L"
-                          value={form.dimensionL || ""}
-                          onChange={(e) =>
-                            updateForm({ dimensionL: e.target.value })
-                          }
-                        />
-                        <Input
-                          placeholder="W"
-                          value={form.dimensionW || ""}
-                          onChange={(e) =>
-                            updateForm({ dimensionW: e.target.value })
-                          }
-                        />
-                        <Input
-                          placeholder="H"
-                          value={form.dimensionH || ""}
-                          onChange={(e) =>
-                            updateForm({ dimensionH: e.target.value })
-                          }
-                        />
-                        <Select
-                          value={form.dimUnit || "cm"}
-                          onValueChange={(v) => updateForm({ dimUnit: v })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cm">cm</SelectItem>
-                            <SelectItem value="mm">mm</SelectItem>
-                            <SelectItem value="m">m</SelectItem>
-                            <SelectItem value="in">in</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Shipping Weight</Label>
-                      <div className="grid grid-cols-[1fr_90px] gap-2">
-                        <Input
-                          placeholder="e.g., 1.34"
-                          value={form.weight || ""}
-                          onChange={(e) =>
-                            updateForm({ weight: e.target.value })
-                          }
-                        />
-                        <Select
-                          value={form.weightUnit || "kg"}
-                          onValueChange={(v) => updateForm({ weightUnit: v })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="kg">kg</SelectItem>
-                            <SelectItem value="g">g</SelectItem>
-                            <SelectItem value="lb">lb</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-3 max-w-[280px]">
-                    <Label>Customs Declaration</Label>
-                    <Select
-                      value={form.customsDeclaration || "Exempt"}
-                      onValueChange={(v) =>
-                        updateForm({ customsDeclaration: v })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Customs Declaration" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {customsOptions.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold text-sm border-b pb-1 mb-3">
-                    Pricing & Inventory
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    <div>
-                      <Label>Regular Price (optional)</Label>
-                      <Input
-                        type="number"
-                        value={form.price}
-                        onChange={(e) =>
-                          updateForm({ price: parseFloat(e.target.value) || 0 })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label>Discount Price</Label>
-                      <Input
-                        type="number"
-                        placeholder="(optional)"
-                        value={form.discountPrice || ""}
-                        onChange={(e) =>
-                          updateForm({
-                            discountPrice:
-                              parseFloat(e.target.value) || undefined,
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <Label>Inventory Status</Label>
+                    <div className="space-y-1.5">
+                      <Label>Status</Label>
                       <Select
                         value={form.status}
                         onValueChange={(v) =>
-                          updateForm({ status: v as CatalogItem["status"] })
+                          updateForm({
+                            status: v as "In Stock" | "Low Stock" | "Out of Stock",
+                          })
                         }
                       >
                         <SelectTrigger>
@@ -2031,17 +2175,18 @@ export default function MasterCataloguePage() {
                         <SelectContent>
                           <SelectItem value="In Stock">In Stock</SelectItem>
                           <SelectItem value="Low Stock">Low Stock</SelectItem>
-                          <SelectItem value="Out of Stock">
-                            Out of Stock
-                          </SelectItem>
+                          <SelectItem value="Out of Stock">Out of Stock</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label>Initial Stock Quantity</Label>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Initial Stock</Label>
                       <Input
                         type="number"
-                        value={form.initialStock}
+                        placeholder="50"
+                        value={form.initialStock || ""}
                         onChange={(e) =>
                           updateForm({
                             initialStock: parseInt(e.target.value, 10) || 0,
@@ -2049,22 +2194,153 @@ export default function MasterCataloguePage() {
                         }
                       />
                     </div>
-                    <div>
-                      <Label>Minimum Stock Threshold</Label>
+                    <div className="space-y-1.5">
+                      <Label>Min Stock Threshold</Label>
                       <Input
                         type="number"
-                        value={form.minStockThreshold}
+                        placeholder="5"
+                        value={form.minStockThreshold || ""}
                         onChange={(e) =>
                           updateForm({
-                            minStockThreshold:
-                              parseInt(e.target.value, 10) || 0,
+                            minStockThreshold: parseInt(e.target.value, 10) || 0,
                           })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Lead Time</Label>
+                      <Input
+                        placeholder="e.g., 10 Days"
+                        value={form.leadTime || ""}
+                        onChange={(e) =>
+                          updateForm({ leadTime: e.target.value })
                         }
                       />
                     </div>
                   </div>
                 </div>
 
+                {/* Logistics & Customs */}
+                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">
+                  <h3 className="font-semibold text-sm text-slate-950 border-b pb-2">
+                    Logistics & Customs
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Length ({form.dimUnit || "cm"})</Label>
+                      <Input
+                        placeholder="L"
+                        value={form.dimensionL || ""}
+                        onChange={(e) =>
+                          updateForm({ dimensionL: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Width ({form.dimUnit || "cm"})</Label>
+                      <Input
+                        placeholder="W"
+                        value={form.dimensionW || ""}
+                        onChange={(e) =>
+                          updateForm({ dimensionW: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Height ({form.dimUnit || "cm"})</Label>
+                      <Input
+                        placeholder="H"
+                        value={form.dimensionH || ""}
+                        onChange={(e) =>
+                          updateForm({ dimensionH: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Weight ({form.weightUnit || "kg"})</Label>
+                      <Input
+                        placeholder="Weight"
+                        value={form.weight || ""}
+                        onChange={(e) =>
+                          updateForm({ weight: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Dimension Unit</Label>
+                      <Select
+                        value={form.dimUnit || "cm"}
+                        onValueChange={(v) => updateForm({ dimUnit: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cm">cm</SelectItem>
+                          <SelectItem value="mm">mm</SelectItem>
+                          <SelectItem value="inch">inch</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Weight Unit</Label>
+                      <Select
+                        value={form.weightUnit || "kg"}
+                        onValueChange={(v) => updateForm({ weightUnit: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="kg">kg</SelectItem>
+                          <SelectItem value="g">g</SelectItem>
+                          <SelectItem value="lb">lb</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Customs Declaration</Label>
+                      <Select
+                        value={form.customsDeclaration || "Exempt"}
+                        onValueChange={(v) =>
+                          updateForm({ customsDeclaration: v })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Exempt">Exempt</SelectItem>
+                          <SelectItem value="Taxable">Taxable</SelectItem>
+                          <SelectItem value="Restricted">Restricted</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Product Description */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm border-b pb-1">
+                    Product Description
+                  </h3>
+                  <div>
+                    <Label>Short Description</Label>
+                    <Textarea
+                      placeholder="Brief product description for catalogues and search results..."
+                      value={form.description || ""}
+                      onChange={(e) =>
+                        updateForm({ description: e.target.value })
+                      }
+                      rows={3}
+                      className="rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                {/* Product Specifics & Media */}
                 <div>
                   <h3 className="font-semibold text-sm border-b pb-1 mb-3">
                     Product Specifics & Media
@@ -2144,6 +2420,52 @@ export default function MasterCataloguePage() {
                                   type="button"
                                   variant="ghost"
                                   size="sm"
+                                  className="h-6 px-2"
+                                  disabled={
+                                    !canManageSemanticSpecs || index === 0
+                                  }
+                                  onClick={() =>
+                                    updateForm({
+                                      specAttributes: (
+                                        form.specAttributes || []
+                                      ).map((item, i, arr) => {
+                                        if (i === index - 1) return arr[index];
+                                        if (i === index) return arr[index - 1];
+                                        return item;
+                                      }),
+                                    })
+                                  }
+                                >
+                                  Up
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2"
+                                  disabled={
+                                    !canManageSemanticSpecs ||
+                                    index ===
+                                      (form.specAttributes || []).length - 1
+                                  }
+                                  onClick={() =>
+                                    updateForm({
+                                      specAttributes: (
+                                        form.specAttributes || []
+                                      ).map((item, i, arr) => {
+                                        if (i === index + 1) return arr[index];
+                                        if (i === index) return arr[index + 1];
+                                        return item;
+                                      }),
+                                    })
+                                  }
+                                >
+                                  Down
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
                                   className="h-6 px-2 text-destructive"
                                   disabled={!canManageSemanticSpecs}
                                   onClick={() =>
@@ -2166,6 +2488,162 @@ export default function MasterCataloguePage() {
                           Authorized internal users can configure while creating
                           or editing items.
                         </p>
+                      </div>
+                      <div className="rounded-lg border p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm">
+                            Vendor Inventory Intelligence
+                          </Label>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setVendorInventoryEntries((prev) => [
+                                ...prev,
+                                {
+                                  id: crypto.randomUUID(),
+                                  vendorName: "",
+                                  unitsAvailable: 0,
+                                  vendorPrice: 0,
+                                  lastUpdated: new Date()
+                                    .toISOString()
+                                    .slice(0, 10),
+                                },
+                              ])
+                            }
+                          >
+                            Add Vendor Row
+                          </Button>
+                        </div>
+
+                        <div className="grid gap-2">
+                          {vendorInventoryEntries.map((entry) => (
+                            <div
+                              key={entry.id}
+                              className="grid grid-cols-1 gap-2 rounded border p-2 md:grid-cols-12"
+                            >
+                              <Input
+                                className="md:col-span-3"
+                                placeholder="Vendor name"
+                                value={entry.vendorName}
+                                onChange={(e) =>
+                                  setVendorInventoryEntries((prev) =>
+                                    prev.map((row) =>
+                                      row.id === entry.id
+                                        ? { ...row, vendorName: e.target.value }
+                                        : row,
+                                    ),
+                                  )
+                                }
+                              />
+                              <Input
+                                className="md:col-span-2"
+                                type="number"
+                                placeholder="Units"
+                                value={entry.unitsAvailable}
+                                onChange={(e) =>
+                                  setVendorInventoryEntries((prev) =>
+                                    prev.map((row) =>
+                                      row.id === entry.id
+                                        ? {
+                                            ...row,
+                                            unitsAvailable:
+                                              parseInt(e.target.value, 10) || 0,
+                                          }
+                                        : row,
+                                    ),
+                                  )
+                                }
+                              />
+                              <Input
+                                className="md:col-span-3"
+                                type="number"
+                                placeholder="Vendor price"
+                                value={entry.vendorPrice}
+                                onChange={(e) =>
+                                  setVendorInventoryEntries((prev) =>
+                                    prev.map((row) =>
+                                      row.id === entry.id
+                                        ? {
+                                            ...row,
+                                            vendorPrice:
+                                              parseFloat(e.target.value) || 0,
+                                          }
+                                        : row,
+                                    ),
+                                  )
+                                }
+                              />
+                              <Input
+                                className="md:col-span-3"
+                                type="date"
+                                value={entry.lastUpdated}
+                                onChange={(e) =>
+                                  setVendorInventoryEntries((prev) =>
+                                    prev.map((row) =>
+                                      row.id === entry.id
+                                        ? {
+                                            ...row,
+                                            lastUpdated: e.target.value,
+                                          }
+                                        : row,
+                                    ),
+                                  )
+                                }
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className="md:col-span-1"
+                                onClick={() =>
+                                  setVendorInventoryEntries((prev) =>
+                                    prev.filter((row) => row.id !== entry.id),
+                                  )
+                                }
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="grid gap-2 md:grid-cols-4">
+                          <div className="rounded border bg-muted/40 p-2 text-xs">
+                            <p className="text-muted-foreground">Total Stock</p>
+                            <p className="text-sm font-semibold">
+                              {totalVendorStock}
+                            </p>
+                          </div>
+                          <div className="rounded border bg-muted/40 p-2 text-xs">
+                            <p className="text-muted-foreground">
+                              Vendor Count
+                            </p>
+                            <p className="text-sm font-semibold">
+                              {vendorInventoryEntries.length}
+                            </p>
+                          </div>
+                          <div className="rounded border bg-muted/40 p-2 text-xs">
+                            <p className="text-muted-foreground">
+                              Lowest Price
+                            </p>
+                            <p className="text-sm font-semibold">
+                              {lowestVendor
+                                ? `${lowestVendor.vendorName} • ₹${lowestVendor.vendorPrice}`
+                                : "-"}
+                            </p>
+                          </div>
+                          <div className="rounded border bg-muted/40 p-2 text-xs">
+                            <p className="text-muted-foreground">
+                              Preferred Vendor
+                            </p>
+                            <p className="text-sm font-semibold">
+                              {preferredVendor
+                                ? preferredVendor.vendorName
+                                : "-"}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                       <div>
                         <Label>Warranty Information</Label>

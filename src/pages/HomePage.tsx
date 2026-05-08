@@ -200,6 +200,109 @@ export default function HomePage() {
             ))}
           </div>
         </AnimatedSection>
+
+        <AnimatedSection delay={900}>
+          <div className="mt-16 max-w-6xl mx-auto rounded-[12px] border border-[#E5E7EB] bg-white p-6">
+            <h3 className="text-lg font-semibold text-[#111827]">
+              Trusted By Enterprise Teams
+            </h3>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-[#6B7280] md:grid-cols-5">
+              {["ABB", "HDFC Bank", "TCS", "Infosys", "Wipro"].map(
+                (company) => (
+                  <div
+                    key={company}
+                    className="rounded-md border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2 text-center font-medium"
+                  >
+                    {company}
+                  </div>
+                ),
+              )}
+            </div>
+          </div>
+        </AnimatedSection>
+
+        <AnimatedSection delay={1000}>
+          <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4 max-w-6xl mx-auto">
+            {[
+              { label: "Active Clients", value: "120+" },
+              { label: "Monthly Orders", value: "18K+" },
+              { label: "Vendor Network", value: "350+" },
+              { label: "On-time SLA", value: "98.4%" },
+            ].map((stat) => (
+              <Card key={stat.label} className="p-4 text-center">
+                <p className="text-2xl font-semibold text-[#111827]">
+                  {stat.value}
+                </p>
+                <p className="text-sm text-[#6B7280]">{stat.label}</p>
+              </Card>
+            ))}
+          </div>
+        </AnimatedSection>
+
+        <AnimatedSection delay={1100}>
+          <div className="mt-10 max-w-6xl mx-auto grid gap-4 md:grid-cols-3">
+            {[
+              {
+                quote:
+                  "Nido made our procurement approval flow 3x faster and cut manual effort significantly.",
+                name: "Rahul Menon",
+                role: "Procurement Head, ABB",
+              },
+              {
+                quote:
+                  "The catalogue and vendor insights helped us reduce cost variance across branches.",
+                name: "Pooja Nair",
+                role: "Operations Manager, Infosys",
+              },
+              {
+                quote:
+                  "Audit-ready workflows and controls gave finance and compliance teams full visibility.",
+                name: "Ankit Sharma",
+                role: "Finance Controller, HDFC",
+              },
+            ].map((item) => (
+              <Card key={item.name}>
+                <Card className="border-0 shadow-none p-0">
+                  <div className="p-5">
+                    <p className="text-sm text-[#111827]">"{item.quote}"</p>
+                    <p className="mt-4 text-sm font-medium">{item.name}</p>
+                    <p className="text-xs text-[#6B7280]">{item.role}</p>
+                  </div>
+                </Card>
+              </Card>
+            ))}
+          </div>
+        </AnimatedSection>
+
+        <AnimatedSection delay={1200}>
+          <div className="mt-12 max-w-6xl mx-auto rounded-[12px] border border-[#DBEAFE] bg-[#EFF6FF] p-6 text-center">
+            <h3 className="text-xl font-semibold text-[#111827]">
+              Ready to modernize enterprise procurement?
+            </h3>
+            <p className="mt-2 text-sm text-[#6B7280]">
+              Launch controlled approvals, intelligent catalog operations, and
+              multi-vendor visibility.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+              <Button onClick={() => navigate("/shop")}>Start Shopping</Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate("/configuration/master-catalogue")}
+              >
+                Manage Catalogue
+              </Button>
+            </div>
+          </div>
+        </AnimatedSection>
+
+        <footer className="mt-16 border-t border-[#E5E7EB] pt-8 text-sm text-[#6B7280]">
+          <div className="mx-auto flex max-w-6xl flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <p>© {new Date().getFullYear()} Nido Tech CorpEssentials</p>
+            <p>
+              Enterprise Procurement Platform • Secure • Scalable • Audit-ready
+            </p>
+          </div>
+        </footer>
       </section>
     </div>
   );

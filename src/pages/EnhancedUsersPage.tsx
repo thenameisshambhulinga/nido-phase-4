@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import { useEnhancedAuth } from "@/contexts/EnhancedAuthContext";
 import {
@@ -65,6 +66,7 @@ import {
 } from "@/lib/validation";
 
 export default function EnhancedUsersPage() {
+  const navigate = useNavigate();
   const {
     users,
     isOwner,
@@ -90,7 +92,7 @@ export default function EnhancedUsersPage() {
   );
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<Partial<EnhancedAppUser>>({
+  const [formData, setFormData] = useState<Record<string, any>>({
     fullName: "",
     email: "",
     jobTitle: "",
@@ -98,6 +100,26 @@ export default function EnhancedUsersPage() {
     roleTemplate: "employee",
     userType: "Internal User",
     phone: "",
+    alternatePhone: "",
+    employeeId: "",
+    manager: "",
+    timezone: "Asia/Kolkata",
+    address: "",
+    city: "",
+    state: "",
+    country: "India",
+    postalCode: "",
+    dob: "",
+    joiningDate: "",
+    emergencyContact: "",
+    notes: "",
+    permissionGroup: "Default",
+    systemAccessLevel: "Standard",
+    internalRole: "Employee",
+    teams: "",
+    allowedModules: "Dashboard,Orders,Shop",
+    approvalAuthority: "No",
+    reportingStructure: "Department Head",
     status: "Active",
   });
 
@@ -135,6 +157,18 @@ export default function EnhancedUsersPage() {
       toast({
         title: "Invalid phone",
         description: "Phone number must contain 10 to 15 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (
+      formData.alternatePhone &&
+      !isValidPhoneNumber(formData.alternatePhone)
+    ) {
+      toast({
+        title: "Invalid alternate phone",
+        description: "Alternate phone number must contain 10 to 15 digits.",
         variant: "destructive",
       });
       return;
@@ -201,7 +235,153 @@ export default function EnhancedUsersPage() {
       roleTemplate: "employee",
       userType: "Internal User",
       phone: "",
+      alternatePhone: "",
+      employeeId: "",
+      manager: "",
+      timezone: "Asia/Kolkata",
+      address: "",
+      city: "",
+      state: "",
+      country: "India",
+      postalCode: "",
+      dob: "",
+      joiningDate: "",
+      emergencyContact: "",
+      notes: "",
+      permissionGroup: "Default",
+      systemAccessLevel: "Standard",
+      internalRole: "Employee",
+      teams: "",
+      allowedModules: "Dashboard,Orders,Shop",
+      approvalAuthority: "No",
+      reportingStructure: "Department Head",
       status: "Active",
+    });
+  };
+
+  const handleSeedEnterpriseUsers = async () => {
+    if (!isOwner) return;
+    const seedRows = [
+      {
+        fullName: "Aarav Mehta",
+        email: "aarav.mehta@nido.tech",
+        jobTitle: "Procurement Director",
+        department: "Procurement",
+        roleTemplate: "procurement_manager",
+        userType: "Internal User",
+        phone: "9876543210",
+        organization: "Nido Tech",
+      },
+      {
+        fullName: "Isha Verma",
+        email: "isha.verma@nido.tech",
+        jobTitle: "Finance Manager",
+        department: "Finance",
+        roleTemplate: "finance_manager",
+        userType: "Internal User",
+        phone: "9876543211",
+        organization: "Nido Tech",
+      },
+      {
+        fullName: "Karan Nair",
+        email: "karan.nair@nido.tech",
+        jobTitle: "IT Operations Lead",
+        department: "IT",
+        roleTemplate: "admin",
+        userType: "Internal User",
+        phone: "9876543212",
+        organization: "Nido Tech",
+      },
+      {
+        fullName: "Neha Rao",
+        email: "neha.rao@nido.tech",
+        jobTitle: "Compliance Analyst",
+        department: "Compliance",
+        roleTemplate: "accounts_payable",
+        userType: "Internal User",
+        phone: "9876543213",
+        organization: "Nido Tech",
+      },
+      {
+        fullName: "Rohit Sinha",
+        email: "rohit.sinha@nido.tech",
+        jobTitle: "Operations Specialist",
+        department: "Operations",
+        roleTemplate: "employee",
+        userType: "Internal User",
+        phone: "9876543214",
+        organization: "Nido Tech",
+      },
+      {
+        fullName: "Priya Kapoor",
+        email: "priya.kapoor@abb-corp.com",
+        jobTitle: "Client Admin",
+        department: "Procurement",
+        roleTemplate: "client_admin",
+        userType: "Client User",
+        phone: "9876543215",
+        organization: "ABB India",
+      },
+      {
+        fullName: "Manoj Kulkarni",
+        email: "manoj.k@hdfc-enterprise.com",
+        jobTitle: "Facility Manager",
+        department: "Facilities",
+        roleTemplate: "client_user",
+        userType: "Client User",
+        phone: "9876543216",
+        organization: "HDFC Bank",
+      },
+      {
+        fullName: "Sneha Iyer",
+        email: "sneha.iyer@tcs-corp.com",
+        jobTitle: "IT Buyer",
+        department: "IT Procurement",
+        roleTemplate: "client_user",
+        userType: "Client User",
+        phone: "9876543217",
+        organization: "TCS",
+      },
+      {
+        fullName: "Aditya Patil",
+        email: "aditya.patil@infosys-corp.com",
+        jobTitle: "Regional Buyer",
+        department: "Regional Ops",
+        roleTemplate: "client_user",
+        userType: "Client User",
+        phone: "9876543218",
+        organization: "Infosys",
+      },
+      {
+        fullName: "Kavya Reddy",
+        email: "kavya.reddy@wipro-enterprise.com",
+        jobTitle: "Operations Coordinator",
+        department: "Operations",
+        roleTemplate: "client_user",
+        userType: "Client User",
+        phone: "9876543219",
+        organization: "Wipro",
+      },
+    ];
+
+    let created = 0;
+    for (const row of seedRows) {
+      if (
+        users.some((u) => u.email.toLowerCase() === row.email.toLowerCase())
+      ) {
+        continue;
+      }
+      const result = await createUser({
+        ...row,
+        status: "Active",
+        createdBy: "owner",
+      } as any);
+      if (result.success) created += 1;
+    }
+
+    toast({
+      title: "Seed completed",
+      description: `${created} enterprise users created. Existing users were skipped.`,
     });
   };
 
@@ -371,136 +551,414 @@ export default function EnhancedUsersPage() {
               </div>
 
               {isOwner && (
-                <Dialog
-                  open={showCreateDialog}
-                  onOpenChange={setShowCreateDialog}
-                >
-                  <DialogTrigger asChild>
-                    <Button className="gap-2">
-                      <Plus className="h-4 w-4" />
-                      Add User
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Create New User</DialogTitle>
-                  </DialogHeader>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Full Name *</Label>
-                      <Input
-                        placeholder="John Doe"
-                        value={formData.fullName || ""}
-                        onChange={(e) =>
-                          setFormData({ ...formData, fullName: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Email *</Label>
-                      <Input
-                        type="email"
-                        placeholder="john@nidotech.com"
-                        value={formData.email || ""}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Job Title</Label>
-                      <Input
-                        placeholder="Manager"
-                        value={formData.jobTitle || ""}
-                        onChange={(e) =>
-                          setFormData({ ...formData, jobTitle: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Phone</Label>
-                      <Input
-                        type="tel"
-                        inputMode="tel"
-                        placeholder="+91-XXXXXXXXXX"
-                        value={formData.phone || ""}
-                        onChange={(e) =>
-                          setFormData({ ...formData, phone: e.target.value })
-                        }
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Department</Label>
-                      <Select
-                        value={formData.department || "General"}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, department: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departments.map((d) => (
-                            <SelectItem key={d.id} value={d.name}>
-                              {d.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>User Type</Label>
-                      <Input value={"Internal User"} disabled />
-                    </div>
-
-                    <div className="col-span-2">
-                      <Label>Role Assignment *</Label>
-                      <Select
-                        value={formData.roleTemplate || "employee"}
-                        onValueChange={(v) =>
-                          setFormData({
-                            ...formData,
-                            roleTemplate: v as RoleTemplateKey,
-                          })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(ROLE_TEMPLATES).map(
-                            ([key, template]) => (
-                              <SelectItem key={key} value={key}>
-                                {template.name} - {template.description}
-                              </SelectItem>
-                            ),
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setShowCreateDialog(false);
-                          resetForm();
-                        }}
-                      >
-                        Cancel
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={handleSeedEnterpriseUsers}>
+                    Seed Enterprise Users
+                  </Button>
+                  <Dialog
+                    open={showCreateDialog}
+                    onOpenChange={setShowCreateDialog}
+                  >
+                    <DialogTrigger asChild>
+                      <Button className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Add User
                       </Button>
-                      <Button onClick={handleCreateUser}>Create User</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Create New User</DialogTitle>
+                      </DialogHeader>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Full Name *</Label>
+                          <Input
+                            placeholder="John Doe"
+                            value={formData.fullName || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                fullName: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Email *</Label>
+                          <Input
+                            type="email"
+                            placeholder="john@nidotech.com"
+                            value={formData.email || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                email: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Job Title</Label>
+                          <Input
+                            placeholder="Manager"
+                            value={formData.jobTitle || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                jobTitle: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Phone</Label>
+                          <Input
+                            type="tel"
+                            inputMode="tel"
+                            placeholder="+91-XXXXXXXXXX"
+                            value={formData.phone || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                phone: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Alternate Phone</Label>
+                          <Input
+                            type="tel"
+                            placeholder="Optional"
+                            value={formData.alternatePhone || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                alternatePhone: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Employee ID</Label>
+                          <Input
+                            placeholder="EMP-1001"
+                            value={formData.employeeId || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                employeeId: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Manager</Label>
+                          <Input
+                            placeholder="Reporting manager"
+                            value={formData.manager || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                manager: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Timezone</Label>
+                          <Input
+                            value={formData.timezone || "Asia/Kolkata"}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                timezone: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="col-span-2">
+                          <Label>Address</Label>
+                          <Input
+                            placeholder="Street address"
+                            value={formData.address || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                address: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>City</Label>
+                          <Input
+                            value={formData.city || ""}
+                            onChange={(e) =>
+                              setFormData({ ...formData, city: e.target.value })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>State</Label>
+                          <Input
+                            value={formData.state || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                state: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Country</Label>
+                          <Input
+                            value={formData.country || "India"}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                country: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Postal Code</Label>
+                          <Input
+                            value={formData.postalCode || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                postalCode: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Date of Birth</Label>
+                          <Input
+                            type="date"
+                            value={formData.dob || ""}
+                            onChange={(e) =>
+                              setFormData({ ...formData, dob: e.target.value })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Joining Date</Label>
+                          <Input
+                            type="date"
+                            value={formData.joiningDate || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                joiningDate: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Emergency Contact</Label>
+                          <Input
+                            value={formData.emergencyContact || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                emergencyContact: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Department</Label>
+                          <Select
+                            value={formData.department || "General"}
+                            onValueChange={(v) =>
+                              setFormData({ ...formData, department: v })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {departments.map((d) => (
+                                <SelectItem key={d.id} value={d.name}>
+                                  {d.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>User Type</Label>
+                          <Input value={"Internal User"} disabled />
+                        </div>
+
+                        <div className="col-span-2">
+                          <Label>Role Assignment *</Label>
+                          <Select
+                            value={formData.roleTemplate || "employee"}
+                            onValueChange={(v) =>
+                              setFormData({
+                                ...formData,
+                                roleTemplate: v as RoleTemplateKey,
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(ROLE_TEMPLATES).map(
+                                ([key, template]) => (
+                                  <SelectItem key={key} value={key}>
+                                    {template.name} - {template.description}
+                                  </SelectItem>
+                                ),
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label>Permission Group</Label>
+                          <Input
+                            value={formData.permissionGroup || "Default"}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                permissionGroup: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>System Access Level</Label>
+                          <Input
+                            value={formData.systemAccessLevel || "Standard"}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                systemAccessLevel: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Internal Role</Label>
+                          <Input
+                            value={formData.internalRole || "Employee"}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                internalRole: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Teams</Label>
+                          <Input
+                            value={formData.teams || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                teams: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Allowed Modules</Label>
+                          <Input
+                            value={formData.allowedModules || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                allowedModules: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <Label>Approval Authority</Label>
+                          <Input
+                            value={formData.approvalAuthority || "No"}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                approvalAuthority: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="col-span-2">
+                          <Label>Reporting Structure</Label>
+                          <Input
+                            value={formData.reportingStructure || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                reportingStructure: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="col-span-2">
+                          <Label>Notes</Label>
+                          <Input
+                            value={formData.notes || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                notes: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowCreateDialog(false);
+                            resetForm();
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button onClick={handleCreateUser}>Create User</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               )}
             </div>
 
@@ -539,6 +997,17 @@ export default function EnhancedUsersPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              navigate(
+                                `/configuration/nido-users/users/${user.id}/profile`,
+                              )
+                            }
+                          >
+                            Profile
+                          </Button>
                           <Dialog
                             open={
                               showPermissionDialog &&

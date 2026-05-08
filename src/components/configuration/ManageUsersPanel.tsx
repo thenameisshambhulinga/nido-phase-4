@@ -138,7 +138,25 @@ export default function ManageUsersPanel() {
     fullName: "",
     email: "",
     phone: "",
+    alternatePhone: "",
     jobTitle: "",
+    manager: "",
+    timezone: "Asia/Kolkata",
+    address: "",
+    city: "",
+    state: "",
+    country: "India",
+    postalCode: "",
+    dob: "",
+    joiningDate: "",
+    emergencyContact: "",
+    notes: "",
+    permissionGroup: "Default",
+    systemAccessLevel: "Standard",
+    internalRole: "Employee",
+    teams: "",
+    approvalAuthority: "No",
+    reportingStructure: "Department Head",
     organizationAccess: [] as string[],
     roleId: "",
     status: "Active" as "Active" | "Inactive" | "Suspended",
@@ -180,7 +198,25 @@ export default function ManageUsersPanel() {
       fullName: "",
       email: "",
       phone: "",
+      alternatePhone: "",
       jobTitle: "",
+      manager: "",
+      timezone: "Asia/Kolkata",
+      address: "",
+      city: "",
+      state: "",
+      country: "India",
+      postalCode: "",
+      dob: "",
+      joiningDate: "",
+      emergencyContact: "",
+      notes: "",
+      permissionGroup: "Default",
+      systemAccessLevel: "Standard",
+      internalRole: "Employee",
+      teams: "",
+      approvalAuthority: "No",
+      reportingStructure: "Department Head",
       organizationAccess: organizations.length ? [organizations[0].name] : [],
       roleId: "",
       status: "Active",
@@ -198,7 +234,25 @@ export default function ManageUsersPanel() {
       fullName: u.fullName,
       email: u.email,
       phone: u.phone,
+      alternatePhone: u.alternatePhone || "",
       jobTitle: u.jobTitle,
+      manager: u.manager || "",
+      timezone: u.timezone || "Asia/Kolkata",
+      address: u.address || "",
+      city: u.city || "",
+      state: u.state || "",
+      country: u.country || "India",
+      postalCode: u.postalCode || "",
+      dob: u.dob || "",
+      joiningDate: u.joiningDate || "",
+      emergencyContact: u.emergencyContact || "",
+      notes: u.notes || "",
+      permissionGroup: u.permissionGroup || "Default",
+      systemAccessLevel: u.systemAccessLevel || "Standard",
+      internalRole: u.internalRole || "Employee",
+      teams: u.teams || "",
+      approvalAuthority: u.approvalAuthority || "No",
+      reportingStructure: u.reportingStructure || "Department Head",
       organizationAccess: normalizeOrgAccess(u.organizationAccess),
       roleId: u.roleId,
       status: u.status,
@@ -260,8 +314,26 @@ export default function ManageUsersPanel() {
         email: form.email,
         fullName: form.fullName,
         phone: form.phone,
+        alternatePhone: form.alternatePhone,
         jobTitle: form.jobTitle,
-        department: "",
+        department: form.reportingStructure || "",
+        manager: form.manager,
+        timezone: form.timezone,
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        country: form.country,
+        postalCode: form.postalCode,
+        dob: form.dob,
+        joiningDate: form.joiningDate,
+        emergencyContact: form.emergencyContact,
+        notes: form.notes,
+        permissionGroup: form.permissionGroup,
+        systemAccessLevel: form.systemAccessLevel,
+        internalRole: form.internalRole,
+        teams: form.teams,
+        approvalAuthority: form.approvalAuthority,
+        reportingStructure: form.reportingStructure,
         roleId: form.roleId,
         organizationAccess: form.organizationAccess,
         userType: "Internal User",
@@ -509,164 +581,478 @@ export default function ManageUsersPanel() {
 
       {/* Add/Edit User Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingId ? "Edit User" : "Add User"}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm">User Type</Label>
-              <Input value="Internal User" readOnly />
+        <DialogContent className="p-0">
+          <div className="flex h-full flex-col">
+            <div className="border-b border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-900 px-6 py-5 text-white">
+              <DialogHeader className="space-y-1 text-left">
+                <DialogTitle className="text-2xl text-white">
+                  {editingId ? "Edit User Profile" : "Create New User"}
+                </DialogTitle>
+                <p className="text-sm text-white/70">
+                  Capture identity, access, location, and governance details in
+                  one page.
+                </p>
+              </DialogHeader>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm">Employee ID</Label>
-                <Input
-                  value={form.employeeId}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, employeeId: e.target.value }))
-                  }
-                  placeholder="EMP-0005"
-                />
-              </div>
-              <div>
-                <Label className="text-sm">Full Name</Label>
-                <Input
-                  value={form.fullName}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, fullName: e.target.value }))
-                  }
-                  placeholder="John Doe"
-                />
-              </div>
-              <div>
-                <Label className="text-sm">Email</Label>
-                <Input
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, email: e.target.value }))
-                  }
-                  placeholder="john@company.com"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm">Phone</Label>
-                <Input
-                  value={form.phone}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, phone: e.target.value }))
-                  }
-                  placeholder="+1 234 567 8900"
-                />
-              </div>
-              <div>
-                <Label className="text-sm">Organization Access</Label>
-                <div className="rounded-md border border-input p-3 space-y-2 max-h-28 overflow-y-auto">
-                  {availableOrganizations.map((orgName) => {
-                    const checked = form.organizationAccess.includes(orgName);
-                    return (
-                      <div key={orgName} className="flex items-center gap-2">
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(v) => {
-                            setForm((prev) => ({
-                              ...prev,
-                              organizationAccess: v
-                                ? [...prev.organizationAccess, orgName]
-                                : prev.organizationAccess.filter(
-                                    (name) => name !== orgName,
-                                  ),
-                            }));
-                          }}
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Identity
+                    </h3>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Employee ID</Label>
+                        <Input
+                          value={form.employeeId}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              employeeId: e.target.value,
+                            }))
+                          }
+                          placeholder="EMP-0005"
                         />
-                        <span className="text-sm">{orgName}</span>
                       </div>
-                    );
-                  })}
+                      <div className="space-y-2">
+                        <Label>Full Name</Label>
+                        <Input
+                          value={form.fullName}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, fullName: e.target.value }))
+                          }
+                          placeholder="John Doe"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Email</Label>
+                        <Input
+                          value={form.email}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, email: e.target.value }))
+                          }
+                          placeholder="john@company.com"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Phone</Label>
+                        <Input
+                          value={form.phone}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, phone: e.target.value }))
+                          }
+                          placeholder="+1 234 567 8900"
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Alternate Phone</Label>
+                        <Input
+                          value={form.alternatePhone}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              alternatePhone: e.target.value,
+                            }))
+                          }
+                          placeholder="Optional backup number"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Access & Role
+                    </h3>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>User Type</Label>
+                        <Input value="Internal User" readOnly />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Job Title</Label>
+                        <Input
+                          value={form.jobTitle}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, jobTitle: e.target.value }))
+                          }
+                          placeholder="e.g., Procurement Manager"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Role</Label>
+                        <Select
+                          value={form.roleId}
+                          onValueChange={(v) =>
+                            setForm((p) => ({ ...p, roleId: v }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {userRoles.map((r) => (
+                              <SelectItem key={r.id} value={r.id}>
+                                {r.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select
+                          value={form.status}
+                          onValueChange={(v) =>
+                            setForm((p) => ({ ...p, status: v as any }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="Inactive">Inactive</SelectItem>
+                            <SelectItem value="Suspended">Suspended</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Organization Access</Label>
+                        <div className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3">
+                          {availableOrganizations.map((orgName) => {
+                            const checked =
+                              form.organizationAccess.includes(orgName);
+                            return (
+                              <label
+                                key={orgName}
+                                className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(v) => {
+                                    setForm((prev) => ({
+                                      ...prev,
+                                      organizationAccess: v
+                                        ? [...prev.organizationAccess, orgName]
+                                        : prev.organizationAccess.filter(
+                                            (name) => name !== orgName,
+                                          ),
+                                    }));
+                                  }}
+                                />
+                                <span className="text-sm">{orgName}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <Input
+                            value={orgAccessInput}
+                            placeholder="Add organization name"
+                            onChange={(e) => setOrgAccessInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addOrganizationAccess(orgAccessInput);
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                              addOrganizationAccess(orgAccessInput)
+                            }
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Profile Details
+                    </h3>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Manager</Label>
+                        <Input
+                          value={form.manager}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, manager: e.target.value }))
+                          }
+                          placeholder="Reporting manager"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Timezone</Label>
+                        <Input
+                          value={form.timezone}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, timezone: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Date of Birth</Label>
+                        <Input
+                          type="date"
+                          value={form.dob}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, dob: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Joining Date</Label>
+                        <Input
+                          type="date"
+                          value={form.joiningDate}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              joiningDate: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Emergency Contact</Label>
+                        <Input
+                          value={form.emergencyContact}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              emergencyContact: e.target.value,
+                            }))
+                          }
+                          placeholder="Emergency contact number"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Internal Role</Label>
+                        <Input
+                          value={form.internalRole}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              internalRole: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Teams</Label>
+                        <Input
+                          value={form.teams}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, teams: e.target.value }))
+                          }
+                          placeholder="Operations, Finance, Procurement"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Location & Governance
+                    </h3>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Address</Label>
+                        <Input
+                          value={form.address}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, address: e.target.value }))
+                          }
+                          placeholder="Street address"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>City</Label>
+                        <Input
+                          value={form.city}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, city: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>State</Label>
+                        <Input
+                          value={form.state}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, state: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Country</Label>
+                        <Input
+                          value={form.country}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, country: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Postal Code</Label>
+                        <Input
+                          value={form.postalCode}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              postalCode: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Permission Group</Label>
+                        <Input
+                          value={form.permissionGroup}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              permissionGroup: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>System Access Level</Label>
+                        <Input
+                          value={form.systemAccessLevel}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              systemAccessLevel: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Reporting Structure</Label>
+                        <Input
+                          value={form.reportingStructure}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              reportingStructure: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Approval Authority</Label>
+                        <Input
+                          value={form.approvalAuthority}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              approvalAuthority: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="md:col-span-2 space-y-2">
+                        <Label>Notes</Label>
+                        <textarea
+                          value={form.notes}
+                          onChange={(e) =>
+                            setForm((p) => ({ ...p, notes: e.target.value }))
+                          }
+                          rows={4}
+                          className="min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          placeholder="Internal notes, onboarding checklist, or special access instructions"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-2 flex gap-2">
-                  <Input
-                    value={orgAccessInput}
-                    placeholder="Add organization name"
-                    onChange={(e) => setOrgAccessInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addOrganizationAccess(orgAccessInput);
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => addOrganizationAccess(orgAccessInput)}
-                  >
-                    Add
-                  </Button>
+
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-950 p-5 text-white shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.24em] text-white/60">
+                          Profile Preview
+                        </p>
+                        <h3 className="mt-2 text-xl font-semibold">
+                          {form.fullName || "New User"}
+                        </h3>
+                        <p className="text-sm text-white/70">
+                          {form.jobTitle || "Job title appears here"}
+                        </p>
+                      </div>
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 text-2xl font-semibold">
+                        {(form.fullName || "U")
+                          .split(" ")
+                          .filter(Boolean)
+                          .map((part) => part[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </div>
+                    </div>
+                    <div className="mt-5 grid gap-3 text-sm text-white/80">
+                      <div className="rounded-xl bg-white/5 px-4 py-3">
+                        <span className="block text-[10px] uppercase tracking-[0.18em] text-white/50">
+                          Organization Access
+                        </span>
+                        <span>
+                          {form.organizationAccess.join(", ") ||
+                            "No organizations selected"}
+                        </span>
+                      </div>
+                      <div className="rounded-xl bg-white/5 px-4 py-3">
+                        <span className="block text-[10px] uppercase tracking-[0.18em] text-white/50">
+                          Role
+                        </span>
+                        <span>
+                          {getRoleName(form.roleId) || "Select a role"}
+                        </span>
+                      </div>
+                      <div className="rounded-xl bg-white/5 px-4 py-3">
+                        <span className="block text-[10px] uppercase tracking-[0.18em] text-white/50">
+                          Status
+                        </span>
+                        <span>{form.status}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Organization Shortcuts
+                    </h3>
+                    <div className="mt-4 space-y-2 text-sm text-slate-600">
+                      <p>Use the check list to grant access.</p>
+                      <p>
+                        Use the inline add field to register a new organization.
+                      </p>
+                      <p>All fields are preserved with the user record.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            <div>
-              <Label className="text-sm">Job Title</Label>
-              <Input
-                value={form.jobTitle}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, jobTitle: e.target.value }))
-                }
-                placeholder="e.g., Procurement Manager"
-              />
-            </div>
-            <div>
-              <Label className="text-sm">Role</Label>
-              <Select
-                value={form.roleId}
-                onValueChange={(v) => setForm((p) => ({ ...p, roleId: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {userRoles.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-sm">Status</Label>
-              <Select
-                value={form.status}
-                onValueChange={(v) =>
-                  setForm((p) => ({ ...p, status: v as any }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
-                  <SelectItem value="Suspended">Suspended</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              User will be able to log in with this email (any password accepted
-              in demo mode).
-            </p>
+
+            <DialogFooter className="border-t border-slate-200 px-6 py-4">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave}>
+                {editingId ? "Update User" : "Add User"}
+              </Button>
+            </DialogFooter>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave}>
-              {editingId ? "Update User" : "Add User"}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

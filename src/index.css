@@ -1,9 +1,30 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    /* Design System - strict tokens (hex values where appropriate) */
+    --ds-primary: #2563eb;
+    --ds-primary-hover: #1d4ed8;
+    --ds-primary-light: #dbeafe;
+    --background-hex: #f8fafc;
+    --card-hex: #ffffff;
+    --border-hex: #e5e7eb;
+    --divider-hex: #f1f5f9;
+    --text-primary-hex: #111827;
+    --text-secondary-hex: #6b7280;
+    --text-muted-hex: #9ca3af;
+    --success-hex: #16a34a;
+    --success-light-hex: #dcfce7;
+    --warning-hex: #f59e0b;
+    --warning-light-hex: #fef3c7;
+    --error-hex: #dc2626;
+    --error-light-hex: #fee2e2;
+
+    /* Preserve existing HSL tokens for compatibility */
     --background: 210 20% 98%;
     --foreground: 215 25% 15%;
     --card: 0 0% 100%;
@@ -132,8 +153,41 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans;
-    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    @apply bg-background text-foreground;
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text-primary-hex);
+  }
+
+  h1 {
+    font-family: "Poppins", "Inter", system-ui, sans-serif;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    line-height: 1.25;
+  }
+
+  h2 {
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1.25;
+  }
+
+  h3 {
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  p,
+  .text,
+  input,
+  textarea,
+  select,
+  button {
+    font-family: "Inter", system-ui, sans-serif;
   }
 }
 

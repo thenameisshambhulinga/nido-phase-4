@@ -1389,65 +1389,72 @@ export default function SupportPage() {
                     return (
                       <button
                         key={ticket.id}
-                        className="grid w-full grid-cols-[24px_160px_minmax(0,1.4fr)_160px_150px_110px_120px_150px_140px] items-center gap-4 rounded-2xl border border-slate-100 px-4 py-4 text-left transition hover:border-primary/30 hover:bg-slate-50"
+                        className="grid w-full min-w-0 overflow-hidden grid-cols-[24px_120px_minmax(0,1fr)_120px_120px_110px_120px_120px_140px] items-center gap-4 rounded-2xl border border-slate-100 px-4 py-4 text-left transition hover:border-primary/30 hover:bg-slate-50"
                         onClick={() => openTicket(ticket.id)}
                       >
                         <Checkbox checked={false} />
-                        <div>
-                          <p className="font-semibold">{ticket.id}</p>
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">{ticket.id}</p>
                           <Badge
                             className={cn(
-                              "mt-2 rounded-full",
+                              "mt-2 rounded-full truncate",
                               getTicketTypeBadge(ticket),
                             )}
                           >
                             {ticket.ticketType}
                           </Badge>
                         </div>
-                        <div>
-                          <p className="font-medium text-slate-900">
+                        <div className="min-w-0 overflow-hidden">
+                          <p className="font-medium text-slate-900 truncate">
                             {ticket.subject}
                           </p>
-                          <p className="mt-1 text-sm text-muted-foreground">
+                          <p className="mt-1 text-sm text-muted-foreground truncate">
                             {ticket.organization}
                           </p>
                         </div>
-                        <div>
-                          <Badge className="rounded-full bg-violet-50 text-violet-700">
+                        <div className="min-w-0">
+                          <Badge className="rounded-full bg-violet-50 text-violet-700 truncate">
                             {ticket.category}
                           </Badge>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p
                             className={cn(
-                              "font-medium",
+                              "font-medium truncate",
                               priorityTone[ticket.priority],
                             )}
                           >
                             {ticket.priority}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground truncate">
                             {ticket.assignedTeam}
                           </p>
                         </div>
                         <Badge
                           className={cn(
-                            "rounded-full",
+                            "rounded-full truncate",
                             statusTone[ticket.status],
                           )}
                         >
                           {ticket.status}
                         </Badge>
-                        <div>
-                          <p className="font-medium">{ticket.assignee}</p>
-                          <p className="text-xs text-muted-foreground">
+                        <div className="min-w-0 overflow-hidden">
+                          <p className="font-medium truncate">
+                            {ticket.assignee}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
                             {ticket.requestType}
                           </p>
                         </div>
-                        <div className={cn("font-semibold", slaTone[health])}>
+                        <div
+                          className={cn(
+                            "font-semibold truncate text-right",
+                            slaTone[health],
+                          )}
+                        >
                           {formatTimeLeft(ticket.dueDate)}
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-sm text-muted-foreground truncate">
                           {formatDateTime(ticket.createdAt)}
                         </div>
                       </button>

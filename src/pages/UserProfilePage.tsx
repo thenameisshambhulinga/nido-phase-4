@@ -29,6 +29,7 @@ import {
   BriefcaseBusiness,
   Building2,
   Calendar,
+  Clock3,
   IdCard,
   Laptop,
   Mail,

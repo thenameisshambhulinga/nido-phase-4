@@ -1,0 +1,30 @@
+# TODO - Step A2: Rebuild AMC Category section exactly like reference
+
+- [ ] A2.1: Implement required section ordering inside AMC Form (from radio selections onward):
+  - [ ] radio selections
+  - [ ] asset details table (responsive)
+  - [ ] services included tabs
+  - [ ] specification rows
+  - [ ] SLA section
+  - [ ] maintenance scope section
+  - [ ] commercial details
+  - [ ] payment terms
+  - [ ] exclusions
+  - [ ] special terms
+  - [ ] attachments
+  - [ ] authorization area
+- [ ] A2.2: Ensure enterprise UX:
+  - [ ] floating validation
+  - [ ] inline error handling
+  - [ ] meaningful placeholders
+  - [ ] autosave draft where appropriate
+- [ ] A2.3: Ensure Tabs work properly and state persists.
+- [ ] A2.4: Ensure company selection auto-fetch fills:
+  - [ ] GST
+  - [ ] address
+  - [ ] contact person
+  - [ ] designation
+  - [ ] email
+  - [ ] mobile number
+- [ ] A2.5: Ensure email/mobile/GST validation blocks submit.
+- [ ] A2.6: Run build + lint + targeted runtime check.
