@@ -136,11 +136,7 @@ export default function LoginPage() {
   };
 
   return (
-<<<<<<< HEAD
-    <div className="min-h-full flex bg-background">
-=======
     <div className="min-h-screen flex bg-background">
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       {/* Left panel — branding & workflow showcase */}
       <div className="hidden lg:flex lg:w-[55%] relative overflow-hidden bg-sidebar text-sidebar-foreground flex-col justify-between p-10">
         {/* Decorative shapes */}

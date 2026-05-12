@@ -32,10 +32,7 @@ import { cn } from "@/lib/utils";
 import {
   buildProductGallery,
   getProductEmoji,
-<<<<<<< HEAD
   getProductImage,
-=======
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   resolveProductImage,
 } from "@/lib/catalogMedia";
 
@@ -155,7 +152,6 @@ export default function ProductDetailPage() {
       id: product.id || product.masterProductId || product.productCode,
       name: product.name,
       category: product.category,
-<<<<<<< HEAD
       subCategory: product.subCategory,
       brand: product.brand || "Nido",
       sku: product.productCode,
@@ -185,19 +181,6 @@ export default function ProductDetailPage() {
               }
             ).minOrderQuantity,
         ) || 1,
-=======
-      price: Number(product.price || 0),
-      emoji: productEmoji,
-      image:
-        selectedImage?.src ||
-        resolveProductImage({
-          name: product.name,
-          category: product.category,
-          brand: product.brand,
-          image: product.image,
-          emoji: productEmoji,
-        }),
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
     });
     toast.success(`${product.name} added to cart`);
   };

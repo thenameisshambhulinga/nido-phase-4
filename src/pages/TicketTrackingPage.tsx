@@ -250,11 +250,7 @@ export default function TicketTrackingPage() {
 
   if (!ticket) {
     return (
-<<<<<<< HEAD
       <div className="min-h-full bg-background flex items-center justify-center p-6">
-=======
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
         <Card className="max-w-md w-full">
           <CardContent className="p-10 text-center space-y-4">
             <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto" />
@@ -275,11 +271,7 @@ export default function TicketTrackingPage() {
   const SIcon = Sc.icon;
 
   return (
-<<<<<<< HEAD
     <div className="min-h-full bg-background">
-=======
-    <div className="min-h-screen bg-background">
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       <div className="bg-primary/5 border-b border-border px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
           <Building2 className="h-6 w-6 text-primary" />

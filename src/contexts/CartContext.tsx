@@ -16,7 +16,6 @@ export interface CartItem {
   image?: string;
   quantity: number;
   stock?: number;
-<<<<<<< HEAD
   minOrder?: number;
 
   // Parity with Shop product cards
@@ -27,34 +26,19 @@ export interface CartItem {
   warranty?: string;
   leadTime?: string;
   status?: "In Stock" | "Out of Stock";
-=======
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 }
 
 interface CartContextType {
   items: CartItem[];
-  addToCart: (product: {
-    id: string;
-    name: string;
-    category: string;
-    price: number;
-    emoji: string;
-    image?: string;
-    stock?: number;
-<<<<<<< HEAD
-    minOrder?: number;
-
-    // Parity fields (optional)
-    sku?: string;
-    subCategory?: string;
-    brand?: string;
-    description?: string;
-    warranty?: string;
-    leadTime?: string;
-    status?: "In Stock" | "Out of Stock";
-=======
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
-  }) => void;
+  addToCart: (
+    product: Partial<CartItem> & {
+      id: string;
+      name: string;
+      price: number;
+      category: string;
+      emoji: string;
+    },
+  ) => void;
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -72,44 +56,34 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   useEffect(() => {
-    localStorage.setItem("nido_cart", JSON.stringify(items));
+    try {
+      localStorage.setItem("nido_cart", JSON.stringify(items));
+    } catch {
+      // ignore
+    }
   }, [items]);
 
   const addToCart = useCallback(
-    (product: {
-      id: string;
-      name: string;
-      category: string;
-      price: number;
-      emoji: string;
-      image?: string;
-      stock?: number;
-<<<<<<< HEAD
-      minOrder?: number;
-
-      sku?: string;
-      subCategory?: string;
-      brand?: string;
-      description?: string;
-      warranty?: string;
-      leadTime?: string;
-      status?: "In Stock" | "Out of Stock";
-=======
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
-    }) => {
+    (
+      product: Partial<CartItem> & {
+        id: string;
+        name: string;
+        price: number;
+        category: string;
+        emoji: string;
+      },
+    ) => {
       setItems((prev) => {
         const existing = prev.find((i) => i.id === product.id);
-        if (existing)
+        if (existing) {
           return prev.map((i) =>
-<<<<<<< HEAD
             i.id === product.id
               ? { ...i, ...product, quantity: i.quantity + 1 }
               : i,
-=======
-            i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i,
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
           );
-        return [...prev, { ...product, quantity: 1 }];
+        }
+
+        return [...prev, { ...(product as CartItem), quantity: 1 }];
       });
     },
     [],
@@ -157,3 +131,5 @@ export const useCart = () => {
   if (!ctx) throw new Error("useCart must be used within CartProvider");
   return ctx;
 };
+
+export default CartContext;

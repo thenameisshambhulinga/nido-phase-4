@@ -158,11 +158,7 @@ export default function MainDashboard() {
   };
 
   return (
-<<<<<<< HEAD
-    <div className="min-h-full bg-slate-50">
-=======
     <div className="min-h-screen bg-slate-50">
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       <Header title="Product Dashboard" />
       <div className="space-y-6 p-6 animate-fade-in">
         <section className="relative overflow-hidden rounded-3xl border border-sky-200/70 bg-gradient-to-br from-slate-100 via-blue-50 to-cyan-100 p-6 md:p-8">
@@ -466,7 +462,10 @@ export default function MainDashboard() {
                     tickFormatter={(v) => `$${v / 1000}K`}
                   />
                   <Tooltip
-                    formatter={(v: number) => [`$${v.toLocaleString()}`, "Spend"]}
+                    formatter={(v: number) => [
+                      `$${v.toLocaleString()}`,
+                      "Spend",
+                    ]}
                   />
                   <Bar
                     dataKey="spend"

@@ -276,7 +276,6 @@ export default function CategoriesPage() {
       id: product.id,
       name: product.name,
       category: product.category,
-<<<<<<< HEAD
       sku: product.sku,
       description: product.description,
       warranty: product.warranty,
@@ -286,21 +285,12 @@ export default function CategoriesPage() {
       emoji: product.emoji,
       image: product.image,
       stock: product.stock,
-=======
-      price: product.price,
-      emoji: product.emoji,
-      image: product.image,
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
     });
     toast.success(`${product.name} added to cart`);
   };
 
   return (
-<<<<<<< HEAD
     <div className="relative min-h-full bg-slate-50 p-6 md:p-8">
-=======
-    <div className="relative min-h-screen bg-slate-50 p-6 md:p-8">
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       <div className="mx-auto max-w-7xl space-y-6">
         <section className="relative overflow-hidden rounded-[32px] border border-sky-200 bg-[linear-gradient(135deg,#eff6ff_0%,#f8fafc_48%,#ecfeff_100%)] p-6 shadow-[0_24px_80px_-50px_rgba(15,23,42,0.45)] md:p-8">
           <div className="pointer-events-none absolute -right-20 -top-16 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl" />
@@ -416,11 +406,7 @@ export default function CategoriesPage() {
         </div>
 
         {isCoreDataLoading ? (
-<<<<<<< HEAD
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-=======
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
             {Array.from({ length: 8 }).map((_, index) => (
               <Card
                 key={index}

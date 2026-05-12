@@ -6,7 +6,6 @@ type MediaSource = {
   emoji?: string;
 };
 
-<<<<<<< HEAD
 const categoryImages: Record<string, string> = {
   "Cloud Servers":
     "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?q=80&w=1200&auto=format&fit=crop",
@@ -51,8 +50,6 @@ export function getProductImage(product: {
   );
 }
 
-=======
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 const fallbackGradients = [
   ["#0f172a", "#1d4ed8"],
   ["#111827", "#0891b2"],
@@ -145,14 +142,10 @@ export function buildProductFallbackImage(
 
 export function resolveProductImage(source: MediaSource, variantIndex = 0) {
   return (
-<<<<<<< HEAD
     getProductImage({
       category: source.category,
       image: source.image?.trim(),
     }) || buildProductFallbackImage(source, variantIndex)
-=======
-    source.image?.trim() || buildProductFallbackImage(source, variantIndex)
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   );
 }
 

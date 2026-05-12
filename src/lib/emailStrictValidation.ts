@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-=======
-import {
-  normalizeEmail as normalizeEmailExisting,
-  isValidEmail as isValidEmailRegexOnly,
-} from "@/lib/validation";
-
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 // Strict, centralized email validation.
 // Guarantees:
 // - invalid emails are rejected before any mail delivery
@@ -20,11 +12,7 @@ const LOCAL_PART_DOMAIN_LIKE =
   /\.(com|org|net|io|co|in|gov|edu|ac|ai|ml|tk|ga|cf|gq|xyz|top|link)$/i;
 
 export function normalizeEmail(value: string): string {
-<<<<<<< HEAD
   return String(value || "").trim().toLowerCase();
-=======
-  return normalizeEmailExisting(value);
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 }
 
 export function isValidEmailStrict(value: string): boolean {
@@ -37,13 +25,6 @@ export function isValidEmailStrict(value: string): boolean {
   const localPart = normalized.split("@")[0] || "";
   if (LOCAL_PART_DOMAIN_LIKE.test(localPart)) return false;
 
-<<<<<<< HEAD
-=======
-  // Compatibility: preserve current behavior even if regex differs.
-  // If current isValidEmailRegexOnly rejects a value, reject it too.
-  if (!isValidEmailRegexOnly(normalized)) return false;
-
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   return true;
 }
 

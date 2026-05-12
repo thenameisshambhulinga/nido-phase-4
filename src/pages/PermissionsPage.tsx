@@ -14,15 +14,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-<<<<<<< HEAD
-=======
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MODULES } from "@/types";
@@ -61,11 +58,7 @@ export default function PermissionsPage() {
   const { roles, addRole, updateRole, deleteRole } = useData();
 
   const [search, setSearch] = useState("");
-<<<<<<< HEAD
-  const [editorOpen, setEditorOpen] = useState(false);
-=======
   const [open, setOpen] = useState(false);
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   const [editing, setEditing] = useState<Role | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Role | null>(null);
 
@@ -98,11 +91,7 @@ export default function PermissionsPage() {
 
   const openCreate = () => {
     resetForm();
-<<<<<<< HEAD
-    setEditorOpen(true);
-=======
     setOpen(true);
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   };
 
   const openEdit = (role: Role) => {
@@ -111,11 +100,7 @@ export default function PermissionsPage() {
     setDescription(role.description || "");
     setStatus(role.status);
     setPermissions({ ...makeDefaultPermissions(), ...role.permissions });
-<<<<<<< HEAD
-    setEditorOpen(true);
-=======
     setOpen(true);
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   };
 
   const togglePermission = (module: string, key: PermissionKey) => {
@@ -151,12 +136,7 @@ export default function PermissionsPage() {
       addRole(payload);
       toast({ title: "Role created" });
     }
-
-<<<<<<< HEAD
-    setEditorOpen(false);
-=======
     setOpen(false);
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
     resetForm();
   };
 
@@ -180,119 +160,6 @@ export default function PermissionsPage() {
           </Button>
         </div>
 
-<<<<<<< HEAD
-        {editorOpen && (
-          <Card>
-            <CardContent className="space-y-4 pt-6">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">
-                  {editing ? "Edit Nido Role" : "Create Nido Role"}
-                </h2>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setEditorOpen(false);
-                    resetForm();
-                  }}
-                >
-                  Close
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label>Role Name</Label>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Role Type</Label>
-                  <Input value="internal" disabled />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label>Description</Label>
-                <Textarea
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <div className="flex gap-4">
-                  <Button
-                    type="button"
-                    variant={status === "active" ? "default" : "outline"}
-                    onClick={() => setStatus("active")}
-                  >
-                    Active
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={status === "inactive" ? "default" : "outline"}
-                    onClick={() => setStatus("inactive")}
-                  >
-                    Inactive
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Assign Permissions</Label>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Module</TableHead>
-                      {permissionKeys.map((key) => (
-                        <TableHead key={key} className="text-center capitalize">
-                          {key}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {MODULES.map((module) => (
-                      <TableRow key={module}>
-                        <TableCell>{module}</TableCell>
-                        {permissionKeys.map((key) => (
-                          <TableCell key={key} className="text-center">
-                            <Checkbox
-                              checked={!!permissions[module]?.[key]}
-                              onCheckedChange={() =>
-                                togglePermission(module, key)
-                              }
-                            />
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setEditorOpen(false);
-                    resetForm();
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={saveRole}>Save Role</Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-=======
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
         <Card>
           <CardContent className="pt-4">
             <Table>
@@ -350,8 +217,6 @@ export default function PermissionsPage() {
         </Card>
       </div>
 
-<<<<<<< HEAD
-=======
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -449,8 +314,6 @@ export default function PermissionsPage() {
           </div>
         </DialogContent>
       </Dialog>
-
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       <ConfirmationDialog
         open={!!deleteTarget}
         title="Delete Role"
