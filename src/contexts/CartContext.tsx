@@ -16,6 +16,7 @@ export interface CartItem {
   image?: string;
   quantity: number;
   stock?: number;
+<<<<<<< HEAD
   minOrder?: number;
 
   // Parity with Shop product cards
@@ -26,6 +27,8 @@ export interface CartItem {
   warranty?: string;
   leadTime?: string;
   status?: "In Stock" | "Out of Stock";
+=======
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 }
 
 interface CartContextType {
@@ -38,6 +41,7 @@ interface CartContextType {
     emoji: string;
     image?: string;
     stock?: number;
+<<<<<<< HEAD
     minOrder?: number;
 
     // Parity fields (optional)
@@ -48,6 +52,8 @@ interface CartContextType {
     warranty?: string;
     leadTime?: string;
     status?: "In Stock" | "Out of Stock";
+=======
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   }) => void;
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
@@ -78,6 +84,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
       emoji: string;
       image?: string;
       stock?: number;
+<<<<<<< HEAD
       minOrder?: number;
 
       sku?: string;
@@ -87,14 +94,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
       warranty?: string;
       leadTime?: string;
       status?: "In Stock" | "Out of Stock";
+=======
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
     }) => {
       setItems((prev) => {
         const existing = prev.find((i) => i.id === product.id);
         if (existing)
           return prev.map((i) =>
+<<<<<<< HEAD
             i.id === product.id
               ? { ...i, ...product, quantity: i.quantity + 1 }
               : i,
+=======
+            i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i,
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
           );
         return [...prev, { ...product, quantity: 1 }];
       });

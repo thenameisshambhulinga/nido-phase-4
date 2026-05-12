@@ -198,7 +198,11 @@ export default function SLAOverview() {
   ];
 
   return (
+<<<<<<< HEAD
     <div className="min-h-full bg-slate-50">
+=======
+    <div className="min-h-screen bg-slate-50">
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       <Header title="SLA Overview" />
       <div className="space-y-6 p-6 animate-fade-in">
         <section className="relative overflow-hidden rounded-3xl border border-amber-200/70 bg-gradient-to-br from-slate-100 via-amber-50 to-blue-100 p-6 md:p-8">

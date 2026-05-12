@@ -69,7 +69,11 @@ export default function HomePage() {
   const quickResults = searchAll(debouncedHomeSearch).slice(0, 6);
 
   return (
+<<<<<<< HEAD
     <div className="min-h-full bg-gradient-to-br from-background to-secondary/20">
+=======
+    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20">
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       <section className="relative py-20 px-4 text-center">
         <AnimatedSection>
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-black bg-gradient-to-r from-primary via-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight mb-6">

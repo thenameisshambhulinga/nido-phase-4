@@ -47,7 +47,11 @@ interface NavChildItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", icon: LayoutDashboard, module: "dashboard", path: "/home" },
+<<<<<<< HEAD
   { label: "Shop", icon: Tags, module: "shop", path: "/shop" },
+=======
+  { label: "Shop", icon: Tags, module: "shop", path: "/categories" },
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   {
     label: "Product Dashboard",
     icon: BarChart3,

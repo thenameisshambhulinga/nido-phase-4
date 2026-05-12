@@ -5,6 +5,7 @@ const getAPIBase = (): string => {
   if (import.meta.env.VITE_API_BASE_URL)
     return import.meta.env.VITE_API_BASE_URL.replace(/\/+$/, "");
 
+<<<<<<< HEAD
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
     const protocol = window.location.protocol || "http:";
@@ -13,6 +14,8 @@ const getAPIBase = (): string => {
     }
   }
 
+=======
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   return "http://localhost:5000";
 };
 

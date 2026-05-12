@@ -31,7 +31,11 @@ export default class AppErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
+<<<<<<< HEAD
         <div className="min-h-full flex items-center justify-center p-6 bg-background text-foreground">
+=======
+        <div className="min-h-screen flex items-center justify-center p-6 bg-background text-foreground">
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
           <div className="max-w-md w-full rounded-lg border border-border bg-card p-6 shadow-sm">
             <h1 className="text-lg font-semibold">Something went wrong</h1>
             <p className="mt-2 text-sm text-muted-foreground">

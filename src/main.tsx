@@ -15,7 +15,11 @@ window.onerror = (message, source, lineno, colno, error) => {
 };
 
 window.onunhandledrejection = (event) => {
+<<<<<<< HEAD
   console.error("Unhandled promise rejection", event.reason); 
+=======
+  console.error("Unhandled promise rejection", event.reason);
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 };
 
 const rootElement = document.getElementById("root");

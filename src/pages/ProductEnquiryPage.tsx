@@ -53,6 +53,7 @@ function TypingIndicator() {
         <UserCircle2 className="h-4 w-4" />
       </div>
       <div className="flex items-center gap-1 rounded-[22px] bg-slate-100 px-4 py-3">
+<<<<<<< HEAD
         <span
           className="h-2 w-2 animate-bounce rounded-full bg-slate-400"
           style={{ animationDelay: "0ms" }}
@@ -65,6 +66,11 @@ function TypingIndicator() {
           className="h-2 w-2 animate-bounce rounded-full bg-slate-400"
           style={{ animationDelay: "300ms" }}
         />
+=======
+        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: "0ms" }} />
+        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: "150ms" }} />
+        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: "300ms" }} />
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       </div>
     </div>
   );
@@ -72,6 +78,7 @@ function TypingIndicator() {
 
 function MessageBubble({ message }: { message: EnquiryMessage }) {
   const time = new Date(message.timestamp);
+<<<<<<< HEAD
   const formattedTime = time.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -80,12 +87,20 @@ function MessageBubble({ message }: { message: EnquiryMessage }) {
     day: "numeric",
     month: "short",
   });
+=======
+  const formattedTime = time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const formattedDate = time.toLocaleDateString([], { day: "numeric", month: "short" });
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 
   return (
     <div
       className={cn(
         "flex gap-3",
+<<<<<<< HEAD
         message.sender === "buyer" && "justify-end",
+=======
+        (message.sender === "buyer") && "justify-end",
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
         message.sender === "system" && "justify-center",
       )}
     >
@@ -115,9 +130,13 @@ function MessageBubble({ message }: { message: EnquiryMessage }) {
               <span className="font-semibold uppercase tracking-[0.14em]">
                 {message.sender}
               </span>
+<<<<<<< HEAD
               <span>
                 {formattedDate} · {formattedTime}
               </span>
+=======
+              <span>{formattedDate} · {formattedTime}</span>
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
             </div>
             {message.attachment && (
               <div className="mb-2 flex items-center gap-2 rounded-xl border border-current/20 bg-white/20 p-2">
@@ -182,6 +201,7 @@ export default function ProductEnquiryPage() {
   const keySpecs = useMemo(() => {
     if (!product) return [];
     return [
+<<<<<<< HEAD
       {
         label: "Function",
         value: product.productType || product.category,
@@ -232,6 +252,27 @@ export default function ProductEnquiryPage() {
       ].filter(([, v]) => v),
     [product],
   );
+=======
+      { label: "Function", value: product.productType || product.category, icon: PackageCheck },
+      { label: "Connectivity", value: product.connectivity || "Standard", icon: ShieldCheck },
+      { label: "Warranty", value: product.warranty || "Standard warranty", icon: ShieldCheck },
+      { label: "Lead Time", value: product.leadTime || "5-7 Days", icon: Truck },
+      { label: "Print Speed", value: product.printSpeed || "Refer spec sheet", icon: Star },
+      { label: "Paper Size", value: product.paperSize || "A4 / Standard", icon: PackageCheck },
+    ].filter(spec => spec.value && spec.value !== "undefined");
+  }, [product]);
+
+  const specRows = useMemo(() => [
+    ["Product Code", product?.productCode],
+    ["Brand", product?.brand || "Nido"],
+    ["Category", product?.category],
+    ["Sub Category", product?.subCategory || "General"],
+    ["Warranty", product?.warranty || "Standard warranty"],
+    ["Lead Time", product?.leadTime || "5-7 Days"],
+    ["Primary Vendor", product?.primaryVendor || "Preferred vendor network"],
+    ["HSN/SAC", product?.hsnCode || "Not specified"],
+  ].filter(([, v]) => v), [product]);
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 
   useEffect(() => {
     if (!productId) return;
@@ -295,6 +336,7 @@ export default function ProductEnquiryPage() {
     const now = new Date().toLocaleString();
     const newMessages: EnquiryMessage[] = [
       ...messages,
+<<<<<<< HEAD
       ...(draft.trim()
         ? [
             {
@@ -307,16 +349,31 @@ export default function ProductEnquiryPage() {
             },
           ]
         : []),
+=======
+      ...(draft.trim() ? [{
+        id: crypto.randomUUID(),
+        sender: "buyer" as const,
+        text: draft.trim(),
+        timestamp: now,
+        attachment: attachedFile ? attachedFile.name : undefined,
+        read: false,
+      }] : []),
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
     ];
     setMessages(newMessages);
     setDraft("");
     setAttachedFile(null);
     setAttachmentName("");
+<<<<<<< HEAD
     setUnreadCount((prev) => prev + 1);
+=======
+    setUnreadCount(prev => prev + 1);
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 
     toast.success("Message sent");
 
     setIsTyping(true);
+<<<<<<< HEAD
     setTimeout(
       () => {
         setIsTyping(false);
@@ -383,6 +440,30 @@ export default function ProductEnquiryPage() {
       },
       1200 + Math.random() * 1200,
     );
+=======
+    setTimeout(() => {
+      setIsTyping(false);
+      const replyMessages: EnquiryMessage[] = [
+        ...newMessages,
+        {
+          id: crypto.randomUUID(),
+          sender: "owner" as const,
+          text: "Thanks for your enquiry. Our team is reviewing your message and will respond shortly. For urgent matters, feel free to call our procurement desk.",
+          timestamp: new Date().toLocaleString(),
+          read: false,
+        },
+        {
+          id: crypto.randomUUID(),
+          sender: "system" as const,
+          text: "A team member will respond within 2 business hours",
+          timestamp: new Date().toLocaleString(),
+          read: false,
+        },
+      ];
+      setMessages(replyMessages);
+      setUnreadCount(prev => prev + 2);
+    }, 2000 + Math.random() * 1500);
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   };
 
   if (!product) {
@@ -411,12 +492,20 @@ export default function ProductEnquiryPage() {
     }),
   };
 
+<<<<<<< HEAD
   const statusColor =
     product.status === "Out of Stock"
       ? "text-rose-600"
       : product.status === "Low Stock"
         ? "text-amber-600"
         : "text-emerald-600";
+=======
+  const statusColor = product.status === "Out of Stock"
+    ? "text-rose-600"
+    : product.status === "Low Stock"
+      ? "text-amber-600"
+      : "text-emerald-600";
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 
   return (
     <div className="space-y-5 p-4 md:p-6 pb-10">
@@ -431,9 +520,13 @@ export default function ProductEnquiryPage() {
             Back
           </Button>
           <div>
+<<<<<<< HEAD
             <h1 className="text-lg font-semibold text-slate-950">
               Product Enquiry
             </h1>
+=======
+            <h1 className="text-lg font-semibold text-slate-950">Product Enquiry</h1>
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
             <p className="text-xs text-slate-500">Real-time conversation</p>
           </div>
         </div>
@@ -488,18 +581,26 @@ export default function ProductEnquiryPage() {
                 <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
                   MOQ
                 </p>
+<<<<<<< HEAD
                 <p className="mt-1 text-lg font-semibold text-slate-950">
                   1 Unit
                 </p>
+=======
+                <p className="mt-1 text-lg font-semibold text-slate-950">1 Unit</p>
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                 <p className="text-[10px] text-slate-500">Minimum order</p>
               </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 space-y-2">
               <div className="flex items-center justify-between">
+<<<<<<< HEAD
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Stock
                 </p>
+=======
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Stock</p>
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                 <span className={cn("text-sm font-semibold", statusColor)}>
                   {product.status || "In Stock"}
                 </span>
@@ -523,19 +624,27 @@ export default function ProductEnquiryPage() {
                   {keySpecs.slice(0, 4).map((spec) => {
                     const Icon = spec.icon;
                     return (
+<<<<<<< HEAD
                       <div
                         key={spec.label}
                         className="rounded-xl border border-slate-200 bg-white p-2"
                       >
+=======
+                      <div key={spec.label} className="rounded-xl border border-slate-200 bg-white p-2">
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <Icon className="h-3.5 w-3.5 text-sky-600" />
                           <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                             {spec.label}
                           </p>
                         </div>
+<<<<<<< HEAD
                         <p className="text-xs font-semibold text-slate-900 line-clamp-1">
                           {spec.value}
                         </p>
+=======
+                        <p className="text-xs font-semibold text-slate-900 line-clamp-1">{spec.value}</p>
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                       </div>
                     );
                   })}
@@ -549,10 +658,14 @@ export default function ProductEnquiryPage() {
               </p>
               <div className="space-y-1">
                 {specRows.map(([label, value]) => (
+<<<<<<< HEAD
                   <div
                     key={label}
                     className="flex items-center justify-between text-xs"
                   >
+=======
+                  <div key={label} className="flex items-center justify-between text-xs">
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                     <span className="text-slate-500">{label}</span>
                     <span className="font-medium text-slate-900">{value}</span>
                   </div>
@@ -565,6 +678,7 @@ export default function ProductEnquiryPage() {
                 Vendor Info
               </p>
               <div className="flex items-center gap-2 text-xs text-slate-600">
+<<<<<<< HEAD
                 <span>
                   {product.primaryVendor || "Preferred vendor network"}
                 </span>
@@ -574,6 +688,13 @@ export default function ProductEnquiryPage() {
                 <span>
                   Rating: {(product.performanceRating || 4.8).toFixed(1)}
                 </span>
+=======
+                <span>{product.primaryVendor || "Preferred vendor network"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                <span>Rating: {(product.performanceRating || 4.8).toFixed(1)}</span>
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
               </div>
             </div>
           </CardContent>
@@ -594,10 +715,14 @@ export default function ProductEnquiryPage() {
             </CardTitle>
           </CardHeader>
 
+<<<<<<< HEAD
           <ScrollArea
             ref={scrollRef}
             className="flex-1 max-h-[480px] min-h-[400px]"
           >
+=======
+          <ScrollArea ref={scrollRef} className="flex-1 max-h-[480px] min-h-[400px]">
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
             <div className="space-y-4 p-5">
               {messages.map((message) => (
                 <MessageBubble key={message.id} message={message} />
@@ -610,6 +735,7 @@ export default function ProductEnquiryPage() {
             {attachedFile && (
               <div className="mb-3 flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2">
                 <FileText className="h-4 w-4 text-sky-600" />
+<<<<<<< HEAD
                 <span className="flex-1 text-xs font-medium text-sky-700">
                   {attachedFile.name}
                 </span>
@@ -618,6 +744,11 @@ export default function ProductEnquiryPage() {
                     setAttachedFile(null);
                     setAttachmentName("");
                   }}
+=======
+                <span className="flex-1 text-xs font-medium text-sky-700">{attachedFile.name}</span>
+                <button
+                  onClick={() => { setAttachedFile(null); setAttachmentName(""); }}
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                   className="text-slate-400 hover:text-slate-600"
                 >
                   ×

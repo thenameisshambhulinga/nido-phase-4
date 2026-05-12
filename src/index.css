@@ -295,6 +295,7 @@
     pointer-events: none;
   }
 }
+<<<<<<< HEAD
 html,
 body,
 #root {
@@ -329,3 +330,5 @@ body {
 .enterprise-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+=======
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e

@@ -94,7 +94,11 @@ export default function ModernErrorPage({
   const background = useMemo(
     () =>
       cn(
+<<<<<<< HEAD
         "relative min-h-full overflow-hidden bg-slate-950 text-white",
+=======
+        "relative min-h-screen overflow-hidden bg-slate-950 text-white",
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
         isOffline &&
           "bg-gradient-to-br from-slate-950 via-cyan-950 to-slate-900",
       ),
@@ -109,7 +113,11 @@ export default function ModernErrorPage({
         <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl" />
       </div>
 
+<<<<<<< HEAD
       <div className="relative z-10 flex min-h-full items-center justify-center px-6 py-12">
+=======
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-12">
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
         <Card
           className={cn(
             "w-full max-w-3xl border-white/10 bg-white/95 text-slate-900 backdrop-blur-xl",

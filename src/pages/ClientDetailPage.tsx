@@ -1936,6 +1936,7 @@ export default function ClientDetailPage() {
               >
                 <ChevronsLeft className="h-3.5 w-3.5 text-gray-600" />
               </button>
+<<<<<<< HEAD
               <div className="h-24 bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-500" />
               <CardContent className="pt-0 -mt-10 px-4 py-4 space-y-4">
                 {/* Avatar and Name */}
@@ -2028,10 +2029,61 @@ export default function ClientDetailPage() {
                   >
                     <Mail className="h-3.5 w-3.5" />
                     Email
+=======
+              <div className="h-20 bg-gradient-to-br from-blue-600 to-blue-400" />
+              <CardContent className="pt-0 -mt-8 text-center space-y-3">
+                <div
+                  className={`mx-auto h-16 w-16 rounded-full border-4 border-white ${getAvatarColor(
+                    client.name,
+                  )} shadow-sm flex items-center justify-center text-xl font-semibold`}
+                >
+                  {initials}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">{client.name}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {client.clientCode || client.clientId || ""}
+                  </p>
+                </div>
+                <div className="space-y-2 text-sm text-left">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Building2 className="h-4 w-4 shrink-0" />
+                    <span className="font-medium text-foreground">
+                      {client.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Mail className="h-4 w-4 shrink-0" />
+                    <span className="text-xs break-all">{client.email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Phone className="h-4 w-4 shrink-0" />
+                    <span className="text-xs">{client.phone}</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-muted-foreground">
+                    <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span className="text-xs">{client.address}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="h-4 w-4 shrink-0" />
+                    <span className="text-xs">
+                      {client.contractStart} - {client.contractEnd}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setShowMail(true)}
+                  >
+                    <Mail className="h-4 w-4" /> Email
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
+<<<<<<< HEAD
                     className="flex-1 h-9 gap-2 rounded-lg"
                     onClick={() => window.open(`tel:${client.phone}`)}
                   >
@@ -2039,6 +2091,39 @@ export default function ClientDetailPage() {
                     Call
                   </Button>
                 </div>
+=======
+                    className="gap-2"
+                    onClick={() => window.open(`tel:${client.phone}`)}
+                  >
+                    <Phone className="h-4 w-4" /> Call
+                  </Button>
+                </div>
+                <div className="pt-2 border-t space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      Contract Progress
+                    </span>
+                    <span className="font-medium">
+                      {daysRemaining} days left
+                    </span>
+                  </div>
+                  <Progress value={contractProgress} className="h-2" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>
+                      Total Orders:{" "}
+                      <strong className="text-foreground">
+                        {client.totalOrders}
+                      </strong>
+                    </span>
+                    <span>
+                      Spend:{" "}
+                      <strong className="text-foreground">
+                        ${totalSpend.toLocaleString()}
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
               </CardContent>
             </Card>
           )}
@@ -5452,6 +5537,7 @@ export default function ClientDetailPage() {
               {editingUserId ? "Edit User" : "Add User"}
             </DialogTitle>
           </DialogHeader>
+<<<<<<< HEAD
           <div className="space-y-4 max-h-[70vh] overflow-y-auto">
             {/* Basic Information */}
             <div className="space-y-2 pb-4 border-b">
@@ -5660,6 +5746,163 @@ export default function ClientDetailPage() {
                 className="resize-none"
               />
             </div>
+=======
+          <div className="space-y-3">
+            <Input
+              placeholder="Name"
+              value={userForm.name}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, name: e.target.value }))
+              }
+            />
+            <Input
+              type="email"
+              placeholder="Email"
+              value={userForm.email}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, email: e.target.value }))
+              }
+            />
+            <Input value={client.name} disabled />
+            <Input
+              placeholder="Phone"
+              value={userForm.phone}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, phone: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Alternate Phone"
+              value={userForm.alternatePhone}
+              onChange={(e) =>
+                setUserForm((prev) => ({
+                  ...prev,
+                  alternatePhone: e.target.value,
+                }))
+              }
+            />
+            <Input
+              placeholder="Employee ID"
+              value={userForm.employeeId}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, employeeId: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Job Title"
+              value={userForm.jobTitle}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, jobTitle: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Department"
+              value={userForm.department}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, department: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Manager"
+              value={userForm.manager}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, manager: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Timezone"
+              value={userForm.timezone}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, timezone: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Address"
+              value={userForm.address}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, address: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="City"
+              value={userForm.city}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, city: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="State"
+              value={userForm.state}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, state: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Country"
+              value={userForm.country}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, country: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Postal Code"
+              value={userForm.postalCode}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, postalCode: e.target.value }))
+              }
+            />
+            <Input
+              type="date"
+              placeholder="DOB"
+              value={userForm.dob}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, dob: e.target.value }))
+              }
+            />
+            <Input
+              type="date"
+              placeholder="Joining Date"
+              value={userForm.joiningDate}
+              onChange={(e) =>
+                setUserForm((prev) => ({
+                  ...prev,
+                  joiningDate: e.target.value,
+                }))
+              }
+            />
+            <Input
+              placeholder="Emergency Contact"
+              value={userForm.emergencyContact}
+              onChange={(e) =>
+                setUserForm((prev) => ({
+                  ...prev,
+                  emergencyContact: e.target.value,
+                }))
+              }
+            />
+            <Textarea
+              placeholder="Notes"
+              value={userForm.notes}
+              onChange={(e) =>
+                setUserForm((prev) => ({ ...prev, notes: e.target.value }))
+              }
+            />
+            <Select
+              value={userForm.status}
+              onValueChange={(value: "active" | "inactive" | "suspended") =>
+                setUserForm((prev) => ({ ...prev, status: value }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="suspended">Suspended</SelectItem>
+              </SelectContent>
+            </Select>
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 
             <div className="flex justify-end gap-2">
               <Button

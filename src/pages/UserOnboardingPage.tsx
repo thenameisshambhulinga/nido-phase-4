@@ -96,7 +96,11 @@ export default function UserOnboardingPage() {
   };
 
   return (
+<<<<<<< HEAD
     <div className="min-h-full flex items-center justify-center bg-slate-100 px-4 py-10">
+=======
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4 py-10">
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       <Card className="w-full max-w-lg border-slate-200 shadow-xl">
         <CardHeader>
           <CardTitle className="text-2xl">Set Up Your Account</CardTitle>

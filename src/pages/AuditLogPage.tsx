@@ -167,7 +167,11 @@ export default function AuditLogPage() {
   };
 
   return (
+<<<<<<< HEAD
     <div className="min-h-full bg-background">
+=======
+    <div className="min-h-screen bg-background">
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       <Header title="Audit Trail & Activity Log" />
 
       <div className="p-6 space-y-6">

@@ -563,11 +563,39 @@ export default function MasterCataloguePage() {
   };
 
   const openAddDialog = () => {
+<<<<<<< HEAD
     navigate("/configuration/master-catalogue/add");
   };
 
   const openEditDialog = (item: CatalogItem) => {
     navigate(`/configuration/master-catalogue/edit/${item.id}`);
+=======
+    setForm(emptyItem);
+    setEditingItem(null);
+    setProductImages([]);
+    setSpecCategoryInput("");
+    setSpecAttributeInput("");
+    setSpecValueInput("");
+    setAutoProductCode(false);
+    setAutoSku(false);
+    setVendorInventoryEntries([]);
+    setAddDialogOpen(true);
+  };
+
+  const openEditDialog = (item: CatalogItem) => {
+    setForm({ ...item, specAttributes: item.specAttributes || [] });
+    setEditingItem(item);
+    setProductImages(item.image ? [item.image] : []);
+    setSpecCategoryInput("");
+    setSpecAttributeInput("");
+    setSpecValueInput("");
+    setAutoProductCode(false);
+    setAutoSku(false);
+    setVendorInventoryEntries(
+      ((item as any).vendorInventoryEntries as VendorInventoryEntry[]) || [],
+    );
+    setAddDialogOpen(true);
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
   };
 
   const totalVendorStock = vendorInventoryEntries.reduce(
@@ -715,7 +743,10 @@ export default function MasterCataloguePage() {
           const newItem: CatalogItem = {
             id: `${Date.now()}-${i}`,
             name: cols[nameIdx] || "",
+<<<<<<< HEAD
             productCode: cols[skuIdx] || "",
+=======
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
             sku: cols[skuIdx] || "",
             category: cols[catIdx] || "IT Hardware",
             subCategory: "",
@@ -1028,11 +1059,15 @@ export default function MasterCataloguePage() {
             >
               <Upload size={12} /> Bulk Import
             </Button>
+<<<<<<< HEAD
             <Button
               size="sm"
               className="gap-1.5"
               onClick={() => navigate("/configuration/master-catalogue/add")}
             >
+=======
+            <Button size="sm" className="gap-1.5" onClick={openAddDialog}>
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
               <Plus size={12} /> Add New Item
             </Button>
           </div>
@@ -1072,7 +1107,14 @@ export default function MasterCataloguePage() {
                   <TableRow
                     key={item.id}
                     className="cursor-pointer transition-colors hover:bg-muted/40"
+<<<<<<< HEAD
                     onClick={() => openEditDialog(item)}
+=======
+                    onClick={() => {
+                      setViewItem(item);
+                      setViewDialogOpen(true);
+                    }}
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                   >
                     <TableCell>
                       <Checkbox
@@ -1137,7 +1179,12 @@ export default function MasterCataloguePage() {
                           className="h-7 w-7"
                           onClick={(e) => {
                             e.stopPropagation();
+<<<<<<< HEAD
                             openEditDialog(item);
+=======
+                            setViewItem(item);
+                            setViewDialogOpen(true);
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                           }}
                         >
                           <Eye size={12} />
@@ -2125,8 +2172,12 @@ export default function MasterCataloguePage() {
                         value={form.discountPrice || ""}
                         onChange={(e) =>
                           updateForm({
+<<<<<<< HEAD
                             discountPrice:
                               parseFloat(e.target.value) || undefined,
+=======
+                            discountPrice: parseFloat(e.target.value) || undefined,
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                           })
                         }
                       />
@@ -2147,10 +2198,14 @@ export default function MasterCataloguePage() {
                         value={form.status}
                         onValueChange={(v) =>
                           updateForm({
+<<<<<<< HEAD
                             status: v as
                               | "In Stock"
                               | "Low Stock"
                               | "Out of Stock",
+=======
+                            status: v as "In Stock" | "Low Stock" | "Out of Stock",
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                           })
                         }
                       >
@@ -2160,9 +2215,13 @@ export default function MasterCataloguePage() {
                         <SelectContent>
                           <SelectItem value="In Stock">In Stock</SelectItem>
                           <SelectItem value="Low Stock">Low Stock</SelectItem>
+<<<<<<< HEAD
                           <SelectItem value="Out of Stock">
                             Out of Stock
                           </SelectItem>
+=======
+                          <SelectItem value="Out of Stock">Out of Stock</SelectItem>
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                         </SelectContent>
                       </Select>
                     </div>
@@ -2189,8 +2248,12 @@ export default function MasterCataloguePage() {
                         value={form.minStockThreshold || ""}
                         onChange={(e) =>
                           updateForm({
+<<<<<<< HEAD
                             minStockThreshold:
                               parseInt(e.target.value, 10) || 0,
+=======
+                            minStockThreshold: parseInt(e.target.value, 10) || 0,
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                           })
                         }
                       />
@@ -2249,7 +2312,13 @@ export default function MasterCataloguePage() {
                       <Input
                         placeholder="Weight"
                         value={form.weight || ""}
+<<<<<<< HEAD
                         onChange={(e) => updateForm({ weight: e.target.value })}
+=======
+                        onChange={(e) =>
+                          updateForm({ weight: e.target.value })
+                        }
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
                       />
                     </div>
                   </div>

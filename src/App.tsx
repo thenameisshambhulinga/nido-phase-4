@@ -80,9 +80,12 @@ const ArchivePage = lazy(() => import("@/pages/ArchivePage"));
 const TicketTrackingPage = lazy(() => import("@/pages/TicketTrackingPage"));
 const PricingDiscountsPage = lazy(() => import("@/pages/PricingDiscountsPage"));
 const MasterCataloguePage = lazy(() => import("@/pages/MasterCataloguePage"));
+<<<<<<< HEAD
 const AddMasterCatalogueItemWrapper = lazy(
   () => import("@/pages/AddMasterCatalogueItemWrapper"),
 );
+=======
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const SalesQuoteFormPage = lazy(() => import("@/pages/SalesQuoteFormPage"));
 const RecurringInvoicesPage = lazy(
@@ -121,7 +124,11 @@ function AppRoutes() {
   return (
     <Suspense
       fallback={
+<<<<<<< HEAD
         <div className="flex items-center justify-center min-h-full bg-background">
+=======
+        <div className="flex items-center justify-center min-h-screen bg-background">
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
       }
@@ -161,7 +168,11 @@ function AppRoutes() {
         >
           <Route index element={<Navigate to="/home" replace />} />
           <Route path="home" element={<HomePage />} />
+<<<<<<< HEAD
           <Route path="categories" element={<Navigate to="/shop" replace />} />
+=======
+          <Route path="categories" element={<CategoriesPage />} />
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
           <Route path="dashboard" element={<MainDashboard />} />
           <Route path="dashboard/vendor" element={<VendorDashboard />} />
           <Route path="dashboard/sla" element={<SLAOverview />} />
@@ -347,6 +358,7 @@ function AppRoutes() {
             path="configuration/master-catalogue"
             element={<MasterCataloguePage />}
           />
+<<<<<<< HEAD
           <Route
             path="configuration/master-catalogue/add"
             element={<AddMasterCatalogueItemWrapper />}
@@ -355,6 +367,8 @@ function AppRoutes() {
             path="configuration/master-catalogue/edit/:itemId"
             element={<AddMasterCatalogueItemWrapper />}
           />
+=======
+>>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
           <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="reports" element={<MainDashboard />} />
           <Route path="reports/audit" element={<AuditTrailPage />} />
