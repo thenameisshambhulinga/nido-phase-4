@@ -30,6 +30,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/contexts/CartContext";
 import { useData } from "@/contexts/DataContext";
+import {
+  PAGE_PILL_BUTTON_CLASS,
+  PAGE_PILL_PRIMARY_BUTTON_CLASS,
+} from "@/lib/navigationStyles";
 import { cn } from "@/lib/utils";
 import { getProductEmoji, resolveProductImage } from "@/lib/catalogMedia";
 
@@ -89,7 +93,18 @@ function ProductCard({
   const inStock = product.stock > 0;
 
   return (
-    <Card className="group flex h-full flex-col overflow-hidden rounded-[28px] border-border/60 bg-white/90 shadow-[0_12px_35px_-24px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_30px_70px_-32px_rgba(15,23,42,0.5)]">
+    <Card
+      className="group flex h-full flex-col overflow-hidden rounded-[28px] border-border/60 bg-white/90 shadow-[0_12px_35px_-24px_rgba(15,23,42,0.45)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_30px_70px_-32px_rgba(15,23,42,0.5)]"
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(product)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(product);
+        }
+      }}
+    >
       <div className="relative h-[255px] overflow-hidden bg-gradient-to-br from-slate-50 via-white to-cyan-50 p-4">
         <ProductImage product={product} />
         <div className="absolute left-4 top-4">
@@ -500,7 +515,7 @@ export default function CategoriesPage() {
             <Button
               variant="outline"
               size="sm"
-              className="h-10 rounded-full border-slate-300 px-4"
+              className={PAGE_PILL_BUTTON_CLASS}
               disabled={page === 1}
               onClick={() => setPage((value) => Math.max(1, value - 1))}
             >
@@ -531,7 +546,7 @@ export default function CategoriesPage() {
             <Button
               variant="outline"
               size="sm"
-              className="h-10 rounded-full border-slate-300 px-4"
+              className={PAGE_PILL_BUTTON_CLASS}
               disabled={page === totalPages}
               onClick={() =>
                 setPage((value) => Math.min(totalPages, value + 1))

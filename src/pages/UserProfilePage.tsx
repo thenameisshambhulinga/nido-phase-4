@@ -53,6 +53,11 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { getProductImage } from "@/lib/catalogMedia";
+import {
+  PAGE_PILL_BUTTON_CLASS,
+  PAGE_PILL_ICON_BUTTON_CLASS,
+  PAGE_PILL_PRIMARY_BUTTON_CLASS,
+} from "@/lib/navigationStyles";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
 
 type DeviceStatus = "available" | "assigned" | "maintenance";
@@ -691,10 +696,9 @@ export default function UserProfilePage() {
 
                   <div className="flex flex-wrap items-center gap-3">
                     <Button
-                      variant="ghost"
-                      size="icon"
+                      variant="outline"
                       onClick={() => navigate(`/clients/${client.id}`)}
-                      className="h-10 w-10 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      className={PAGE_PILL_ICON_BUTTON_CLASS}
                     >
                       <ArrowLeft className="h-4 w-4" />
                     </Button>
@@ -718,7 +722,7 @@ export default function UserProfilePage() {
 
                 <div className="flex flex-wrap gap-3">
                   <Button
-                    className="h-11 rounded-xl bg-slate-950 px-5 text-white hover:bg-slate-800"
+                    className={PAGE_PILL_PRIMARY_BUTTON_CLASS}
                     onClick={() => setShowMail(true)}
                   >
                     <Mail className="mr-2 h-4 w-4" />
@@ -726,7 +730,7 @@ export default function UserProfilePage() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-11 rounded-xl border-slate-300 px-5 text-slate-700"
+                    className={PAGE_PILL_BUTTON_CLASS}
                     onClick={() => window.open(`tel:${userPhone}`)}
                   >
                     <Phone className="mr-2 h-4 w-4" />
@@ -736,7 +740,7 @@ export default function UserProfilePage() {
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="outline"
-                        className="h-11 rounded-xl border-slate-300 px-4 text-slate-700"
+                        className={PAGE_PILL_BUTTON_CLASS}
                       >
                         Actions
                         <ChevronDown className="ml-2 h-4 w-4" />

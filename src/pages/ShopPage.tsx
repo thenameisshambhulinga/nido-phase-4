@@ -33,6 +33,10 @@ import {
 import { useCart } from "@/contexts/CartContext";
 import { useData } from "@/contexts/DataContext";
 import { getProductEmoji, getProductImage } from "@/lib/catalogMedia";
+import {
+  PAGE_PILL_BUTTON_CLASS,
+  PAGE_PILL_PRIMARY_BUTTON_CLASS,
+} from "@/lib/navigationStyles";
 import { cn } from "@/lib/utils";
 
 interface ShopProduct {
@@ -100,7 +104,7 @@ function PaginationButton({
       size="sm"
       onClick={onClick}
       disabled={disabled}
-      className="h-10 rounded-xl border-slate-300 px-4 text-slate-700"
+      className={PAGE_PILL_BUTTON_CLASS}
     >
       {children}
     </Button>
@@ -301,7 +305,7 @@ export default function ShopPage() {
 
           <div className="flex flex-wrap gap-3">
             <Button
-              className="h-11 rounded-xl bg-blue-600 px-5 text-white hover:bg-blue-700"
+              className={PAGE_PILL_PRIMARY_BUTTON_CLASS}
               onClick={() => navigate("/shop/cart")}
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
@@ -312,14 +316,14 @@ export default function ShopPage() {
             </Button>
             <Button
               variant="outline"
-              className="h-11 rounded-xl border-slate-300 px-5 text-slate-700"
+              className={PAGE_PILL_BUTTON_CLASS}
               onClick={() => navigate("/categories")}
             >
               Browse Categories
             </Button>
             <Button
               variant="outline"
-              className="h-11 rounded-xl border-slate-300 px-5 text-slate-700"
+              className={PAGE_PILL_BUTTON_CLASS}
               onClick={() => navigate("/support")}
             >
               Procurement Support
@@ -463,6 +467,7 @@ export default function ShopPage() {
                 <EnterpriseProductCard
                   key={product.id}
                   product={product}
+                  onOpen={() => navigate(`/shop/product/${product.id}`)}
                   onAdd={() => handleAddToCart(product)}
                   onEnquire={() =>
                     navigate(`/shop/product/${product.id}/enquire`)

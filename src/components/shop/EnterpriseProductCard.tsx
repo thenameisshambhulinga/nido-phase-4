@@ -7,19 +7,33 @@ import { cn } from "@/lib/utils";
 
 interface Props {
   product: any;
+  onOpen?: () => void;
   onAdd: () => void;
   onEnquire: () => void;
 }
 
 export default function EnterpriseProductCard({
   product,
+  onOpen,
   onAdd,
   onEnquire,
 }: Props) {
   const isOutOfStock = product.status === "Out of Stock";
 
   return (
-    <Card className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+    <Card
+      className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (!onOpen) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+    >
       <div className="p-5">
         <div className="mb-4 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl bg-gray-50">
           <img
@@ -81,18 +95,27 @@ export default function EnterpriseProductCard({
 
           <div className="grid grid-cols-2 gap-2 pt-3">
             <Button
-              onClick={onAdd}
               disabled={isOutOfStock}
               className={cn(
                 "bg-blue-600 hover:bg-blue-700",
                 isOutOfStock && "cursor-not-allowed opacity-60",
               )}
+              onClick={(event) => {
+                event.stopPropagation();
+                onAdd();
+              }}
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
               Add to Cart
             </Button>
 
-            <Button variant="outline" onClick={onEnquire}>
+            <Button
+              variant="outline"
+              onClick={(event) => {
+                event.stopPropagation();
+                onEnquire();
+              }}
+            >
               <MessageCircle className="mr-2 h-4 w-4" />
               Enquire
             </Button>

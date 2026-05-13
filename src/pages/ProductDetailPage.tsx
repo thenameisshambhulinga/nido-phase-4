@@ -30,6 +30,10 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import {
+  PAGE_PILL_BUTTON_CLASS,
+  PAGE_PILL_PRIMARY_BUTTON_CLASS,
+} from "@/lib/navigationStyles";
+import {
   buildProductGallery,
   getProductEmoji,
   getProductImage,
@@ -188,17 +192,17 @@ export default function ProductDetailPage() {
   return (
     <div className="space-y-6 pb-10">
       <div className="space-y-3">
-        <div className="flex items-center gap-2 text-sm text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
           <button
             onClick={() => navigate("/shop")}
-            className="hover:text-slate-900"
+            className={PAGE_PILL_BUTTON_CLASS}
           >
             Shop
           </button>
           <ChevronRight className="h-4 w-4" />
           <button
             onClick={() => navigate("/categories")}
-            className="hover:text-slate-900"
+            className={PAGE_PILL_BUTTON_CLASS}
           >
             Categories
           </button>
@@ -211,7 +215,7 @@ export default function ProductDetailPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button
             variant="outline"
-            className="h-10 rounded-full"
+            className={PAGE_PILL_BUTTON_CLASS}
             onClick={() => navigate("/shop")}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -224,7 +228,7 @@ export default function ProductDetailPage() {
             <Button
               variant="outline"
               className={cn(
-                "h-10 rounded-full",
+                PAGE_PILL_BUTTON_CLASS,
                 wishlisted && "border-rose-300 bg-rose-50 text-rose-700",
               )}
               onClick={() => setWishlisted((value) => !value)}
@@ -385,7 +389,7 @@ export default function ProductDetailPage() {
 
             <div className="grid gap-2">
               <Button
-                className="h-11 rounded-full bg-slate-950 text-white hover:bg-slate-800"
+                className={PAGE_PILL_PRIMARY_BUTTON_CLASS}
                 disabled={product.status === "Out of Stock"}
                 onClick={handleAddToCart}
               >
@@ -394,7 +398,7 @@ export default function ProductDetailPage() {
               </Button>
               <Button
                 variant="outline"
-                className="h-11 rounded-full"
+                className={PAGE_PILL_BUTTON_CLASS}
                 onClick={() => {
                   handleAddToCart();
                   navigate("/shop/cart");

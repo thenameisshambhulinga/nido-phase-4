@@ -39,6 +39,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { isValidEmail, normalizeEmail } from "@/lib/validation";
+import {
+  PAGE_PILL_BUTTON_CLASS,
+  PAGE_PILL_ICON_BUTTON_CLASS,
+  PAGE_PILL_PRIMARY_BUTTON_CLASS,
+} from "@/lib/navigationStyles";
 import NidoRolesPanel from "@/components/configuration/NidoRolesPanel";
 import {
   ArrowLeft,
@@ -1865,9 +1870,9 @@ export default function ClientDetailPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
-              variant="ghost"
-              size="sm"
+              variant="outline"
               onClick={() => navigate("/clients")}
+              className={PAGE_PILL_ICON_BUTTON_CLASS}
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
@@ -1891,7 +1896,7 @@ export default function ClientDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              className="gap-2"
+              className={PAGE_PILL_BUTTON_CLASS}
               onClick={() => setShowProfileCard((prev) => !prev)}
             >
               {showProfileCard ? (
@@ -1904,7 +1909,7 @@ export default function ClientDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              className="gap-2"
+              className={PAGE_PILL_BUTTON_CLASS}
               onClick={() => setShowMail(true)}
             >
               <Mail className="h-4 w-4" /> Quick Mail
@@ -1912,7 +1917,7 @@ export default function ClientDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              className="gap-2"
+              className={PAGE_PILL_BUTTON_CLASS}
               onClick={() => window.open(`tel:${client.phone}`)}
             >
               <Phone className="h-4 w-4" /> Call
@@ -1931,7 +1936,10 @@ export default function ClientDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowProfileCard(false)}
-                className="absolute top-2 right-2 z-10 h-7 w-7 rounded-full bg-white/90 backdrop-blur-sm border border-gray-200 shadow-sm flex items-center justify-center hover:bg-white hover:shadow-md transition-all"
+                className={cn(
+                  PAGE_PILL_ICON_BUTTON_CLASS,
+                  "absolute right-2 top-2 z-10 h-7 w-7 p-0",
+                )}
                 title="Hide profile card"
               >
                 <ChevronsLeft className="h-3.5 w-3.5 text-gray-600" />
@@ -1952,7 +1960,10 @@ export default function ClientDetailPage() {
                     <Badge className="bg-blue-100 text-blue-700 border-0">
                       {client.clientCode || client.clientId || "Client"}
                     </Badge>
-                    <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50">
+                    <Badge
+                      variant="outline"
+                      className="text-green-700 border-green-200 bg-green-50"
+                    >
                       Active
                     </Badge>
                   </div>
@@ -1966,22 +1977,32 @@ export default function ClientDetailPage() {
                   <div className="flex items-start gap-2">
                     <Mail className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
                     <div className="min-w-0">
-                      <p className="text-[11px] text-gray-500 font-medium">Email</p>
-                      <p className="text-xs text-gray-900 break-all">{client.email}</p>
+                      <p className="text-[11px] text-gray-500 font-medium">
+                        Email
+                      </p>
+                      <p className="text-xs text-gray-900 break-all">
+                        {client.email}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <Phone className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
                     <div className="min-w-0">
-                      <p className="text-[11px] text-gray-500 font-medium">Phone</p>
+                      <p className="text-[11px] text-gray-500 font-medium">
+                        Phone
+                      </p>
                       <p className="text-xs text-gray-900">{client.phone}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
                     <MapPin className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
                     <div className="min-w-0">
-                      <p className="text-[11px] text-gray-500 font-medium">Address</p>
-                      <p className="text-xs text-gray-900 line-clamp-2">{client.address}</p>
+                      <p className="text-[11px] text-gray-500 font-medium">
+                        Address
+                      </p>
+                      <p className="text-xs text-gray-900 line-clamp-2">
+                        {client.address}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1994,12 +2015,20 @@ export default function ClientDetailPage() {
                   <div className="flex items-start gap-2">
                     <Calendar className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] text-gray-500 font-medium">Duration</p>
-                      <p className="text-xs text-gray-900">{client.contractStart} - {client.contractEnd}</p>
+                      <p className="text-[11px] text-gray-500 font-medium">
+                        Duration
+                      </p>
+                      <p className="text-xs text-gray-900">
+                        {client.contractStart} - {client.contractEnd}
+                      </p>
                       <div className="mt-2">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-[10px] text-gray-500">Progress</span>
-                          <span className="text-[10px] font-medium text-gray-700">{daysRemaining} days left</span>
+                          <span className="text-[10px] text-gray-500">
+                            Progress
+                          </span>
+                          <span className="text-[10px] font-medium text-gray-700">
+                            {daysRemaining} days left
+                          </span>
                         </div>
                         <Progress value={contractProgress} className="h-1.5" />
                       </div>
@@ -2010,12 +2039,20 @@ export default function ClientDetailPage() {
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-2 text-center border-t pt-3">
                   <div className="bg-blue-50 rounded-lg p-2">
-                    <p className="text-2xl font-bold text-blue-700">{client.totalOrders}</p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">Total Orders</p>
+                    <p className="text-2xl font-bold text-blue-700">
+                      {client.totalOrders}
+                    </p>
+                    <p className="text-[10px] text-gray-600 mt-0.5">
+                      Total Orders
+                    </p>
                   </div>
                   <div className="bg-green-50 rounded-lg p-2">
-                    <p className="text-lg font-bold text-green-700">₹{(totalSpend / 100000).toFixed(1)}L</p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">Total Spend</p>
+                    <p className="text-lg font-bold text-green-700">
+                      ₹{(totalSpend / 100000).toFixed(1)}L
+                    </p>
+                    <p className="text-[10px] text-gray-600 mt-0.5">
+                      Total Spend
+                    </p>
                   </div>
                 </div>
 
@@ -5455,7 +5492,9 @@ export default function ClientDetailPage() {
           <div className="space-y-4 max-h-[70vh] overflow-y-auto">
             {/* Basic Information */}
             <div className="space-y-2 pb-4 border-b">
-              <h3 className="text-sm font-semibold text-gray-900">Basic Information</h3>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Basic Information
+              </h3>
               <Input
                 placeholder="Full Name"
                 value={userForm.name}
@@ -5495,12 +5534,17 @@ export default function ClientDetailPage() {
 
             {/* Professional Information */}
             <div className="space-y-2 pb-4 border-b">
-              <h3 className="text-sm font-semibold text-gray-900">Professional Information</h3>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Professional Information
+              </h3>
               <Input
                 placeholder="Employee ID"
                 value={userForm.employeeId}
                 onChange={(e) =>
-                  setUserForm((prev) => ({ ...prev, employeeId: e.target.value }))
+                  setUserForm((prev) => ({
+                    ...prev,
+                    employeeId: e.target.value,
+                  }))
                 }
               />
               <Input
@@ -5514,7 +5558,10 @@ export default function ClientDetailPage() {
                 placeholder="Department"
                 value={userForm.department}
                 onChange={(e) =>
-                  setUserForm((prev) => ({ ...prev, department: e.target.value }))
+                  setUserForm((prev) => ({
+                    ...prev,
+                    department: e.target.value,
+                  }))
                 }
               />
               <Input
@@ -5528,7 +5575,9 @@ export default function ClientDetailPage() {
 
             {/* Address Information */}
             <div className="space-y-2 pb-4 border-b">
-              <h3 className="text-sm font-semibold text-gray-900">Address Information</h3>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Address Information
+              </h3>
               <Input
                 placeholder="Street Address"
                 value={userForm.address}
@@ -5557,7 +5606,10 @@ export default function ClientDetailPage() {
                   placeholder="Country"
                   value={userForm.country}
                   onChange={(e) =>
-                    setUserForm((prev) => ({ ...prev, country: e.target.value }))
+                    setUserForm((prev) => ({
+                      ...prev,
+                      country: e.target.value,
+                    }))
                   }
                 />
                 <Input
@@ -5575,7 +5627,9 @@ export default function ClientDetailPage() {
 
             {/* Important Dates */}
             <div className="space-y-2 pb-4 border-b">
-              <h3 className="text-sm font-semibold text-gray-900">Important Dates</h3>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Important Dates
+              </h3>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <Label className="text-xs text-gray-600">Date of Birth</Label>
@@ -5605,15 +5659,19 @@ export default function ClientDetailPage() {
 
             {/* System Settings */}
             <div className="space-y-2 pb-4 border-b">
-              <h3 className="text-sm font-semibold text-gray-900">System Settings</h3>
+              <h3 className="text-sm font-semibold text-gray-900">
+                System Settings
+              </h3>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">Status</Label>
+                  <Label className="text-xs text-gray-600 mb-1 block">
+                    Status
+                  </Label>
                   <Select
                     value={userForm.status}
-                    onValueChange={(value: "active" | "inactive" | "suspended") =>
-                      setUserForm((prev) => ({ ...prev, status: value }))
-                    }
+                    onValueChange={(
+                      value: "active" | "inactive" | "suspended",
+                    ) => setUserForm((prev) => ({ ...prev, status: value }))}
                   >
                     <SelectTrigger className="h-9">
                       <SelectValue />
@@ -5626,12 +5684,17 @@ export default function ClientDetailPage() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-600 mb-1 block">Timezone</Label>
+                  <Label className="text-xs text-gray-600 mb-1 block">
+                    Timezone
+                  </Label>
                   <Input
                     placeholder="Asia/Kolkata"
                     value={userForm.timezone}
                     onChange={(e) =>
-                      setUserForm((prev) => ({ ...prev, timezone: e.target.value }))
+                      setUserForm((prev) => ({
+                        ...prev,
+                        timezone: e.target.value,
+                      }))
                     }
                   />
                 </div>
@@ -5640,7 +5703,9 @@ export default function ClientDetailPage() {
 
             {/* Additional Information */}
             <div className="space-y-2 pb-4 border-b">
-              <h3 className="text-sm font-semibold text-gray-900">Additional Information</h3>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Additional Information
+              </h3>
               <Input
                 placeholder="Emergency Contact"
                 value={userForm.emergencyContact}
