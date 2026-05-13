@@ -24,6 +24,12 @@ import {
 import { toast } from "sonner";
 import { normalizeOrderCode } from "@/lib/documentNumbering";
 import { apiRequest } from "@/lib/api";
+import {
+  PAGE_PILL_BUTTON_CLASS,
+  PAGE_PILL_PRIMARY_BUTTON_CLASS,
+  PAGE_PILL_OUTLINE_BUTTON_CLASS,
+  PAGE_PILL_ICON_BUTTON_CLASS,
+} from "@/lib/navigationStyles";
 
 type TrackingStage = "confirmed" | "processing" | "shipped" | "delivered";
 
@@ -458,21 +464,21 @@ export default function OrderConfirmationPage() {
   return (
     <div className="space-y-8 pb-12">
       {/* Success Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-200 p-8 lg:p-12">
+      <div className="relative overflow-hidden rounded-[32px] border border-emerald-200 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-8 text-white shadow-2xl lg:p-12">
         <div className="absolute right-0 top-0 -translate-y-1/2 translate-x-1/4 opacity-10">
           <CheckCircle2 className="h-96 w-96 text-green-600" />
         </div>
 
-        <div className="relative space-y-6 max-w-2xl">
+        <div className="relative max-w-3xl space-y-6">
           <div className="flex items-center gap-4">
-            <div className="flex-shrink-0 flex items-center justify-center w-16 h-16 rounded-full bg-green-100 border-4 border-green-500">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
+            <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full border border-emerald-300/50 bg-white/10 backdrop-blur">
+              <CheckCircle2 className="h-8 w-8 text-emerald-300" />
             </div>
             <div>
-              <h1 className="text-3xl lg:text-4xl font-bold text-foreground">
+              <h1 className="text-3xl font-bold tracking-tight text-white lg:text-5xl">
                 Thank You for Your Order!
               </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="mt-2 max-w-2xl text-sm text-slate-300 lg:text-base">
                 Your order has been successfully placed and is being processed
               </p>
             </div>
@@ -484,14 +490,14 @@ export default function OrderConfirmationPage() {
                 Order Number
               </p>
               <div className="flex items-center gap-2 mt-2">
-                <p className="text-xl font-bold text-foreground">
+                <p className="text-xl font-bold text-white">
                   {displayOrderCode || orderId}
                 </p>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={handleCopyOrderId}
-                  className="h-8 w-8 p-0"
+                  className="h-8 w-8 rounded-full border-white/15 bg-white/10 p-0 text-white hover:bg-white/15"
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
@@ -511,7 +517,7 @@ export default function OrderConfirmationPage() {
               <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
                 Order Total
               </p>
-              <p className="text-2xl font-bold text-green-600 mt-2">
+              <p className="mt-2 text-2xl font-bold text-emerald-300">
                 ${order ? order.total.toLocaleString() : "0"}
               </p>
             </div>
@@ -526,30 +532,35 @@ export default function OrderConfirmationPage() {
           {/* Order Status */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle>Order Status</CardTitle>
+              <CardTitle className="text-xl text-slate-900">
+                Order Status
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4">
-                <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-green-100 border-2 border-green-500">
-                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50">
+                  <CheckCircle2 className="h-6 w-6 text-emerald-600" />
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold text-foreground">
                     Order Confirmed
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-slate-500">
                     Your order has been received and is being processed
                   </p>
                 </div>
-                <Badge variant="default" className="bg-green-600">
+                <Badge
+                  variant="default"
+                  className="rounded-full bg-emerald-600 px-3 py-1 text-white"
+                >
                   Confirmed
                 </Badge>
               </div>
 
               <Separator />
 
-              <div className="rounded-xl border bg-muted/20 p-4">
-                <p className="mb-3 text-sm font-semibold text-foreground">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                <p className="mb-3 text-sm font-semibold text-slate-900">
                   Live Tracking Flow
                 </p>
                 <div className="space-y-3">
@@ -565,10 +576,10 @@ export default function OrderConfirmationPage() {
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-foreground">
+                          <p className="text-sm font-medium text-slate-900">
                             {step.title}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-slate-500">
                             {step.subtitle}
                           </p>
                         </div>
@@ -600,8 +611,8 @@ export default function OrderConfirmationPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Shipping Method</span>
-                  <span className="font-medium capitalize">
+                  <span className="text-slate-500">Shipping Method</span>
+                  <span className="font-medium capitalize text-slate-900">
                     {order?.shippingMethod === "express"
                       ? "Express (2-3 days)"
                       : "Standard (5-7 days)"}
@@ -614,14 +625,16 @@ export default function OrderConfirmationPage() {
           {/* Order Items */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle>Order Items ({order?.items.length || 0})</CardTitle>
+              <CardTitle className="text-xl text-slate-900">
+                Order Items ({order?.items.length || 0})
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {order?.items.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                    className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/80 p-3"
                   >
                     <div className="flex items-center gap-3 flex-1">
                       {item.image ? (
@@ -637,7 +650,7 @@ export default function OrderConfirmationPage() {
                         <span className="text-2xl">{item.emoji}</span>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground truncate">
+                        <p className="truncate font-medium text-slate-900">
                           {item.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -646,7 +659,7 @@ export default function OrderConfirmationPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-foreground">
+                      <p className="font-bold text-slate-900">
                         ${item.total.toLocaleString()}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -662,19 +675,19 @@ export default function OrderConfirmationPage() {
               {/* Cost Summary */}
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-slate-500">Subtotal</span>
                   <span className="font-medium">
                     ${order?.subtotal.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tax (10%)</span>
+                  <span className="text-slate-500">Tax (10%)</span>
                   <span className="font-medium">
                     ${order?.tax.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Shipping</span>
+                  <span className="text-slate-500">Shipping</span>
                   <span className="font-medium">
                     ${order?.shippingCost.toLocaleString()}
                   </span>
@@ -682,7 +695,7 @@ export default function OrderConfirmationPage() {
                 <Separator />
                 <div className="flex justify-between text-base font-bold">
                   <span>Total</span>
-                  <span className="text-green-600">
+                  <span className="text-emerald-600">
                     ${order?.total.toLocaleString()}
                   </span>
                 </div>
@@ -693,7 +706,7 @@ export default function OrderConfirmationPage() {
           {/* Shipping Address */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-xl text-slate-900">
                 <MapPin className="h-5 w-5" /> Shipping Address
               </CardTitle>
             </CardHeader>
@@ -704,7 +717,7 @@ export default function OrderConfirmationPage() {
                     {order.shippingInfo.fullName}
                   </p>
                   {order.shippingInfo.companyName && (
-                    <p className="text-muted-foreground">
+                    <p className="text-slate-500">
                       {order.shippingInfo.companyName}
                     </p>
                   )}
@@ -734,9 +747,11 @@ export default function OrderConfirmationPage() {
         {/* Right Column - Next Steps */}
         <div className="space-y-6">
           {/* Next Steps Card */}
-          <Card className="border-border/50 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+          <Card className="rounded-[28px] border border-blue-200 bg-gradient-to-br from-blue-50 via-indigo-50 to-white shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg">What's Next?</CardTitle>
+              <CardTitle className="text-lg text-slate-900">
+                What's Next?
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
@@ -800,10 +815,16 @@ export default function OrderConfirmationPage() {
           {/* Communication Card */}
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-lg">Need Help?</CardTitle>
+              <CardTitle className="text-lg text-slate-900">
+                Need Help?
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button variant="outline" className="w-full gap-2" asChild>
+              <Button
+                variant="outline"
+                className={`${PAGE_PILL_OUTLINE_BUTTON_CLASS} w-full justify-center gap-2`}
+                asChild
+              >
                 <a href={`mailto:${order?.shippingInfo.email}`}>
                   <Mail className="h-4 w-4" /> Contact Support
                 </a>
@@ -811,7 +832,7 @@ export default function OrderConfirmationPage() {
 
               <Button
                 variant="outline"
-                className="w-full gap-2"
+                className={`${PAGE_PILL_OUTLINE_BUTTON_CLASS} w-full justify-center gap-2`}
                 onClick={downloadInvoice}
                 disabled={!canDownloadInvoice}
               >
@@ -820,7 +841,7 @@ export default function OrderConfirmationPage() {
 
               <Button
                 variant="outline"
-                className="w-full gap-2"
+                className={`${PAGE_PILL_OUTLINE_BUTTON_CLASS} w-full justify-center gap-2`}
                 onClick={advanceTracking}
                 disabled={trackingStage === "delivered"}
               >
@@ -833,7 +854,7 @@ export default function OrderConfirmationPage() {
               {canConvertToInvoice && (
                 <Button
                   variant="outline"
-                  className="w-full gap-2"
+                  className={`${PAGE_PILL_OUTLINE_BUTTON_CLASS} w-full justify-center gap-2`}
                   onClick={convertToInvoice}
                 >
                   <FilePlus2 className="h-4 w-4" /> Convert To Invoice
@@ -846,7 +867,7 @@ export default function OrderConfirmationPage() {
           <Button
             onClick={() => navigate("/shop")}
             size="lg"
-            className="w-full gap-2 h-11"
+            className={`${PAGE_PILL_PRIMARY_BUTTON_CLASS} w-full justify-center gap-2`}
           >
             <Home className="h-4 w-4" /> Continue Shopping
           </Button>
@@ -854,7 +875,7 @@ export default function OrderConfirmationPage() {
           <Button
             onClick={() => navigate("/shop/cart")}
             variant="outline"
-            className="w-full"
+            className={`${PAGE_PILL_BUTTON_CLASS} w-full justify-center`}
           >
             View Cart
           </Button>

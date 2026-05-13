@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -13,16 +13,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { useCart, type CartItem } from "@/contexts/CartContext";
 import { getProductImage } from "@/lib/catalogMedia";
+import {
+  PAGE_PILL_BUTTON_CLASS,
+  PAGE_PILL_PRIMARY_BUTTON_CLASS,
+} from "@/lib/navigationStyles";
 
 function formatCurrency(value: number) {
   return `₹${value.toLocaleString("en-IN")}`;
@@ -54,26 +51,10 @@ export default function CartPage() {
   const { items, removeFromCart, updateQuantity, clearCart, subtotal } =
     useCart();
   const navigate = useNavigate();
-  const [showCheckout, setShowCheckout] = useState(false);
 
   const tax = subtotal * 0.1;
   const shipping = subtotal > 500 ? 0 : 25;
   const total = subtotal + tax + shipping;
-
-  const orderSummaryRows = useMemo(
-    () =>
-      items.map((item) => ({
-        id: item.id,
-        label: `${item.name} x${item.quantity}`,
-        amount: item.price * item.quantity,
-      })),
-    [items],
-  );
-
-  const handleCheckout = () => {
-    setShowCheckout(false);
-    navigate("/shop/checkout");
-  };
 
   if (items.length === 0) {
     return (
@@ -119,15 +100,15 @@ export default function CartPage() {
           <div className="flex flex-wrap gap-3">
             <Button
               variant="outline"
-              className="rounded-xl border-slate-300 text-slate-700"
+              className={PAGE_PILL_BUTTON_CLASS}
               onClick={() => navigate("/shop")}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Continue Shopping
             </Button>
             <Button
-              className="rounded-xl bg-blue-600 hover:bg-blue-700"
-              onClick={() => setShowCheckout(true)}
+              className={PAGE_PILL_PRIMARY_BUTTON_CLASS}
+              onClick={() => navigate("/shop/checkout")}
             >
               <CreditCard className="mr-2 h-4 w-4" />
               Proceed to Checkout
@@ -141,7 +122,9 @@ export default function CartPage() {
           {items.map((item) => {
             const isInStock =
               item.status !== "Out of Stock" &&
-              (item.stock === undefined || item.stock === null || item.stock > 0);
+              (item.stock === undefined ||
+                item.stock === null ||
+                item.stock > 0);
 
             return (
               <Card
@@ -182,7 +165,9 @@ export default function CartPage() {
                             {item.name}
                           </h2>
                           <p className="mt-1 text-sm text-slate-500">
-                            {(item.subCategory || "General") + " · " + (item.brand || "Nido")}
+                            {(item.subCategory || "General") +
+                              " · " +
+                              (item.brand || "Nido")}
                           </p>
                         </div>
 
@@ -206,7 +191,9 @@ export default function CartPage() {
                               {item.description ||
                                 "Enterprise-ready product configured for repeat purchasing."}
                             </li>
-                            <li>Warranty: {item.warranty || "Standard warranty"}</li>
+                            <li>
+                              Warranty: {item.warranty || "Standard warranty"}
+                            </li>
                             <li>Lead Time: {item.leadTime || "5-7 Days"}</li>
                           </ul>
                         </div>
@@ -239,7 +226,10 @@ export default function CartPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() =>
-                              updateQuantity(item.id, Math.max(1, item.quantity - 1))
+                              updateQuantity(
+                                item.id,
+                                Math.max(1, item.quantity - 1),
+                              )
                             }
                             className="h-9 w-9 rounded-xl text-slate-700 hover:bg-white"
                           >
@@ -338,8 +328,8 @@ export default function CartPage() {
               )}
 
               <Button
-                className="h-11 w-full rounded-xl bg-blue-600 hover:bg-blue-700"
-                onClick={() => setShowCheckout(true)}
+                className={PAGE_PILL_PRIMARY_BUTTON_CLASS}
+                onClick={() => navigate("/shop/checkout")}
               >
                 <CreditCard className="mr-2 h-4 w-4" />
                 Proceed to Checkout
@@ -355,57 +345,6 @@ export default function CartPage() {
           </Card>
         </div>
       </div>
-
-      <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Confirm Order</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-3 text-sm">
-            <p className="text-slate-500">
-              You&apos;re about to place an order for{" "}
-              <span className="font-semibold text-slate-900">
-                {items.length} item{items.length !== 1 ? "s" : ""}
-              </span>
-              .
-            </p>
-
-            <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              {orderSummaryRows.map((row) => (
-                <div key={row.id} className="flex items-center justify-between gap-4">
-                  <span className="text-slate-600">{row.label}</span>
-                  <span className="font-medium text-slate-900">
-                    {formatCurrency(row.amount)}
-                  </span>
-                </div>
-              ))}
-              <Separator />
-              <div className="flex items-center justify-between font-semibold text-slate-900">
-                <span>Total</span>
-                <span>{formatCurrency(total)}</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-500">
-              Checkout opens the existing order flow without changing provider
-              or routing behavior.
-            </p>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCheckout(false)}>
-              Cancel
-            </Button>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={handleCheckout}
-            >
-              Place Order
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

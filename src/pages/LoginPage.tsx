@@ -233,6 +233,13 @@ export default function LoginPage() {
         >
           {/* Mobile-only branding */}
           <div className="lg:hidden text-center mb-8">
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-lg ring-1 ring-slate-200">
+              <img
+                src="/favicon.svg"
+                alt="Nido Tech logo"
+                className="h-11 w-11"
+              />
+            </div>
             <h1 className="text-2xl font-display font-bold text-foreground">
               Nido Tech
             </h1>
@@ -245,6 +252,23 @@ export default function LoginPage() {
           </div>
 
           <div className="hidden lg:block mb-8">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-lg ring-1 ring-slate-200">
+                <img
+                  src="/favicon.svg"
+                  alt="Nido Tech logo"
+                  className="h-10 w-10"
+                />
+              </div>
+              <div>
+                <h1 className="text-2xl font-display font-bold text-foreground">
+                  Nido Tech
+                </h1>
+                <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground font-medium">
+                  CorpEssentials
+                </p>
+              </div>
+            </div>
             <h2 className="text-xl font-display font-bold text-foreground">
               Welcome back
             </h2>

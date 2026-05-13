@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +35,11 @@ import {
   normalizeOrderCode,
 } from "@/lib/documentNumbering";
 import { apiRequest } from "@/lib/api";
+import {
+  PAGE_PILL_BUTTON_CLASS,
+  PAGE_PILL_PRIMARY_BUTTON_CLASS,
+  PAGE_PILL_OUTLINE_BUTTON_CLASS,
+} from "@/lib/navigationStyles";
 import {
   isValidEmail,
   isValidPhoneNumber,
@@ -87,7 +92,7 @@ export default function CheckoutPage() {
   // Shipping Info State
   const [shipping, setShipping] = useState<ShippingInfo>({
     fullName: user?.name || "",
-    companyName: "",
+    companyName: user?.organization || "",
     address: "",
     city: "",
     state: "",
@@ -105,6 +110,15 @@ export default function CheckoutPage() {
     cvv: "",
     purchaseOrderNumber: "",
   });
+
+  useEffect(() => {
+    if (!shipping.companyName && user?.organization) {
+      setShipping((prev) => ({
+        ...prev,
+        companyName: user.organization || prev.companyName,
+      }));
+    }
+  }, [shipping.companyName, user?.organization]);
 
   // Calculations
   const tax = subtotal * 0.1;
@@ -539,7 +553,7 @@ export default function CheckoutPage() {
             variant="ghost"
             size="sm"
             onClick={() => navigate("/shop/cart")}
-            className="gap-2"
+            className={PAGE_PILL_BUTTON_CLASS}
           >
             <ArrowLeft className="h-4 w-4" /> Back to Cart
           </Button>
@@ -1193,9 +1207,11 @@ export default function CheckoutPage() {
 
         {/* Order Summary Sidebar */}
         <div className="lg:col-span-4">
-          <Card className="sticky top-6 border-border/50 bg-white/95 shadow-sm">
+          <Card className="sticky top-6 overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50/60 shadow-xl">
             <CardHeader>
-              <CardTitle>Order Summary</CardTitle>
+              <CardTitle className="text-xl text-slate-900">
+                Order Summary
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Items */}
@@ -1236,7 +1252,7 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              <div className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 p-3 text-xs">
+              <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 p-3 text-xs shadow-sm">
                 <p className="font-semibold text-slate-800">Shipping Preview</p>
                 <p className="mt-1 text-slate-600">
                   {shipping.fullName || "Recipient"} •{" "}
@@ -1292,7 +1308,7 @@ export default function CheckoutPage() {
               <Button
                 onClick={handlePlaceOrder}
                 disabled={isProcessing || totalItems === 0}
-                className="w-full h-11 gap-2 mt-4"
+                className={`${PAGE_PILL_PRIMARY_BUTTON_CLASS} mt-4 w-full justify-center gap-2`}
                 size="lg"
               >
                 {isProcessing ? (
@@ -1309,7 +1325,7 @@ export default function CheckoutPage() {
 
               <Button
                 variant="outline"
-                className="w-full"
+                className={`${PAGE_PILL_OUTLINE_BUTTON_CLASS} w-full justify-center`}
                 onClick={() => navigate("/shop/cart")}
                 disabled={isProcessing}
               >
@@ -1317,7 +1333,7 @@ export default function CheckoutPage() {
               </Button>
 
               {/* Trust Badges */}
-              <div className="pt-4 border-t grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-3 gap-2 border-t pt-4 text-center">
                 <div className="text-xs">
                   <Lock className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
                   <span className="text-muted-foreground text-xs">Secure</span>

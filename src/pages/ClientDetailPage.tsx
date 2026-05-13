@@ -1867,32 +1867,36 @@ export default function ClientDetailPage() {
     <div>
       <Header title={client.name} />
       <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        {/* Consistent Navigation Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               onClick={() => navigate("/clients")}
-              className={PAGE_PILL_ICON_BUTTON_CLASS}
+              className={PAGE_PILL_BUTTON_CLASS}
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Clients
             </Button>
-            <div>
-              <p className="text-xs text-muted-foreground">
-                Clients / {client.name}
-              </p>
-              <h1 className="text-2xl font-display font-bold">{client.name}</h1>
-            </div>
-            <Badge
-              className={
-                client.status === "active"
-                  ? "bg-success text-success-foreground"
-                  : "bg-muted text-muted-foreground"
-              }
-            >
-              {client.status}
-            </Badge>
+            <span className="text-sm text-muted-foreground">
+              Clients / {client.name}
+            </span>
           </div>
-          <div className="flex gap-2">
+          <Badge
+            className={
+              client.status === "active"
+                ? "bg-success text-success-foreground"
+                : "bg-muted text-muted-foreground"
+            }
+          >
+            {client.status}
+          </Badge>
+        </div>
+
+        {/* Title Section */}
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="text-2xl font-display font-bold">{client.name}</h1>
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button
               variant="outline"
               size="sm"
@@ -1904,7 +1908,9 @@ export default function ClientDetailPage() {
               ) : (
                 <ChevronsRight className="h-4 w-4" />
               )}
-              {showProfileCard ? "Hide Profile" : "Show Profile"}
+              <span className="ml-2">
+                {showProfileCard ? "Hide Profile" : "Show Profile"}
+              </span>
             </Button>
             <Button
               variant="outline"
@@ -1912,7 +1918,8 @@ export default function ClientDetailPage() {
               className={PAGE_PILL_BUTTON_CLASS}
               onClick={() => setShowMail(true)}
             >
-              <Mail className="h-4 w-4" /> Quick Mail
+              <Mail className="h-4 w-4" />
+              <span className="ml-2">Quick Mail</span>
             </Button>
             <Button
               variant="outline"
@@ -1920,7 +1927,8 @@ export default function ClientDetailPage() {
               className={PAGE_PILL_BUTTON_CLASS}
               onClick={() => window.open(`tel:${client.phone}`)}
             >
-              <Phone className="h-4 w-4" /> Call
+              <Phone className="h-4 w-4" />
+              <span className="ml-2">Call</span>
             </Button>
           </div>
         </div>

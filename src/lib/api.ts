@@ -11,6 +11,8 @@ const getAPIBase = (): string => {
     if (host === "localhost" || host === "127.0.0.1") {
       return `${protocol}//${host}:5000`;
     }
+
+    return window.location.origin.replace(/\/+$/, "");
   }
 
   return "http://localhost:5000";

@@ -266,17 +266,34 @@ export default function Sidebar({
               )}
             />
           ) : (
-            <>
-              <h1 className="text-lg font-display font-bold text-sidebar-primary-foreground tracking-tight">
-                {(branding?.companyName || "Nido Tech")
-                  .split(" ")
-                  .slice(0, 2)
-                  .join(" ")}
-              </h1>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-sidebar-foreground/60 font-medium">
-                CorpEssentials
-              </p>
-            </>
+            <div
+              className={cn(
+                "flex items-center gap-3",
+                collapsed && "justify-center",
+              )}
+            >
+              <img
+                src="/favicon.svg"
+                alt="Nido Tech logo"
+                className={cn(
+                  "rounded-xl object-contain shadow-sm ring-1 ring-white/10",
+                  collapsed ? "h-8 w-8" : "h-10 w-10",
+                )}
+              />
+              {!collapsed && (
+                <div>
+                  <h1 className="text-lg font-display font-bold text-sidebar-primary-foreground tracking-tight">
+                    {(branding?.companyName || "Nido Tech")
+                      .split(" ")
+                      .slice(0, 2)
+                      .join(" ")}
+                  </h1>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-sidebar-foreground/60 font-medium">
+                    CorpEssentials
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </div>
         {!isMobile && onCollapseChange && (

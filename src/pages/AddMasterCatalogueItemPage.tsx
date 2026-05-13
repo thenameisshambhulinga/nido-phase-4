@@ -446,17 +446,21 @@ export default function AddMasterCatalogueItemPage() {
   const generateSkuCode = () => {
     const b = (brand || "").trim();
     const name = (productName || "").trim();
-    
+
     // Generate more unique prefix
     let prefix = "SKU";
     if (b) {
       // Use first 2 letters of brand + first letter of name
-      prefix = `${b.substring(0, 2).toUpperCase()}${name.substring(0, 1).toUpperCase()}`.slice(0, 3);
+      prefix =
+        `${b.substring(0, 2).toUpperCase()}${name.substring(0, 1).toUpperCase()}`.slice(
+          0,
+          3,
+        );
     } else if (name) {
       // Use first 3 letters of product name
       prefix = name.replace(/\s+/g, "").substring(0, 3).toUpperCase();
     }
-    
+
     // Generate random alphanumeric components
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let segment1 = "";
@@ -465,7 +469,7 @@ export default function AddMasterCatalogueItemPage() {
       segment1 += chars.charAt(Math.floor(Math.random() * chars.length));
       segment2 += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    
+
     const sku = `SKU-${segment1}-${segment2}`;
     setSkuCode(sku);
     return sku;
@@ -474,9 +478,10 @@ export default function AddMasterCatalogueItemPage() {
   // Auto-generate both codes when product name or brand change (only for new items)
   useEffect(() => {
     if (isEditMode) return;
-    if ((skuCode && skuCode.trim()) || (productCode && productCode.trim())) return;
+    if ((skuCode && skuCode.trim()) || (productCode && productCode.trim()))
+      return;
     if (!productName.trim() && !brand.trim()) return;
-    
+
     const t = setTimeout(() => {
       generateProductCode();
       generateSkuCode();
@@ -525,7 +530,12 @@ export default function AddMasterCatalogueItemPage() {
 
     didSeedEditForm.current = true;
     setProductName(editingItem.name || "");
-    setSkuCode((editingItem as any).sku || editingItem.productCode || editingItem.id || "");
+    setSkuCode(
+      (editingItem as any).sku ||
+        editingItem.productCode ||
+        editingItem.id ||
+        "",
+    );
     setProductCode(editingItem.productCode || "");
     setProductType(editingItem.productType || "Product");
     setPhysicalType(editingItem.physicalType || "Physical");
@@ -1539,21 +1549,23 @@ export default function AddMasterCatalogueItemPage() {
                   <div className="mb-4 rounded-xl border border-emerald-200/50 bg-white/60 p-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-xs text-emerald-700">Total Stock</div>
+                        <div className="text-xs text-emerald-700">
+                          Total Stock
+                        </div>
                         <div className="text-2xl font-bold text-emerald-900">
                           {totalInventory}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="text-xs text-emerald-700">
-                          {vendorInventory.length} Vendor{vendorInventory.length !== 1 ? "s" : ""}
+                          {vendorInventory.length} Vendor
+                          {vendorInventory.length !== 1 ? "s" : ""}
                         </div>
                         <div className="text-lg font-semibold text-emerald-900">
                           ₹
                           {vendorInventory
                             .reduce(
-                              (sum, v) =>
-                                sum + v.pricePerItem * v.quantity,
+                              (sum, v) => sum + v.pricePerItem * v.quantity,
                               0,
                             )
                             .toLocaleString()}
@@ -1586,10 +1598,17 @@ export default function AddMasterCatalogueItemPage() {
                               </div>
                               <div className="flex gap-4 mt-1 text-xs text-emerald-700">
                                 <span>
-                                  <span className="font-semibold">{vendor.quantity}</span> units
+                                  <span className="font-semibold">
+                                    {vendor.quantity}
+                                  </span>{" "}
+                                  units
                                 </span>
                                 <span>
-                                  ₹<span className="font-semibold">{vendor.pricePerItem}</span>/unit
+                                  ₹
+                                  <span className="font-semibold">
+                                    {vendor.pricePerItem}
+                                  </span>
+                                  /unit
                                 </span>
                               </div>
                               {vendor.leadTime && (
@@ -1730,7 +1749,10 @@ export default function AddMasterCatalogueItemPage() {
                         placeholder="e.g., Sony, Dell"
                         value={generalSpecs.manufacturer}
                         onChange={(e) =>
-                          handleGeneralSpecsChange("manufacturer", e.target.value)
+                          handleGeneralSpecsChange(
+                            "manufacturer",
+                            e.target.value,
+                          )
                         }
                         className="h-8 rounded-lg text-sm"
                       />

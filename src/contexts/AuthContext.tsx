@@ -254,6 +254,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       setToken(token);
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("nido_auth_token", token);
+      }
       const nextUser = toFrontendUser(userData);
       setUser(nextUser);
 

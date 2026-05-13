@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft,
-  ChevronRight,
   Heart,
   MessageSquare,
   PackageCheck,
@@ -33,6 +31,7 @@ import {
   PAGE_PILL_BUTTON_CLASS,
   PAGE_PILL_PRIMARY_BUTTON_CLASS,
 } from "@/lib/navigationStyles";
+import { Breadcrumb } from "@/components/shared/Breadcrumb";
 import {
   buildProductGallery,
   getProductEmoji,
@@ -86,10 +85,13 @@ export default function ProductDetailPage() {
   if (!product) {
     return (
       <div className="space-y-4">
-        <Button variant="outline" onClick={() => navigate("/shop")}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Shop
-        </Button>
+        <Breadcrumb
+          items={[
+            { label: "Shop", onClick: () => navigate("/shop") },
+            { label: "Categories", onClick: () => navigate("/categories") },
+            { label: "Product Not Found", isActive: true },
+          ]}
+        />
         <Card>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
             Product not found.
@@ -191,57 +193,44 @@ export default function ProductDetailPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <button
-            onClick={() => navigate("/shop")}
-            className={PAGE_PILL_BUTTON_CLASS}
-          >
-            Shop
-          </button>
-          <ChevronRight className="h-4 w-4" />
-          <button
-            onClick={() => navigate("/categories")}
-            className={PAGE_PILL_BUTTON_CLASS}
-          >
-            Categories
-          </button>
-          <ChevronRight className="h-4 w-4" />
-          <span className="line-clamp-1 font-medium text-slate-900">
-            {product.name}
-          </span>
-        </div>
+      {/* Breadcrumb Navigation */}
+      <Breadcrumb
+        items={[
+          { label: "Shop", onClick: () => navigate("/shop") },
+          { label: "Categories", onClick: () => navigate("/categories") },
+          { label: product.name, isActive: true },
+        ]}
+      />
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Action Buttons */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button
+          variant="outline"
+          className={PAGE_PILL_BUTTON_CLASS}
+          onClick={() => navigate("/shop")}
+        >
+          ← Back to Catalog
+        </Button>
+        <div className="flex items-center gap-2">
+          <Badge className={cn("rounded-full px-3 py-1", statusBadge)}>
+            {product.status}
+          </Badge>
           <Button
             variant="outline"
-            className={PAGE_PILL_BUTTON_CLASS}
-            onClick={() => navigate("/shop")}
+            className={cn(
+              PAGE_PILL_BUTTON_CLASS,
+              wishlisted && "border-rose-300 bg-rose-50 text-rose-700",
+            )}
+            onClick={() => setWishlisted((value) => !value)}
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Catalog
-          </Button>
-          <div className="flex items-center gap-2">
-            <Badge className={cn("rounded-full px-3 py-1", statusBadge)}>
-              {product.status}
-            </Badge>
-            <Button
-              variant="outline"
+            <Heart
               className={cn(
-                PAGE_PILL_BUTTON_CLASS,
-                wishlisted && "border-rose-300 bg-rose-50 text-rose-700",
+                "mr-2 h-4 w-4",
+                wishlisted && "fill-rose-500 text-rose-500",
               )}
-              onClick={() => setWishlisted((value) => !value)}
-            >
-              <Heart
-                className={cn(
-                  "mr-2 h-4 w-4",
-                  wishlisted && "fill-rose-500 text-rose-500",
-                )}
-              />
-              {wishlisted ? "Saved" : "Save"}
-            </Button>
-          </div>
+            />
+            {wishlisted ? "Saved" : "Save"}
+          </Button>
         </div>
       </div>
 

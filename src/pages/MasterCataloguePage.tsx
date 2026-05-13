@@ -51,6 +51,10 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import {
+  PAGE_PILL_BUTTON_CLASS,
+  PAGE_PILL_PRIMARY_BUTTON_CLASS,
+} from "@/lib/navigationStyles";
 
 interface SpecificationAttribute {
   category: string;
@@ -905,14 +909,15 @@ export default function MasterCataloguePage() {
     <div>
       <Header title="Configuration" />
       <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+        {/* Consistent Back Navigation */}
+        <div>
           <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1"
+            variant="outline"
+            className={PAGE_PILL_BUTTON_CLASS}
             onClick={() => navigate("/configuration")}
           >
-            <ArrowLeft className="h-4 w-4" /> Back to Configuration
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Configuration
           </Button>
         </div>
 
