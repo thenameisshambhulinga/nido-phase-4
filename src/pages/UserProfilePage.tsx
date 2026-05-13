@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "@/components/layout/Header";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, type User } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -300,6 +300,17 @@ export default function UserProfilePage() {
 
   const client = clients.find((entry) => entry.id === clientId);
   const profileUser = users.find((entry) => entry.id === userId);
+  const displayProfileUser: User = profileUser ?? {
+    id: userId || client?.contactEmployeeId || client?.id || "client-user",
+    email: client?.contactEmail || client?.email || "",
+    name: client?.contactPerson || client?.name || "Client User",
+    role: "client_employee",
+    status: "active",
+    createdAt: client?.createdAt || new Date().toISOString(),
+    organization: client?.companyName || client?.name || "",
+    jobTitle: client?.jobTitle || "Employee",
+    department: client?.industryType || "Operations",
+  };
 
   useEffect(() => {
     if (!profileUser || !client) return;
@@ -635,7 +646,7 @@ export default function UserProfilePage() {
     });
   };
 
-  if (!client || !profileUser) {
+  if (!client) {
     return (
       <div>
         <Header title="User Profile" />
@@ -693,7 +704,7 @@ export default function UserProfilePage() {
                     <span>Users</span>
                     <ChevronRight className="h-4 w-4" />
                     <span className="font-medium text-slate-900">
-                      {profileUser.name}
+                      {displayProfileUser.name}
                     </span>
                   </div>
 
@@ -709,7 +720,7 @@ export default function UserProfilePage() {
                     <div>
                       <div className="flex flex-wrap items-center gap-3">
                         <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
-                          {profileUser.name}
+                          {displayProfileUser.name}
                         </h1>
                         <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
                           {profileStatusLabel}
@@ -766,7 +777,7 @@ export default function UserProfilePage() {
                         onClick={() => void handleToggleStatus()}
                       >
                         <UserX className="mr-2 h-4 w-4" />
-                        {profileUser.status === "active"
+                        {displayProfileUser.status === "active"
                           ? "Deactivate user"
                           : "Reactivate user"}
                       </DropdownMenuItem>
@@ -784,19 +795,19 @@ export default function UserProfilePage() {
                     {profileUser.avatar ? (
                       <img
                         src={profileUser.avatar}
-                        alt={profileUser.name}
+                        alt={displayProfileUser.name}
                         className="h-full w-full object-cover"
                       />
                     ) : (
                       <span className="text-3xl font-semibold text-blue-700">
-                        {getInitials(profileUser.name)}
+                        {getInitials(displayProfileUser.name)}
                       </span>
                     )}
                   </div>
 
                   <div className="space-y-1 text-center">
                     <h2 className="text-[30px] font-semibold tracking-tight text-slate-900">
-                      {profileUser.name}
+                      {displayProfileUser.name}
                     </h2>
                     <p className="text-base text-slate-500">
                       {profileUser.jobTitle || client.jobTitle || "Employee"}
@@ -805,7 +816,7 @@ export default function UserProfilePage() {
 
                   <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                     {[
-                      { icon: Mail, value: profileUser.email },
+                      { icon: Mail, value: displayProfileUser.email },
                       { icon: Phone, value: userPhone },
                       { icon: Clock3, value: `Active today · ${lastLogin}` },
                       { icon: Building2, value: clientCompanyName },
@@ -1296,7 +1307,7 @@ export default function UserProfilePage() {
         open={showMail}
         onClose={() => setShowMail(false)}
         recipientType="client"
-        defaultTo={profileUser.email}
+        defaultTo={displayProfileUser.email}
       />
     </>
   );
