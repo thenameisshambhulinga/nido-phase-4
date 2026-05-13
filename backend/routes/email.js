@@ -99,11 +99,7 @@ router.post("/send", async (req, res) => {
 router.get("/verify", async (req, res) => {
   try {
     const isValid = await verifyEmailService();
-<<<<<<< HEAD
     res.json({
-=======
-    res.json({;
->>>>>>> 67d1e15f2fd66c27748766bdee559c6aee16d96e
       success: isValid,
       message: isValid
         ? "Email service is operational"
