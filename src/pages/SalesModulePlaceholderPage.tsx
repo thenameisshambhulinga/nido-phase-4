@@ -1,5 +1,7 @@
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 interface SalesModulePlaceholderPageProps {
   title: string;
@@ -7,13 +9,15 @@ interface SalesModulePlaceholderPageProps {
 }
 
 export default function SalesModulePlaceholderPage({
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Sales" }); }, []);
+
   title,
   description,
 }: SalesModulePlaceholderPageProps) {
   return (
     <div>
-      <Header title={title} />
-      <div className="p-6">
+            <div className="p-6">
         <Card>
           <CardHeader>
             <CardTitle>{title}</CardTitle>

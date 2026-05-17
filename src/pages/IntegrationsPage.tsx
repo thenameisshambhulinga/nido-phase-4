@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,8 @@ import {
   Pencil,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 interface Integration {
   id: string;
@@ -174,6 +176,9 @@ const DEFAULT_INTEGRATIONS: Integration[] = [
 ];
 
 export default function IntegrationsPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Integrations" }); }, []);
+
   const [integrations, setIntegrations] = useState(DEFAULT_INTEGRATIONS);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -278,8 +283,7 @@ export default function IntegrationsPage() {
 
   return (
     <div>
-      <Header title="Integrations" />
-      <div className="p-6 space-y-6 animate-fade-in">
+            <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold">Integrations</h1>

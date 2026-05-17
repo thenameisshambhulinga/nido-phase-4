@@ -62,7 +62,10 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
-function fuzzyMatch(text: string, query: string): { matched: boolean; score: number } {
+function fuzzyMatch(
+  text: string,
+  query: string,
+): { matched: boolean; score: number } {
   const t = text.toLowerCase().trim();
   const q = query.toLowerCase().trim();
   if (!t || !q) return { matched: false, score: 0 };
@@ -157,7 +160,9 @@ export function GlobalSearch() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [recentSearches, setRecentSearches] = useState<string[]>(() => getRecentSearches());
+  const [recentSearches, setRecentSearches] = useState<string[]>(() =>
+    getRecentSearches(),
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -238,7 +243,9 @@ export function GlobalSearch() {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setIsOpen(true);
-      setActiveIndex((current) => (current + 1) % Math.max(flatResults.length, 1));
+      setActiveIndex(
+        (current) => (current + 1) % Math.max(flatResults.length, 1),
+      );
       return;
     }
 
@@ -259,7 +266,8 @@ export function GlobalSearch() {
   };
 
   const showPanel = isOpen && query.trim().length > 0;
-  const showRecent = isOpen && query.trim().length === 0 && recentSearches.length > 0;
+  const showRecent =
+    isOpen && query.trim().length === 0 && recentSearches.length > 0;
 
   return (
     <div ref={containerRef} className="relative w-full max-w-2xl">
@@ -275,7 +283,7 @@ export function GlobalSearch() {
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="Search users, orders, vendors, clients, invoices..."
-          className="h-12 border-slate-200 bg-slate-50/90 pl-11 pr-10 text-sm shadow-sm transition focus:border-cyan-500 focus:bg-white focus-visible:ring-cyan-500"
+          className="h-10 border-slate-200 bg-slate-50/90 pl-10 pr-9 text-sm shadow-sm transition focus:border-cyan-500 focus:bg-white focus-visible:ring-cyan-500"
         />
         {query ? (
           <button
@@ -328,7 +336,10 @@ export function GlobalSearch() {
                         <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                           <GroupIcon className="h-3.5 w-3.5" />
                           <span>{GROUP_META[group].label}</span>
-                          <Badge variant="outline" className="ml-auto text-[10px] px-1.5">
+                          <Badge
+                            variant="outline"
+                            className="ml-auto text-[10px] px-1.5"
+                          >
                             {items.length}
                           </Badge>
                         </div>

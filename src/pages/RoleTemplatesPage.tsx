@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/layout/Header";
+
 import {
   ROLE_TEMPLATES,
   AVAILABLE_MODULES,
@@ -33,8 +33,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { CheckCircle2, XCircle, Users } from "lucide-react";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 export default function RoleTemplatesPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Role Templates" }); }, []);
+
   const [selectedRole, setSelectedRole] = useState<RoleTemplateKey>("owner");
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
 
@@ -48,7 +53,7 @@ export default function RoleTemplatesPage() {
 
   return (
     <div className="min-h-full bg-background">
-      <Header title="Role & Permission Management" />
+      {/* */}
 
       <div className="p-6 space-y-6">
         {/* Overview */}

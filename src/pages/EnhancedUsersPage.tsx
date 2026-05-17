@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useEnhancedAuth } from "@/contexts/EnhancedAuthContext";
 import {
   ROLE_TEMPLATES,
@@ -67,6 +67,12 @@ import {
 
 export default function EnhancedUsersPage() {
   const navigate = useNavigate();
+  const { setMeta } = usePageMeta();
+
+  useEffect(() => {
+    setMeta({ title: "Users", breadcrumbs: [{ label: "Users" }] });
+    return () => setMeta({});
+  }, [setMeta]);
   const {
     users,
     isOwner,
@@ -417,8 +423,7 @@ export default function EnhancedUsersPage() {
 
   return (
     <div className="min-h-full bg-background">
-      <Header title="User Management System" />
-
+      
       <div className="p-6 space-y-6">
         {/* Overview Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

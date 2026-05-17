@@ -1,4 +1,4 @@
-import Header from "@/components/layout/Header";
+
 import SalesDocumentPreview from "@/components/sales/SalesDocumentPreview";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,8 +14,13 @@ import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 export default function SalesOrderDetailPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Sales Order" }); }, []);
+
   const navigate = useNavigate();
   const { id = "" } = useParams();
   const { salesOrders, sendEmail, getActivities } = useData();
@@ -28,8 +33,7 @@ export default function SalesOrderDetailPage() {
   if (!order) {
     return (
       <div>
-        <Header title="Sales Order Not Found" />
-        <div className="p-6">
+                <div className="p-6">
           <Button variant="outline" onClick={() => navigate("/sales/orders")}>
             Back to Sales Orders
           </Button>
@@ -53,8 +57,7 @@ export default function SalesOrderDetailPage() {
 
   return (
     <div>
-      <Header title={`Sales Order ${order.salesOrderNumber}`} />
-      <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4">
         <Card>
           <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-3">
             <div>

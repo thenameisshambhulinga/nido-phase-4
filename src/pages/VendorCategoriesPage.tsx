@@ -1,5 +1,5 @@
-import { useState } from "react";
-import Header from "@/components/layout/Header";
+import { useState, useEffect } from "react";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +65,15 @@ const SLA_TEMPLATES = [
 ];
 
 export default function VendorCategoriesPage() {
+  const { setMeta } = usePageMeta();
+
+  useEffect(() => {
+    setMeta({
+      title: "Vendor Categories",
+      breadcrumbs: [{ label: "Vendors" }, { label: "Categories" }],
+    });
+    return () => setMeta({});
+  }, [setMeta]);
   const {
     vendorCategories,
     addVendorCategory,
@@ -219,7 +228,6 @@ export default function VendorCategoriesPage() {
 
   return (
     <div>
-      <Header title="Vendor Categories" />
       <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>

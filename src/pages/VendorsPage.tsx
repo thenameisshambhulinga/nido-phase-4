@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,12 @@ import { API } from "../api.js";
 import type { Vendor } from "@/contexts/DataContext";
 
 export default function VendorsPage() {
+  const { setMeta } = usePageMeta();
+
+  useEffect(() => {
+    setMeta({ title: "Vendors", breadcrumbs: [{ label: "Vendors" }] });
+    return () => setMeta({});
+  }, [setMeta]);
   const {
     addVendor,
     updateVendor,
@@ -463,7 +469,6 @@ export default function VendorsPage() {
 
   return (
     <div>
-      <Header title="Vendors" />
       <div className="p-6 space-y-4 animate-fade-in">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-display font-bold">Vendor Management</h1>
@@ -503,7 +508,7 @@ export default function VendorsPage() {
             <Button
               size="sm"
               className="gap-2"
-              onClick={() => setShowCreate(true)}
+              onClick={() => navigate("/vendors/add")}
             >
               <Plus className="h-4 w-4" /> Add Vendor
             </Button>

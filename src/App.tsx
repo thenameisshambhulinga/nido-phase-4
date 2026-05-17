@@ -16,10 +16,13 @@ import { DataProvider } from "@/contexts/DataContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import AppLayout from "@/components/layout/AppLayout";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 import { Suspense, lazy, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { I18nProvider } from "@/i18n/I18nProvider";
+import { PreferencesProvider } from "@/store/preferencesStore";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +51,7 @@ const VendorsPage = lazy(() => import("@/pages/VendorsPage"));
 const VendorDetailPage = lazy(() => import("@/pages/VendorDetailPage"));
 const VendorOrdersPage = lazy(() => import("@/pages/VendorOrdersPage"));
 const VendorOnboardingPage = lazy(() => import("@/pages/VendorOnboardingPage"));
+const AddVendorPage = lazy(() => import("@/pages/AddVendorPage"));
 const ClientsPage = lazy(() => import("@/pages/ClientsPage"));
 const AddClient = lazy(() => import("@/pages/AddClient"));
 const ClientDetailPage = lazy(() => import("@/pages/ClientDetailPage"));
@@ -191,6 +195,7 @@ function AppRoutes() {
           <Route path="vendors/orders" element={<VendorOrdersPage />} />
           <Route path="vendors/categories" element={<VendorCategoriesPage />} />
           <Route path="vendors/onboarding" element={<VendorOnboardingPage />} />
+          <Route path="vendors/add" element={<AddVendorPage />} />
           <Route path="vendors/:id" element={<VendorDetailPage />} />
           <Route
             path="procure/orders/:id"
@@ -663,17 +668,23 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ThemeProvider>
-          <NotificationProvider>
-            <AuthProvider>
-              <EnhancedAuthProvider>
-                <DataProvider>
-                  <CartProvider>
-                    <AppRoutes />
-                  </CartProvider>
-                </DataProvider>
-              </EnhancedAuthProvider>
-            </AuthProvider>
-          </NotificationProvider>
+          <I18nProvider>
+            <PreferencesProvider>
+              <NotificationProvider>
+                <AuthProvider>
+                  <EnhancedAuthProvider>
+                    <DataProvider>
+                      <CartProvider>
+                        <OrganizationProvider>
+                          <AppRoutes />
+                        </OrganizationProvider>
+                      </CartProvider>
+                    </DataProvider>
+                  </EnhancedAuthProvider>
+                </AuthProvider>
+              </NotificationProvider>
+            </PreferencesProvider>
+          </I18nProvider>
         </ThemeProvider>
       </BrowserRouter>
     </TooltipProvider>

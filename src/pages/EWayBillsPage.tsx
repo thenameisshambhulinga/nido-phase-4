@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -82,6 +82,12 @@ export default function EWayBillsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { clients, invoices } = useData();
+  const { setMeta } = usePageMeta();
+
+  useEffect(() => {
+    setMeta({ title: "e-Way Bills", breadcrumbs: [{ label: "e-Way Bills" }] });
+    return () => setMeta({});
+  }, [setMeta]);
 
   const [bills, setBills] = useState<EWayBill[]>(() =>
     safeReadJson<EWayBill[]>(STORAGE_KEY, defaultBills),
@@ -198,7 +204,6 @@ export default function EWayBillsPage() {
 
   return (
     <div>
-      <Header title="e-Way Bills" />
       <div className="space-y-4 p-6">
         <Card>
           <CardContent className="pt-6">

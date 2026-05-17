@@ -13,16 +13,16 @@ export default function UserRolesTab() {
 
   return (
     <div>
-      <Header title="Configuration" />
+      <Header title="" />
       <div className="p-6 space-y-4 animate-fade-in">
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
             size="sm"
             className="gap-1"
-            onClick={() => navigate("/configuration")}
+            onClick={() => navigate("/")}
           >
-            <ArrowLeft size={14} /> Back to Configuration
+            <ArrowLeft size={14} /> Back to
           </Button>
         </div>
 

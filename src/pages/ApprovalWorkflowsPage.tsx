@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Plus, Trash2, ArrowRight, Clock, Mail } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 export default function ApprovalWorkflowsPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Approval Workflows" }); }, []);
+
   const {
     approvalWorkflows,
     addApprovalWorkflow,
@@ -67,8 +72,7 @@ export default function ApprovalWorkflowsPage() {
 
   return (
     <div>
-      <Header title="Approval Workflows" />
-      <div className="p-6 space-y-6 animate-fade-in">
+            <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold">

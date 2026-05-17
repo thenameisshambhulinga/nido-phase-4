@@ -295,11 +295,6 @@ export default function ShopPage() {
               <h1 className="text-4xl font-semibold tracking-tight text-slate-900 md:text-[42px]">
                 Products
               </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-500 md:text-[15px]">
-                Manage and organize your product catalog with consistent
-                imagery, premium procurement cards, and enterprise-friendly
-                search and filtering.
-              </p>
             </div>
           </div>
 
@@ -309,7 +304,7 @@ export default function ShopPage() {
               onClick={() => navigate("/shop/cart")}
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
-              View Cart
+
               <Badge className="ml-3 bg-white text-blue-700 hover:bg-white">
                 {totalItems}
               </Badge>

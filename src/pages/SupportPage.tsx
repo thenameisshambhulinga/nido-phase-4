@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import Header from "@/components/layout/Header";
+import { useMemo, useState, useEffect } from "react";
+
 import AMCForm from "@/components/forms/AMCForm";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -743,6 +743,9 @@ const statCardStyles = [
 ];
 
 export default function SupportPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Support" }); }, []);
+
   const { clients, vendors, orders, organizations } = useData();
   const { user } = useAuth();
   const [tickets, setTickets] = useState<TicketRecord[]>(loadTickets);
@@ -1170,8 +1173,7 @@ export default function SupportPage() {
 
   return (
     <div>
-      <Header title="Services" />
-      <div className="space-y-6 p-6">
+            <div className="space-y-6 p-6">
         {mode === "dashboard" && (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">

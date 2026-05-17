@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,8 @@ import {
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
 import { toast } from "@/hooks/use-toast";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 const CHART_COLORS = [
   "hsl(var(--primary))",
@@ -89,6 +91,9 @@ const deriveCategory = (itemName: string) => {
 };
 
 export default function OrganizationsPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Organizations" }); }, []);
+
   const { clients, orders } = useData();
   const { users } = useAuth();
   const navigate = useNavigate();
@@ -229,8 +234,7 @@ export default function OrganizationsPage() {
 
     return (
       <div>
-        <Header title="Organization Details" />
-        <div className="space-y-6 p-6 animate-fade-in">
+                <div className="space-y-6 p-6 animate-fade-in">
           <Button variant="ghost" size="sm" onClick={() => setSelectedCompanyId(null)} className="w-fit gap-2">
             <ArrowLeft className="h-4 w-4" /> Back to Organizations
           </Button>
@@ -668,8 +672,7 @@ export default function OrganizationsPage() {
 
   return (
     <div>
-      <Header title="Organizations" />
-      <div className="space-y-6 p-6 animate-fade-in">
+            <div className="space-y-6 p-6 animate-fade-in">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <h1 className="flex items-center gap-3 text-2xl font-display font-bold tracking-tight">

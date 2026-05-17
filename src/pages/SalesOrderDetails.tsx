@@ -1,7 +1,7 @@
 import { memo, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import Header from "@/components/layout/Header";
+
 import NewSalesOrderModal from "@/pages/NewSalesOrderModal";
 import SalesOrderPDF from "@/components/sales/SalesOrderPDF";
 import { Badge } from "@/components/ui/badge";
@@ -242,6 +242,9 @@ function useSalesOrder() {
 }
 
 export default function SalesOrderDetails() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Sales Order" }); }, []);
+
   const navigate = useNavigate();
   const order = useSalesOrder();
   const {
@@ -270,7 +273,7 @@ export default function SalesOrderDetails() {
   if (!order) {
     return (
       <div>
-        <Header title="Sales Order Not Found" />
+        {/* */}
         <div className="p-6">
           <Button variant="outline" onClick={() => navigate("/sales/orders")}>
             Back to Sales Orders
@@ -312,7 +315,7 @@ export default function SalesOrderDetails() {
 
   return (
     <div>
-      <Header title={`Sales Order ${order.salesOrderNumber}`} />
+      {/* */}
       <div className="p-6 space-y-4">
         <Card className="border-border/60 shadow-sm">
           <CardContent className="flex flex-col gap-4 py-5 lg:flex-row lg:items-center lg:justify-between">

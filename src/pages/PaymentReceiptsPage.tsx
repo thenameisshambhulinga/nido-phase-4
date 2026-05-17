@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,6 +52,15 @@ const defaultReceipts: PaymentReceipt[] = [];
 export default function PaymentReceiptsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { setMeta } = usePageMeta();
+
+  useEffect(() => {
+    setMeta({
+      title: "Payment Receipt",
+      breadcrumbs: [{ label: "Payment Receipt" }],
+    });
+    return () => setMeta({});
+  }, [setMeta]);
   const state = (location.state || {}) as {
     fromInvoiceId?: string;
     customerName?: string;
@@ -149,8 +158,7 @@ export default function PaymentReceiptsPage() {
 
   return (
     <div>
-      <Header title="Payment Receipts" />
-      <div className="space-y-4 p-6">
+            <div className="space-y-4 p-6">
         <Card>
           <CardContent className="flex items-center justify-between pt-6">
             <div>

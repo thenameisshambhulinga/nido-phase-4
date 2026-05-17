@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -160,6 +160,20 @@ export default function VendorDetailPage() {
     useState<VendorAnalytics | null>(null);
 
   const vendor = vendors.find((v) => v.id === id);
+
+  const { setMeta } = usePageMeta();
+  useEffect(() => {
+    if (vendor) {
+      setMeta({
+        title: vendor.name,
+        breadcrumbs: [
+          { label: "Vendors", href: "/vendors" },
+          { label: vendor.name },
+        ],
+      });
+    }
+    return () => setMeta({});
+  }, [vendor, setMeta]);
 
   useEffect(() => {
     if (!id) {
@@ -533,7 +547,6 @@ export default function VendorDetailPage() {
 
   return (
     <div>
-      <Header title={vendor.name} />
       <div className="p-6 space-y-6 animate-fade-in">
         {/* Header with breadcrumb */}
         <div className="flex items-center justify-between">

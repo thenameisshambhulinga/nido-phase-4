@@ -1,6 +1,6 @@
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,6 +15,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import {
   Select,
   SelectContent,
@@ -41,6 +43,11 @@ import {
 } from "lucide-react";
 
 export default function OrdersPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => {
+    setMeta({ title: "Procure Orders" });
+  }, []);
+
   const {
     orders,
     updateOrder,
@@ -49,6 +56,7 @@ export default function OrdersPage() {
     coreDataError,
   } = useData();
   const { user } = useAuth();
+  const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
 
   const [selected, setSelected] = useState<string[]>([]);
@@ -110,6 +118,19 @@ export default function OrdersPage() {
   const filteredOrders = useMemo(() => {
     const query = search.trim().toLowerCase();
     return normalizedOrders.filter((order) => {
+      // For client roles, only show orders from their organization
+      const isClientRole = user?.role?.toLowerCase().startsWith("client_");
+      if (isClientRole && currentOrganization) {
+        const orgName = currentOrganization.name.toLowerCase();
+        const orderOrg = order.organization?.toLowerCase() || "";
+        if (
+          !orderOrg.includes(orgName) &&
+          !orgName.includes(orderOrg.replace(/\s+/g, ""))
+        ) {
+          return false;
+        }
+      }
+
       const matchesSearch =
         !query ||
         order.orderNumber.toLowerCase().includes(query) ||
@@ -123,21 +144,24 @@ export default function OrdersPage() {
         order.analystTeam.toLowerCase() === teamFilter.toLowerCase();
       return matchesSearch && matchesStatus && matchesTeam;
     });
-  }, [normalizedOrders, search, statusFilter, teamFilter]);
+  }, [
+    normalizedOrders,
+    search,
+    statusFilter,
+    teamFilter,
+    user,
+    currentOrganization,
+  ]);
 
   const orderStats = useMemo(() => {
     const total = normalizedOrders.length;
-    const newCount = normalizedOrders.filter(
-      (order) =>
-        ["pending", "pending approval"].includes(
-          order.statusLabel.toLowerCase(),
-        ),
+    const newCount = normalizedOrders.filter((order) =>
+      ["pending", "pending approval"].includes(order.statusLabel.toLowerCase()),
     ).length;
-    const processingCount = normalizedOrders.filter(
-      (order) =>
-        ["approved", "confirmed", "assigned", "processing"].includes(
-          order.statusLabel.toLowerCase(),
-        ),
+    const processingCount = normalizedOrders.filter((order) =>
+      ["approved", "confirmed", "assigned", "processing"].includes(
+        order.statusLabel.toLowerCase(),
+      ),
     ).length;
     const riskCount = normalizedOrders.filter(
       (order) =>
@@ -347,8 +371,6 @@ export default function OrdersPage() {
 
   return (
     <div>
-      <Header title="Procure Orders" />
-
       <div className="p-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">

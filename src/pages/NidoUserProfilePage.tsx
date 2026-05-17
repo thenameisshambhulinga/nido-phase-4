@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { ArrowLeft, Mail, Phone, ShieldCheck, UserCircle2 } from "lucide-react";
-import Header from "@/components/layout/Header";
+
 import { useEnhancedAuth } from "@/contexts/EnhancedAuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,9 @@ import {
 } from "@/components/ui/table";
 
 export default function NidoUserProfilePage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "User Profile" }); }, []);
+
   const navigate = useNavigate();
   const { userId } = useParams();
   const { users } = useEnhancedAuth();
@@ -30,8 +34,7 @@ export default function NidoUserProfilePage() {
   if (!profile) {
     return (
       <div>
-        <Header title="Nido User Profile" />
-        <div className="p-6">
+                <div className="p-6">
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
               Profile not found.
@@ -59,8 +62,7 @@ export default function NidoUserProfilePage() {
 
   return (
     <div>
-      <Header title="Nido User Profile" />
-      <div className="space-y-6 p-6 animate-fade-in">
+            <div className="space-y-6 p-6 animate-fade-in">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-center gap-3">
             <Button

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { useData } from "@/contexts/DataContext";
 import { useAuth, type UserRole } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 
 const SERVICE_TYPES = [
   "Installation",
@@ -224,6 +225,9 @@ const getAvatarColor = (name: string) => {
 };
 
 export default function ClientDetailPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Client Details" }); }, []);
+
   const { id } = useParams();
   const navigate = useNavigate();
   const {
@@ -1865,8 +1869,7 @@ export default function ClientDetailPage() {
 
   return (
     <div>
-      <Header title={client.name} />
-      <div className="p-6 space-y-6 animate-fade-in">
+            <div className="p-6 space-y-6 animate-fade-in">
         {/* Consistent Navigation Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-2">

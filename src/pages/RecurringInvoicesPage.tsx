@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import InvoicePDF from "@/components/sales/InvoicePDF";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,8 @@ import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
 import { MoreHorizontal, Pencil, Plus, X } from "lucide-react";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 type Frequency = "weekly" | "monthly" | "quarterly";
 type RecurringStatus = "active" | "stopped";
@@ -273,6 +275,9 @@ const frequencyLabel: Record<Frequency, string> = {
 };
 
 export default function RecurringInvoicesPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Recurring Invoices" }); }, []);
+
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -683,8 +688,7 @@ export default function RecurringInvoicesPage() {
 
   return (
     <div>
-      <Header title="Recurring Invoices" />
-      <div className="space-y-4 p-6">
+            <div className="space-y-4 p-6">
         <Card>
           <CardContent className="flex items-center justify-between pt-6">
             <div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import Header from "@/components/layout/Header";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -458,6 +458,9 @@ function CreditNoteDocument({
 }
 
 export default function CreditNotesPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Credit Notes" }); }, []);
+
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -606,8 +609,7 @@ export default function CreditNotesPage() {
 
   return (
     <div>
-      <Header title="Credit Notes" />
-      <div className="space-y-4 p-6">
+            <div className="space-y-4 p-6">
         <Card>
           <CardContent className="flex items-center justify-between pt-6">
             <h2 className="text-lg font-semibold">All Credit Notes</h2>

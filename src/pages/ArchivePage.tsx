@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { RotateCcw, Trash2, Building2, Users } from "lucide-react";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 interface ArchivedRecord {
   id: string;
@@ -22,6 +24,9 @@ function loadArchived(): ArchivedRecord[] {
 }
 
 export default function ArchivePage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Archived Records" }); }, []);
+
   const [records, setRecords] = useState<ArchivedRecord[]>(loadArchived);
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); }, [records]);
@@ -38,8 +43,7 @@ export default function ArchivePage() {
 
   return (
     <div>
-      <Header title="Archived Records" />
-      <div className="p-6 space-y-6 animate-fade-in">
+            <div className="p-6 space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-display font-bold">Archived Records</h1>
           <p className="text-sm text-muted-foreground">Manage deleted vendors and clients — restore or permanently remove</p>

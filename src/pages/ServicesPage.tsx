@@ -1,8 +1,10 @@
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { useEffect } from "react";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import {
   ArrowRight,
   ClipboardList,
@@ -42,12 +44,13 @@ const SERVICE_CARDS = [
 ];
 
 export default function ServicesPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Services" }); }, []);
+
   const navigate = useNavigate();
 
   return (
     <div className="space-y-8 p-6">
-      <Header title="Services" />
-
       <div className="relative overflow-hidden rounded-[32px] border border-blue-200/70 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-8 text-white shadow-2xl">
         <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-blue-500/25 blur-3xl" />
         <div className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-cyan-400/15 blur-3xl" />

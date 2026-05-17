@@ -15,7 +15,7 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
-import Header from "@/components/layout/Header";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import BrandAutocomplete from "@/components/shared/BrandAutocomplete";
+import CategoryCombobox from "@/components/shared/CategoryCombobox";
 
 type ProductStatus = "In Stock" | "Low Stock" | "Out of Stock";
 
@@ -290,6 +293,11 @@ function FauxRichTextArea({
 }
 
 export default function AddMasterCatalogueItemPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => {
+    setMeta({ title: "Configuration" });
+  }, []);
+
   const navigate = useNavigate();
   const { itemId } = useParams<{ itemId: string }>();
   const { user } = useAuth();
@@ -321,6 +329,7 @@ export default function AddMasterCatalogueItemPage() {
 
   const [productName, setProductName] = useState("");
   const [skuCode, setSkuCode] = useState("");
+  const [draggingSpecId, setDraggingSpecId] = useState<string | null>(null);
   const [productCode, setProductCode] = useState("");
   const [productType, setProductType] = useState("Product");
   const [physicalType, setPhysicalType] = useState("Physical");
@@ -475,38 +484,37 @@ export default function AddMasterCatalogueItemPage() {
     return sku;
   };
 
-  // Auto-generate both codes when product name or brand change (only for new items)
-  useEffect(() => {
-    if (isEditMode) return;
-    if ((skuCode && skuCode.trim()) || (productCode && productCode.trim()))
-      return;
-    if (!productName.trim() && !brand.trim()) return;
+  // Auto-generate both codes disabled (SKU must be manual-only).
+  // Product code generation remains available via "Generate" button (if present).
 
-    const t = setTimeout(() => {
-      generateProductCode();
-      generateSkuCode();
-    }, 600);
-    return () => clearTimeout(t);
-  }, [productName, brand]);
+  // General Specifications (repeating rows with Category + Attribute Value)
+  const [genSpecRows, setGenSpecRows] = useState<
+    Array<{
+      id: string;
+      category: string;
+      value: string;
+    }>
+  >([]);
 
-  // General Specifications for sidebar
-  const [generalSpecs, setGeneralSpecs] = useState({
-    manufacturer: brand || "",
-    colour: "",
-    dimensions: "",
-    weight: "",
-    warranty: "",
-    inTheBox: "",
-  });
-
-  const handleGeneralSpecsChange = (
-    field: keyof typeof generalSpecs,
-    value: string,
-  ) => {
-    setGeneralSpecs((prev) => ({
+  const addGenSpecRow = () => {
+    setGenSpecRows((prev) => [
       ...prev,
-      [field]: value,
-    }));
+      { id: `gen-${Date.now()}`, category: "", value: "" },
+    ]);
+  };
+
+  const updateGenSpecRow = (
+    id: string,
+    field: "category" | "value",
+    val: string,
+  ) => {
+    setGenSpecRows((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, [field]: val } : r)),
+    );
+  };
+
+  const deleteGenSpecRow = (id: string) => {
+    setGenSpecRows((prev) => prev.filter((r) => r.id !== id));
   };
 
   useEffect(() => {
@@ -761,8 +769,6 @@ export default function AddMasterCatalogueItemPage() {
 
   return (
     <div className="min-h-full w-full bg-background">
-      <Header title="Configuration" />
-
       {/* FULL-WIDTH STICKY TOP ACTION BAR */}
       <div className="sticky top-0 z-40 w-full border-b border-border/70 bg-white/90 backdrop-blur">
         <div className="w-full px-6 py-4" style={{ maxWidth: "100%" }}>
@@ -865,10 +871,10 @@ export default function AddMasterCatalogueItemPage() {
 
                     <div className="space-y-2">
                       <Label>Category</Label>
-                      <Input
+                      <CategoryCombobox
                         value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        placeholder="e.g., IT Hardware"
+                        onChange={setCategory}
+                        placeholder="Search or create category..."
                         className="h-11 rounded-xl"
                       />
                     </div>
@@ -883,10 +889,10 @@ export default function AddMasterCatalogueItemPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Brand</Label>
-                      <Input
+                      <BrandAutocomplete
                         value={brand}
-                        onChange={(e) => setBrand(e.target.value)}
-                        placeholder="e.g., Apple"
+                        onChange={setBrand}
+                        placeholder="Search or enter brand..."
                         className="h-11 rounded-xl"
                       />
                     </div>
@@ -986,29 +992,34 @@ export default function AddMasterCatalogueItemPage() {
                               </TableRow>
                             ) : (
                               specRows.map((r, idx) => (
-                                <TableRow key={r.id} className="align-middle">
+                                <TableRow
+                                  key={r.id}
+                                  className="align-middle"
+                                  draggable
+                                  onDragStart={() => setDraggingSpecId(r.id)}
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={() => {
+                                    if (!draggingSpecId) return;
+                                    if (draggingSpecId === r.id) return;
+                                    const from = specRows.findIndex(
+                                      (x) => x.id === draggingSpecId,
+                                    );
+                                    const to = specRows.findIndex(
+                                      (x) => x.id === r.id,
+                                    );
+                                    if (from < 0 || to < 0 || from === to)
+                                      return;
+                                    setSpecRows((prev) =>
+                                      reorder(prev, from, to),
+                                    );
+                                    setDraggingSpecId(null);
+                                  }}
+                                >
                                   <TableCell>
                                     <div className="flex flex-col items-center gap-1">
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 rounded-xl"
-                                        onClick={() => moveSpecRow(r.id, -1)}
-                                        disabled={idx === 0}
-                                      >
-                                        <span className="text-lg">↑</span>
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 rounded-xl"
-                                        onClick={() => moveSpecRow(r.id, 1)}
-                                        disabled={idx === specRows.length - 1}
-                                      >
-                                        <span className="text-lg">↓</span>
-                                      </Button>
+                                      <span className="text-muted-foreground/70 text-xs">
+                                        Drag
+                                      </span>
                                     </div>
                                   </TableCell>
                                   <TableCell>
@@ -1181,6 +1192,91 @@ export default function AddMasterCatalogueItemPage() {
                         </p>
                       </div>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* SECTION 3 - General Specifications */}
+              <Card className="rounded-2xl bg-white shadow-sm border-border/70">
+                <CardContent className="p-6 space-y-6">
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      3. General Specifications
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Categorized product attributes for structured catalog metadata.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-border/70 bg-white">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[280px]">Category</TableHead>
+                            <TableHead className="w-[280px]">Attribute Value</TableHead>
+                            <TableHead className="w-20 text-right">Delete</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {genSpecRows.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={3}
+                                className="py-8 text-center text-muted-foreground"
+                              >
+                                No general specifications yet. Click "Add Row" to begin.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            genSpecRows.map((r) => (
+                              <TableRow key={r.id} className="align-middle">
+                                <TableCell>
+                                  <Input
+                                    value={r.category}
+                                    onChange={(e) =>
+                                      updateGenSpecRow(r.id, "category", e.target.value)
+                                    }
+                                    placeholder="e.g., Manufacturer, Color, Weight"
+                                    className="h-9 rounded-lg text-sm"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    value={r.value}
+                                    onChange={(e) =>
+                                      updateGenSpecRow(r.id, "value", e.target.value)
+                                    }
+                                    placeholder="e.g., Samsung, Black, 2.5kg"
+                                    className="h-9 rounded-lg text-sm"
+                                  />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                    onClick={() => deleteGenSpecRow(r.id)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={addGenSpecRow}
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> Add Row
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1448,13 +1544,6 @@ export default function AddMasterCatalogueItemPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-border/70 bg-background/30 p-3">
-                    <div className="text-xs text-muted-foreground">
-                      Price Preview
-                    </div>
-                    <div className="text-3xl font-semibold mt-1">₹0</div>
-                  </div>
-
                   <div className="flex flex-wrap gap-2">
                     <div className="inline-flex flex-wrap gap-2">
                       <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -1516,19 +1605,7 @@ export default function AddMasterCatalogueItemPage() {
                           value={skuCode}
                           onChange={(e) => setSkuCode(e.target.value)}
                           className="h-9 rounded-lg text-sm bg-white/70"
-                          readOnly={isEditMode}
                         />
-                        {!isEditMode && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-9 rounded-lg px-3"
-                            onClick={() => generateSkuCode()}
-                          >
-                            Generate
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -1726,112 +1803,6 @@ export default function AddMasterCatalogueItemPage() {
                         </Button>
                       </div>
                     </details>
-                  </div>
-                </div>
-
-                {/* Sidebar Section 3 - General Specifications (EDITABLE) */}
-                <div className="mt-4 rounded-2xl border border-border/70 bg-white shadow-sm p-4">
-                  <div className="mb-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      General Specifications
-                    </div>
-                    <div className="mt-1 text-sm font-medium text-foreground">
-                      Product attributes
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    {/* Manufacturer */}
-                    <div>
-                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">
-                        Manufacturer
-                      </Label>
-                      <Input
-                        placeholder="e.g., Sony, Dell"
-                        value={generalSpecs.manufacturer}
-                        onChange={(e) =>
-                          handleGeneralSpecsChange(
-                            "manufacturer",
-                            e.target.value,
-                          )
-                        }
-                        className="h-8 rounded-lg text-sm"
-                      />
-                    </div>
-
-                    {/* Colour */}
-                    <div>
-                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">
-                        Colour
-                      </Label>
-                      <Input
-                        placeholder="e.g., Black, White, Silver"
-                        value={generalSpecs.colour}
-                        onChange={(e) =>
-                          handleGeneralSpecsChange("colour", e.target.value)
-                        }
-                        className="h-8 rounded-lg text-sm"
-                      />
-                    </div>
-
-                    {/* Dimensions */}
-                    <div>
-                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">
-                        Dimensions
-                      </Label>
-                      <Input
-                        placeholder="e.g., 100x200x50 cm"
-                        value={generalSpecs.dimensions}
-                        onChange={(e) =>
-                          handleGeneralSpecsChange("dimensions", e.target.value)
-                        }
-                        className="h-8 rounded-lg text-sm"
-                      />
-                    </div>
-
-                    {/* Weight */}
-                    <div>
-                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">
-                        Weight
-                      </Label>
-                      <Input
-                        placeholder="e.g., 2.5 kg"
-                        value={generalSpecs.weight}
-                        onChange={(e) =>
-                          handleGeneralSpecsChange("weight", e.target.value)
-                        }
-                        className="h-8 rounded-lg text-sm"
-                      />
-                    </div>
-
-                    {/* Warranty */}
-                    <div>
-                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">
-                        Warranty
-                      </Label>
-                      <Input
-                        placeholder="e.g., 1 Year, 2 Years"
-                        value={generalSpecs.warranty}
-                        onChange={(e) =>
-                          handleGeneralSpecsChange("warranty", e.target.value)
-                        }
-                        className="h-8 rounded-lg text-sm"
-                      />
-                    </div>
-
-                    {/* In the Box */}
-                    <div>
-                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">
-                        In the Box
-                      </Label>
-                      <Textarea
-                        placeholder="e.g., Product, Manual, Cable, Warranty Card"
-                        value={generalSpecs.inTheBox}
-                        onChange={(e) =>
-                          handleGeneralSpecsChange("inTheBox", e.target.value)
-                        }
-                        className="min-h-16 rounded-lg text-sm resize-none"
-                      />
-                    </div>
                   </div>
                 </div>
 

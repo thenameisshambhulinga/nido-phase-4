@@ -1,4 +1,4 @@
-import Header from "@/components/layout/Header";
+
 import SalesDocumentPreview from "@/components/sales/SalesDocumentPreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,10 +36,15 @@ import { ChevronDown, Mail, ArrowRight, FileText } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 const statuses = ["DRAFT", "SENT", "ACCEPTED", "REJECTED"] as const;
 
 export default function SalesQuoteDetailPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Quote Details" }); }, []);
+
   const navigate = useNavigate();
   const { id = "" } = useParams();
   const {
@@ -64,8 +69,7 @@ export default function SalesQuoteDetailPage() {
   if (!quote) {
     return (
       <div>
-        <Header title="Quote Not Found" />
-        <div className="p-6">
+                <div className="p-6">
           <Button variant="outline" onClick={() => navigate("/sales/quotes")}>
             Back to Quotes
           </Button>
@@ -146,8 +150,7 @@ export default function SalesQuoteDetailPage() {
 
   return (
     <div>
-      <Header title={`Quote ${quote.quoteNumber}`} />
-      <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6">
         <Card className="border-border/60 shadow-sm bg-white">
           <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-1">

@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import Header from "@/components/layout/Header";
+
 import InvoicePDF from "@/components/sales/InvoicePDF";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,8 @@ import {
   Wallet,
 } from "lucide-react";
 import type { Invoice } from "@/contexts/DataContext";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 const currency = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -228,6 +230,9 @@ const InvoiceSummary = memo(function InvoiceSummary({
 });
 
 export default function InvoiceDetails() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Invoice Details" }); }, []);
+
   const navigate = useNavigate();
   const { id = "" } = useParams();
   const { invoices, updateInvoice, sendEmail, getActivities, generalSettings } =
@@ -274,8 +279,7 @@ export default function InvoiceDetails() {
   if (!invoice) {
     return (
       <div>
-        <Header title="Invoice Not Found" />
-        <div className="p-6">
+                <div className="p-6">
           <Button variant="outline" onClick={() => navigate("/sales/invoices")}>
             Back to Invoices
           </Button>
@@ -387,8 +391,7 @@ export default function InvoiceDetails() {
 
   return (
     <div>
-      <Header title={`Invoice ${invoice.invoiceNumber}`} />
-      <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4">
         <Card className="border-border/60 shadow-sm">
           <CardContent className="flex flex-col gap-4 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>

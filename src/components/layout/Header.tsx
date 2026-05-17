@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   Bell,
   Settings,
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useData } from "@/contexts/DataContext";
 import GlobalSearch from "@/components/shared/GlobalSearch";
+import ProfileMenu from "./profile/ProfileMenu";
 import { useTheme, ThemeMode } from "@/contexts/ThemeContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -92,7 +93,7 @@ export default function Header({ title }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b px-3 backdrop-blur-md sm:px-6 border-[hsl(var(--header-border)/0.85)] bg-[hsl(var(--header-background)/0.92)] text-[hsl(var(--header-foreground))]">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b px-3 backdrop-blur-md sm:px-6 border-[hsl(var(--header-border)/0.85)] bg-[hsl(var(--header-background)/0.92)] text-[hsl(var(--header-foreground))]">
       <div className="flex items-center gap-2 sm:gap-3">
         <Button
           variant="ghost"
@@ -242,59 +243,11 @@ export default function Header({ title }: HeaderProps) {
           </PopoverContent>
         </Popover>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 rounded-lg border border-transparent text-[hsl(var(--header-foreground))] transition-transform hover:scale-105 hover:border-white/20 hover:bg-white/10 hover:text-[hsl(var(--header-foreground))] active:scale-95"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Appearance
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {THEMES.map((option) => (
-              <DropdownMenuItem
-                key={option.value}
-                onClick={() => setTheme(option.value)}
-                className={
-                  theme === option.value ? "bg-accent font-semibold" : ""
-                }
-              >
-                <option.icon className="mr-2 h-4 w-4" /> {option.label}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate("/archive")}>
-              <Trash2 className="mr-2 h-4 w-4" /> Archived Records
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Profile Menu with Appearance, Organizations, Logout */}
+        <ProfileMenu />
 
-        <Button
-          variant={
-            location.pathname.startsWith("/organizations")
-              ? "secondary"
-              : "ghost"
-          }
-          size="sm"
-          className="gap-2 text-[hsl(var(--header-foreground))] transition-transform hover:scale-105 active:scale-95"
-          onClick={() => navigate("/organizations")}
-        >
-          <Building2 className="h-4 w-4" />
-          {!isMobile && (
-            <span className="text-xs font-medium">Organizations</span>
-          )}
-          {!isMobile && (
-            <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-              {activeOrganizations.length}
-            </Badge>
-          )}
-        </Button>
+        {/* NOTE: Organization navigation is intentionally ONLY available from Profile menu.
+            Prevents duplicate entry points and reduces route/layout inconsistencies. */}
       </div>
     </header>
   );

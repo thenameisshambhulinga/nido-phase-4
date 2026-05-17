@@ -1,57 +1,9 @@
 import { useNavigate } from "react-router-dom";
-import { Truck, Shield, Zap, Search, ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Search, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useData } from "@/contexts/DataContext";
-
-function useInView(threshold = 0.15) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) {
-          setInView(true);
-          obs.disconnect();
-        }
-      },
-      { threshold },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
-  return { ref, inView };
-}
-
-function AnimatedSection({
-  children,
-  className,
-  delay = 0,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  delay?: number;
-}) {
-  const { ref, inView } = useInView();
-  return (
-    <div
-      ref={ref}
-      className={cn(
-        "transition-all duration-700 ease-out",
-        inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6",
-        className,
-      )}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      {children}
-    </div>
-  );
-}
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -66,243 +18,77 @@ export default function HomePage() {
     return () => window.clearTimeout(timer);
   }, [homeSearch]);
 
-  const quickResults = searchAll(debouncedHomeSearch).slice(0, 6);
+  const quickResult = useMemo(() => {
+    const term = debouncedHomeSearch.trim();
+    if (!term) return null;
+    return searchAll(term)[0] || null;
+  }, [debouncedHomeSearch, searchAll]);
+
+  const handleSubmit = () => {
+    if (quickResult?.path) {
+      navigate(quickResult.path);
+      return;
+    }
+
+    if (homeSearch.trim()) {
+      navigate(`/shop?search=${encodeURIComponent(homeSearch.trim())}`);
+      return;
+    }
+
+    navigate("/shop");
+  };
 
   return (
-    <div className="min-h-full bg-gradient-to-br from-background to-secondary/20">
-      <section className="relative py-20 px-4 text-center">
-        <AnimatedSection>
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black bg-gradient-to-r from-primary via-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight mb-6">
-            Elevate Your Procurement
-          </h1>
-        </AnimatedSection>
-        <AnimatedSection delay={200}>
-          <h2 className="text-4xl md:text-6xl lg:text-7xl font-black mb-8">
-            <span className="text-blue-600 underline decoration-yellow-400 decoration-4">
-              Nido-Tech
-            </span>
-          </h2>
-        </AnimatedSection>
-        <AnimatedSection delay={400}>
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10 leading-relaxed">
-            Your trusted B2B platform for daily-use items, office supplies,
-            electronics, and logistics solutions with enterprise-grade approval
-            workflows.
-          </p>
-          <div className="flex justify-center gap-4 mb-10">
-            <Button
-              size="lg"
-              className="rounded-xl font-semibold text-base px-8 h-12 gap-2"
-              onClick={() => navigate("/categories")}
-            >
-              Browse Catalog
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="rounded-xl font-semibold text-base px-8 h-12 gap-2"
-              onClick={() => navigate("/services")}
-            >
-              Learn More
-            </Button>
+    <div className="relative min-h-full overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.14),_transparent_42%),linear-gradient(180deg,_#f8fafc,_#eef4ff_62%,_#f8fafc)]">
+      <div className="pointer-events-none absolute inset-0 opacity-70">
+        <div className="absolute left-[-8rem] top-[-4rem] h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="absolute right-[-6rem] top-24 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl" />
+      </div>
+
+      <section
+        className={cn(
+          "relative mx-auto flex min-h-[calc(100vh-8rem)] max-w-4xl items-center px-4 py-16 sm:px-6 lg:px-8",
+        )}
+      >
+        <div className="w-full space-y-10">
+          <div className="space-y-5 text-center">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/70 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700 shadow-sm backdrop-blur">
+              <Sparkles className="h-3.5 w-3.5" />
+              NIDO-TECH
+            </div>
+            <h1 className="text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+              Elevate Your Procurement with NIDO-TECH
+            </h1>
           </div>
-        </AnimatedSection>
-        <AnimatedSection delay={600}>
-          <div className="mx-auto w-full max-w-4xl">
-            <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-card via-white to-card p-2 shadow-2xl">
-              <div className="relative rounded-xl border bg-background px-6 py-4">
-                <div className="absolute inset-y-0 left-6 flex items-center text-primary/70">
-                  <Search className="h-5 w-5" />
-                </div>
+
+          <form
+            className="mx-auto w-full max-w-2xl"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSubmit();
+            }}
+          >
+            <div className="group relative rounded-[28px] border border-slate-200 bg-white/90 p-2 shadow-[0_24px_70px_-32px_rgba(15,23,42,0.3)] backdrop-blur-xl transition-transform duration-300 hover:-translate-y-0.5">
+              <div className="absolute inset-0 rounded-[28px] bg-gradient-to-r from-blue-500/10 via-transparent to-cyan-500/10 opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100" />
+              <div className="relative flex items-center gap-3 rounded-[22px] bg-slate-50 px-4 py-3">
+                <Search className="h-5 w-5 shrink-0 text-slate-400" />
                 <input
                   value={homeSearch}
-                  onChange={(e) => setHomeSearch(e.target.value)}
-                  placeholder="🔍 Search 2000+ products, vendors, clients, orders..."
-                  className="h-14 w-full border-0 bg-transparent pl-16 pr-16 text-lg placeholder:text-muted-foreground focus:placeholder:text-transparent outline-none"
+                  onChange={(event) => setHomeSearch(event.target.value)}
+                  placeholder="Search products, clients, orders..."
+                  className="h-11 flex-1 border-0 bg-transparent text-[15px] text-slate-900 placeholder:text-slate-400 outline-none"
                 />
                 <Button
-                  variant="ghost"
+                  type="submit"
                   size="icon"
-                  className="absolute inset-y-0 right-4 flex items-center"
-                  onClick={() => setHomeSearch("")}
+                  className="h-10 w-10 rounded-xl bg-blue-600 text-white shadow-md transition hover:bg-blue-700"
                 >
-                  {homeSearch ? (
-                    <ArrowRight className="h-5 w-5" />
-                  ) : (
-                    <Sparkles className="h-5 w-5" />
-                  )}
+                  <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
-            {debouncedHomeSearch && quickResults.length > 0 && (
-              <div className="mt-4 max-w-4xl mx-auto rounded-xl border bg-card shadow-md">
-                <div className="grid gap-2 p-4">
-                  {quickResults.slice(0, 5).map((result: any) => (
-                    <div
-                      key={result.id}
-                      className="flex items-center p-3 rounded-lg hover:bg-accent cursor-pointer transition-colors"
-                      onClick={() => navigate(result.path)}
-                    >
-                      <div className="mr-3">
-                        <Badge variant="outline" className="text-xs">
-                          {result.group}
-                        </Badge>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{result.title}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {result.subtitle}
-                        </p>
-                      </div>
-                      <ArrowRight className="h-4 w-4 ml-2 text-muted-foreground" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </AnimatedSection>
-        <AnimatedSection delay={800}>
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {[
-              {
-                icon: Truck,
-                title: "Lightning Delivery",
-                desc: "Same-day dispatch • Track in real-time",
-              },
-              {
-                icon: Shield,
-                title: "Ironclad Security",
-                desc: "Role-based approvals • Full audit trail",
-              },
-              {
-                icon: Zap,
-                title: "Budget Control",
-                desc: "Pre-approved pricing • Auto workflows",
-              },
-            ].map((feature) => (
-              <Card
-                key={feature.title}
-                className="group hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 border-primary/30 bg-gradient-to-b from-card to-muted p-1 rounded-2xl"
-              >
-                <div className="bg-background p-8 rounded-xl h-full group-hover:bg-gradient-to-br group-hover:from-primary/5">
-                  <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center group-hover:bg-primary/20 transition-all mb-6 mx-auto">
-                    <feature.icon className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-                  </div>
-                  <h3 className="text-xl font-bold text-foreground mb-3 text-center">
-                    {feature.title}
-                  </h3>
-                  <p className="text-muted-foreground text-center leading-relaxed">
-                    {feature.desc}
-                  </p>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </AnimatedSection>
-
-        <AnimatedSection delay={900}>
-          <div className="mt-16 max-w-6xl mx-auto rounded-[12px] border border-[#E5E7EB] bg-white p-6">
-            <h3 className="text-lg font-semibold text-[#111827]">
-              Trusted By Enterprise Teams
-            </h3>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-[#6B7280] md:grid-cols-5">
-              {["ABB", "HDFC Bank", "TCS", "Infosys", "Wipro"].map(
-                (company) => (
-                  <div
-                    key={company}
-                    className="rounded-md border border-[#E5E7EB] bg-[#F8FAFC] px-3 py-2 text-center font-medium"
-                  >
-                    {company}
-                  </div>
-                ),
-              )}
-            </div>
-          </div>
-        </AnimatedSection>
-
-        <AnimatedSection delay={1000}>
-          <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4 max-w-6xl mx-auto">
-            {[
-              { label: "Active Clients", value: "120+" },
-              { label: "Monthly Orders", value: "18K+" },
-              { label: "Vendor Network", value: "350+" },
-              { label: "On-time SLA", value: "98.4%" },
-            ].map((stat) => (
-              <Card key={stat.label} className="p-4 text-center">
-                <p className="text-2xl font-semibold text-[#111827]">
-                  {stat.value}
-                </p>
-                <p className="text-sm text-[#6B7280]">{stat.label}</p>
-              </Card>
-            ))}
-          </div>
-        </AnimatedSection>
-
-        <AnimatedSection delay={1100}>
-          <div className="mt-10 max-w-6xl mx-auto grid gap-4 md:grid-cols-3">
-            {[
-              {
-                quote:
-                  "Nido made our procurement approval flow 3x faster and cut manual effort significantly.",
-                name: "Rahul Menon",
-                role: "Procurement Head, ABB",
-              },
-              {
-                quote:
-                  "The catalogue and vendor insights helped us reduce cost variance across branches.",
-                name: "Pooja Nair",
-                role: "Operations Manager, Infosys",
-              },
-              {
-                quote:
-                  "Audit-ready workflows and controls gave finance and compliance teams full visibility.",
-                name: "Ankit Sharma",
-                role: "Finance Controller, HDFC",
-              },
-            ].map((item) => (
-              <Card key={item.name}>
-                <Card className="border-0 shadow-none p-0">
-                  <div className="p-5">
-                    <p className="text-sm text-[#111827]">"{item.quote}"</p>
-                    <p className="mt-4 text-sm font-medium">{item.name}</p>
-                    <p className="text-xs text-[#6B7280]">{item.role}</p>
-                  </div>
-                </Card>
-              </Card>
-            ))}
-          </div>
-        </AnimatedSection>
-
-        <AnimatedSection delay={1200}>
-          <div className="mt-12 max-w-6xl mx-auto rounded-[12px] border border-[#DBEAFE] bg-[#EFF6FF] p-6 text-center">
-            <h3 className="text-xl font-semibold text-[#111827]">
-              Ready to modernize enterprise procurement?
-            </h3>
-            <p className="mt-2 text-sm text-[#6B7280]">
-              Launch controlled approvals, intelligent catalog operations, and
-              multi-vendor visibility.
-            </p>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-              <Button onClick={() => navigate("/shop")}>Start Shopping</Button>
-              <Button
-                variant="outline"
-                onClick={() => navigate("/configuration/master-catalogue")}
-              >
-                Manage Catalogue
-              </Button>
-            </div>
-          </div>
-        </AnimatedSection>
-
-        <footer className="mt-16 border-t border-[#E5E7EB] pt-8 text-sm text-[#6B7280]">
-          <div className="mx-auto flex max-w-6xl flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <p>© {new Date().getFullYear()} Nido Tech CorpEssentials</p>
-            <p>
-              Enterprise Procurement Platform • Secure • Scalable • Audit-ready
-            </p>
-          </div>
-        </footer>
+          </form>
+        </div>
       </section>
     </div>
   );

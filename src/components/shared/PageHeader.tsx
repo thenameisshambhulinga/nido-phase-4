@@ -1,6 +1,5 @@
 import React from "react";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import EnterpriseBackButton from "@/components/shared/EnterpriseBackButton";
 import {
   Breadcrumb,
   type BreadcrumbItem,
@@ -44,14 +43,11 @@ export function PageHeader({
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Back Button */}
         {showBackButton && (
-          <Button
-            variant="outline"
-            className={cn(PAGE_PILL_BUTTON_CLASS, "flex-shrink-0")}
+          <EnterpriseBackButton
             onClick={onBack}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {backLabel}
-          </Button>
+            label={backLabel}
+            className={cn(PAGE_PILL_BUTTON_CLASS, "flex-shrink-0")}
+          />
         )}
 
         {/* Title (if no back button, show title in main area) */}

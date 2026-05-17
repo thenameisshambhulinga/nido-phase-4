@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/storage";
@@ -453,6 +453,15 @@ function PurchaseOrderPdfView({
 }
 
 export default function PurchaseOrdersPage() {
+  const { setMeta } = usePageMeta();
+
+  useEffect(() => {
+    setMeta({
+      title: selectedOrder ? selectedOrder.poNumber : "Purchase Orders",
+      breadcrumbs: [{ label: "Procure Orders" }],
+    });
+    return () => setMeta({});
+  }, [selectedOrder, setMeta]);
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -764,8 +773,7 @@ export default function PurchaseOrdersPage() {
 
     return (
       <div>
-        <Header title={selectedOrder.poNumber} />
-        <div className="space-y-4 p-6">
+                <div className="space-y-4 p-6">
           <Card>
             <CardContent className="py-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1034,8 +1042,7 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div>
-      <Header title="Purchase Orders" />
-      <div className="space-y-4 p-6">
+            <div className="space-y-4 p-6">
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-5">
             <h2 className="text-3xl font-semibold">All Purchase Orders</h2>

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -159,7 +159,6 @@ export default function MainDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Header title="Product Dashboard" />
       <div className="space-y-6 p-6 animate-fade-in">
         <section className="relative overflow-hidden rounded-3xl border border-sky-200/70 bg-gradient-to-br from-slate-100 via-blue-50 to-cyan-100 p-6 md:p-8">
           <div className="pointer-events-none absolute -right-16 -top-12 h-48 w-48 rounded-full bg-blue-500/15 blur-3xl" />

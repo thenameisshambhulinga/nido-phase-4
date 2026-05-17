@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useReactToPrint } from "react-to-print";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useData } from "@/contexts/DataContext";
 import { safeReadJson } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
@@ -193,6 +193,15 @@ function VendorCreditDocument({ entry }: { entry: VendorCreditEntry }) {
 }
 
 export default function VendorCreditsPage() {
+  const { setMeta } = usePageMeta();
+
+  useEffect(() => {
+    setMeta({
+      title: "Vendor Credits",
+      breadcrumbs: [{ label: "Vendors" }, { label: "Credits" }],
+    });
+    return () => setMeta({});
+  }, [setMeta]);
   const { vendors } = useData();
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -401,7 +410,6 @@ export default function VendorCreditsPage() {
 
   return (
     <div>
-      <Header title="Vendor Credits" />
       <div className="space-y-4 p-6">
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">

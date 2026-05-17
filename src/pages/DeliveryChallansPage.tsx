@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import Header from "@/components/layout/Header";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -400,6 +400,9 @@ function DeliveryChallanDocument({
 }
 
 export default function DeliveryChallansPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Delivery Challans" }); }, []);
+
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -625,8 +628,7 @@ export default function DeliveryChallansPage() {
 
   return (
     <div>
-      <Header title="Delivery Challans" />
-      <div className="space-y-4 p-6">
+            <div className="space-y-4 p-6">
         <Card>
           <CardContent className="flex items-center justify-between pt-6">
             <h2 className="text-lg font-semibold">Delivery Challans</h2>

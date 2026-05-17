@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+
 import { Card } from "@/components/ui/card";
 import {
   Popover,
@@ -154,12 +156,14 @@ const CONFIG_CARDS: ConfigCard[] = [
 ];
 
 export default function ConfigurationHubPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Configuration" }); }, []);
+
   const navigate = useNavigate();
 
   return (
     <div>
-      <Header title="Configuration" />
-      <div className="p-6 space-y-6 animate-fade-in">
+            <div className="p-6 space-y-6 animate-fade-in">
         <h1 className="text-2xl font-display font-bold">Configuration</h1>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {CONFIG_CARDS.map((card) => {

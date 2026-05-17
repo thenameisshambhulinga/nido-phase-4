@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/layout/Header";
+
 import { useEnhancedAuth } from "@/contexts/EnhancedAuthContext";
 import { AuditLog } from "@/lib/userManagementTypes";
 import {
@@ -49,6 +49,9 @@ import {
 } from "lucide-react";
 
 export default function AuditLogPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Audit Log" }); }, []);
+
   const { auditLogs, getAuditLogs } = useEnhancedAuth();
 
   const [actionFilter, setActionFilter] = useState<string>("all");
@@ -168,8 +171,7 @@ export default function AuditLogPage() {
 
   return (
     <div className="min-h-full bg-background">
-      <Header title="Audit Trail & Activity Log" />
-
+      
       <div className="p-6 space-y-6">
         {/* Overview */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">

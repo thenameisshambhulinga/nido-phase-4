@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { useAuth, type User } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,7 @@ import {
   PAGE_PILL_PRIMARY_BUTTON_CLASS,
 } from "@/lib/navigationStyles";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 
 type DeviceStatus = "available" | "assigned" | "maintenance";
 
@@ -274,6 +275,9 @@ function DetailCard({
 }
 
 export default function UserProfilePage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "User Profile" }); }, []);
+
   const { id: clientId, userId } = useParams();
   const navigate = useNavigate();
   const { users, updateUser } = useAuth();
@@ -649,8 +653,7 @@ export default function UserProfilePage() {
   if (!client) {
     return (
       <div>
-        <Header title="User Profile" />
-        <div className="p-6">
+                <div className="p-6">
           <Card className="rounded-2xl border border-gray-100 shadow-sm">
             <CardContent className="p-6">
               <p className="text-sm text-muted-foreground">
@@ -677,8 +680,7 @@ export default function UserProfilePage() {
   return (
     <>
       <div>
-        <Header title={clientCompanyName} />
-
+        
         <div className="min-h-full bg-slate-50/70 p-4 md:p-6">
           <div className="mx-auto max-w-[1680px] space-y-6">
             <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">

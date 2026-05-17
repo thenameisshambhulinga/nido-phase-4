@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,6 +39,8 @@ import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
 import { useData } from "@/contexts/DataContext";
 import { Ellipsis, Pencil, Plus, X } from "lucide-react";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 type Frequency = "Weekly" | "Monthly" | "Quarterly";
 type ProfileStatus = "ACTIVE" | "STOPPED";
@@ -170,6 +172,9 @@ const fmtCurrency = (value: number) =>
   }).format(value);
 
 export default function RecurringExpensesPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Recurring Expenses" }); }, []);
+
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -470,8 +475,7 @@ export default function RecurringExpensesPage() {
 
   return (
     <div>
-      <Header title="Recurring Expenses" />
-      <div className="space-y-4 p-6">
+            <div className="space-y-4 p-6">
         <Card>
           <CardContent className="pt-5">
             <div className="flex flex-wrap items-center justify-between gap-4">

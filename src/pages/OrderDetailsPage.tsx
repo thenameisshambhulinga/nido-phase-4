@@ -5,7 +5,7 @@ import {
   useSearchParams,
   useLocation,
 } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +66,8 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import QuickMailComposer from "@/components/shared/QuickMailComposer";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 interface SubOrder {
   subOrderId: string;
@@ -237,6 +239,9 @@ const formatTimelineDate = (value: string) =>
   });
 
 export default function OrderDetailsPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Order Details" }); }, []);
+
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1070,8 +1075,7 @@ export default function OrderDetailsPage() {
 
   return (
     <div>
-      <Header title="Order History" />
-      <div className="p-6 space-y-6 animate-fade-in">
+            <div className="p-6 space-y-6 animate-fade-in">
         <Button
           variant="ghost"
           size="sm"

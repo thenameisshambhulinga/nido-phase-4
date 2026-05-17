@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { useData } from "@/contexts/DataContext";
 import NewSalesOrderModal from "@/pages/NewSalesOrderModal";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 
 const statusVariant: Record<
   string,
@@ -44,6 +45,9 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 export default function SalesOrdersPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Sales Orders" }); }, []);
+
   const navigate = useNavigate();
   const { salesOrders } = useData();
   const [search, setSearch] = useState("");
@@ -72,7 +76,6 @@ export default function SalesOrdersPage() {
 
   return (
     <div>
-      <Header title="Sales Orders" />
       <div className="p-6 space-y-4">
         <Card className="border-border/60 shadow-sm">
           <CardContent className="flex flex-col gap-4 pt-6 md:flex-row md:items-center md:justify-between">

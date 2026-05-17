@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import Header from "@/components/layout/Header";
+
 import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/storage";
@@ -42,6 +42,8 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Ellipsis, Mail, Pencil, Plus, Printer, X } from "lucide-react";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 type BillStatus = "DRAFT" | "OPEN" | "PAID";
 
@@ -415,6 +417,9 @@ function BillPdfSheet({
 }
 
 export default function BillsPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Bills" }); }, []);
+
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -652,8 +657,7 @@ export default function BillsPage() {
 
     return (
       <div>
-        <Header title={selectedBill.billNumber} />
-        <div className="space-y-4 p-6">
+                <div className="space-y-4 p-6">
           <Card>
             <CardContent className="py-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -864,8 +868,7 @@ export default function BillsPage() {
 
   return (
     <div>
-      <Header title="Bills" />
-      <div className="space-y-4 p-6">
+            <div className="space-y-4 p-6">
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
             <h2 className="text-3xl font-semibold">All Bills</h2>

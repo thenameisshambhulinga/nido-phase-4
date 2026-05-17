@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +35,8 @@ import { toast } from "@/hooks/use-toast";
 import { nextSequentialCode } from "@/lib/documentNumbering";
 import { Paperclip, Plus, Search, Trash2 } from "lucide-react";
 import type { Invoice, SalesLineItem } from "@/contexts/DataContext";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 type InvoiceDraftItem = SalesLineItem & { catalogItemId?: string };
 
@@ -110,6 +112,9 @@ const gstTreatmentLabel = (value: InvoiceDraft["customerBusinessType"]) => {
 };
 
 export default function InvoicePage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Invoices" }); }, []);
+
   const navigate = useNavigate();
   const {
     invoices,
@@ -489,8 +494,7 @@ export default function InvoicePage() {
 
   return (
     <div>
-      <Header title="Invoices" />
-      <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4">
         <Card className="border-border/60 shadow-sm">
           <CardContent className="flex flex-col gap-4 pt-6 md:flex-row md:items-center md:justify-between">
             <div>

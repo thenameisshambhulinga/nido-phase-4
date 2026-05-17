@@ -34,6 +34,7 @@ export interface User {
   modules?: string[];
   jobTitle?: string;
   department?: string;
+  phone?: string;
   mustResetPassword?: boolean;
 }
 
@@ -315,7 +316,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           organization: data.organization,
           permissions: {},
           email: normalizeEmail(data.email),
-          phone: data.phone,
+          phone: (data as any).phone,
           jobTitle: data.jobTitle,
           department: data.department,
         },

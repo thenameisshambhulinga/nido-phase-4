@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -206,8 +206,6 @@ export default function VendorOrdersPage() {
 
   return (
     <div>
-      <Header title="Vendor Orders" />
-
       <div className="space-y-6 p-6">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">

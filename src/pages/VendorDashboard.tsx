@@ -1,4 +1,4 @@
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useData } from "@/contexts/DataContext";
 import { Building2, DollarSign, ShoppingBag, Star, TrendingUp } from "lucide-react";
@@ -6,10 +6,15 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 const COLORS = ["hsl(213, 55%, 35%)", "hsl(142, 70%, 40%)", "hsl(38, 92%, 50%)", "hsl(0, 84%, 60%)", "hsl(200, 80%, 50%)"];
 
 export default function VendorDashboard() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Vendor Dashboard" }); }, []);
+
   const { vendors, orders } = useData();
 
   const totalSpend = vendors.reduce((s, v) => s + v.totalSpend, 0);
@@ -27,8 +32,7 @@ export default function VendorDashboard() {
 
   return (
     <div>
-      <Header title="Vendor Dashboard" />
-      <div className="p-6 space-y-6 animate-fade-in">
+            <div className="p-6 space-y-6 animate-fade-in">
         <h1 className="text-2xl font-display font-bold">Vendor Analytics</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/layout/Header";
+
 import { useEnhancedAuth } from "@/contexts/EnhancedAuthContext";
 import { UserDepartment } from "@/lib/userManagementTypes";
 import {
@@ -32,8 +32,13 @@ import {
 import { Plus, Pencil, Trash2, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 export default function DepartmentsPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Departments" }); }, []);
+
   const {
     departments,
     createDepartment,
@@ -117,8 +122,7 @@ export default function DepartmentsPage() {
 
   return (
     <div className="min-h-full bg-background">
-      <Header title="Department & Team Management" />
-
+      
       <div className="p-6 space-y-6">
         {/* Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -1,4 +1,4 @@
-import Header from "@/components/layout/Header";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { useData } from "@/contexts/DataContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 const badgeVariantByStatus: Record<
   string,
@@ -26,6 +28,9 @@ const badgeVariantByStatus: Record<
 };
 
 export default function SalesQuotesPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Sales Quotes" }); }, []);
+
   const navigate = useNavigate();
   const {
     salesQuotes,
@@ -110,8 +115,7 @@ export default function SalesQuotesPage() {
 
   return (
     <div>
-      <Header title="Sales Quotes" />
-      <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4">
         <Card>
           <CardContent className="pt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50 shadow-sm md:flex-row md:items-center md:justify-between">
             <div>

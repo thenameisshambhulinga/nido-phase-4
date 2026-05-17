@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Plus, User, MoreVertical } from "lucide-react";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import CredentialsModal from "@/components/shared/CredentialsModal";
 import { toast } from "@/hooks/use-toast";
 
@@ -45,6 +46,20 @@ export default function ClientsPage() {
   const navigate = useNavigate();
   const { clients, isCoreDataLoading, coreDataError } = useData();
   const { createUser } = useAuth();
+  const { setMeta } = usePageMeta();
+  const { currentOrganization } = useOrganization();
+  const { user } = useAuth();
+
+  // Determine if user is a client role
+  const isClientRole = user?.role?.toLowerCase().startsWith("client_");
+
+  // For client roles, only show their own organization
+  const displayOrganization = isClientRole ? currentOrganization : null;
+
+  useEffect(() => {
+    setMeta({ title: "Clients", breadcrumbs: [{ label: "Clients" }] });
+    return () => setMeta({});
+  }, [setMeta]);
 
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<
@@ -96,6 +111,16 @@ export default function ClientsPage() {
   const filteredClients = useMemo(() => {
     let filtered = clients;
 
+    // FOR CLIENT ROLES: Only show user's own organization, not all clients
+    if (isClientRole && displayOrganization) {
+      // Match by organization name or ID
+      const orgName = displayOrganization.name.toLowerCase();
+      filtered = filtered.filter((client) => {
+        const clientName = (client.name || client.companyName || "").toLowerCase();
+        return clientName === orgName || clientName.includes(orgName) || orgName.includes(clientName);
+      });
+    }
+
     // Tab filter
     if (activeTab === "active") {
       filtered = filtered.filter((c) => c.status === "active");
@@ -127,7 +152,7 @@ export default function ClientsPage() {
     }
 
     return filtered;
-  }, [clients, search, activeTab]);
+  }, [clients, search, activeTab, isClientRole, displayOrganization]);
 
   const handleCreateUser = async () => {
     if (!userForm.name.trim() || !userForm.email.trim()) {
@@ -221,7 +246,6 @@ export default function ClientsPage() {
 
   return (
     <div>
-      <Header title="Clients" />
       <div className="p-6 space-y-6 animate-fade-in">
         {isCoreDataLoading && (
           <div className="flex items-center justify-center p-12">
@@ -246,28 +270,38 @@ export default function ClientsPage() {
             {/* Header with actions */}
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold">Clients</h1>
+                <h1 className="text-3xl font-bold">
+                  {isClientRole && displayOrganization
+                    ? displayOrganization.name
+                    : "Clients"
+                  }
+                </h1>
                 <p className="text-sm text-muted-foreground">
-                  Manage all your client accounts
+                  {isClientRole && displayOrganization
+                    ? "Your organization details and team members"
+                    : "Manage all your client accounts"
+                  }
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => setShowCreateUserDialog(true)}
-                >
-                  <User className="h-4 w-4" /> Create User
-                </Button>
-                <Button
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => navigate("/clients/add")}
-                >
-                  <Plus className="h-4 w-4" /> Add Client
-                </Button>
-              </div>
+              {!isClientRole && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setShowCreateUserDialog(true)}
+                  >
+                    <User className="h-4 w-4" /> Create User
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => navigate("/clients/add")}
+                  >
+                    <Plus className="h-4 w-4" /> Add Client
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Stats cards */}

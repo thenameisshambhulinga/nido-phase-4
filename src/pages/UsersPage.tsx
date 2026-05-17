@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,12 @@ import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import { isValidEmail, normalizeEmail } from "@/lib/validation";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 
 export default function UsersPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Users" }); }, []);
+
   const {
     users,
     createUser,
@@ -158,8 +162,6 @@ export default function UsersPage() {
 
   return (
     <div>
-      <Header title="User Management" />
-
       <div className="p-6 space-y-4">
         <div className="flex justify-between">
           <Input

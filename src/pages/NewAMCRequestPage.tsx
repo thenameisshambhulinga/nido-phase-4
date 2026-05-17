@@ -1,8 +1,10 @@
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import AMCForm from "@/components/forms/AMCForm";
 import { safeReadJson } from "@/lib/storage";
 import { toast } from "sonner";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 const STORAGE_KEY = "nido_services_tickets_v2";
 
@@ -19,6 +21,9 @@ const buildNewTicketId = (tickets: any[]) => {
 };
 
 export default function NewAMCRequestPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "New AMC Request" }); }, []);
+
   const navigate = useNavigate();
 
   const handleSubmit = (payload: any) => {
@@ -60,8 +65,7 @@ export default function NewAMCRequestPage() {
 
   return (
     <div className="space-y-6 p-6">
-      <Header title="New AMC Request" />
-      <div className="mx-auto max-w-6xl rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="mx-auto max-w-6xl rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
         <AMCForm onSubmit={handleSubmit} />
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,8 @@ import { useData } from "@/contexts/DataContext";
 import { toast } from "@/hooks/use-toast";
 import { nextSequentialCode } from "@/lib/documentNumbering";
 import { Trash2, Plus, Save } from "lucide-react";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 interface QuoteFormData {
   quoteNumber: string;
@@ -64,6 +66,9 @@ interface QuoteFormData {
 }
 
 export default function SalesQuoteFormPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Sales Quote" }); }, []);
+
   const navigate = useNavigate();
   const { id } = useParams();
   const {
@@ -289,8 +294,7 @@ export default function SalesQuoteFormPage() {
 
   return (
     <div>
-      <Header title={existingQuote ? "Edit Quote" : "Create Quote"} />
-      <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6">
         {/* Quote Header */}
         <Card>
           <CardHeader>

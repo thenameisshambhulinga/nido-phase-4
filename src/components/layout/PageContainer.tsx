@@ -16,7 +16,7 @@ export default function PageContainer({
     <div
       className={cn(
         "w-full",
-        compact ? "max-w-6xl" : "max-w-[1700px]",
+        compact ? "max-w-6xl" : "max-w-[1400px]",
         "mx-auto",
         className,
       )}

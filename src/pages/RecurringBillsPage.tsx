@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { useData } from "@/contexts/DataContext";
 import { safeReadJson } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import {
   CalendarClock,
   Ellipsis,
@@ -210,6 +211,9 @@ const defaultHistory: Record<string, RecurringBillHistory[]> = {
 };
 
 export default function RecurringBillsPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Recurring Bills" }); }, []);
+
   const navigate = useNavigate();
   const { vendors } = useData();
 
@@ -519,7 +523,6 @@ export default function RecurringBillsPage() {
 
   return (
     <div>
-      <Header title="Recurring Bills" />
       <div className="space-y-4 p-6">
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">

@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -434,6 +435,11 @@ const emptyItem: Omit<CatalogItem, "id"> = {
 };
 
 export default function MasterCataloguePage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => {
+    setMeta({ title: "Configuration" });
+  }, []);
+
   const navigate = useNavigate();
   const { user, isOwner } = useAuth();
   const {
@@ -460,7 +466,6 @@ export default function MasterCataloguePage() {
 
   const [form, setForm] = useState<Omit<CatalogItem, "id">>(emptyItem);
   const [autoProductCode, setAutoProductCode] = useState(false);
-  const [autoSku, setAutoSku] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [categories, setCategories] =
     useState<Record<string, string[]>>(defaultCategories);
@@ -639,7 +644,7 @@ export default function MasterCataloguePage() {
       toast.error("Item Name is required");
       return;
     }
-    const sku = autoSku ? generateSku() : form.sku;
+    const sku = form.sku;
     const productCode = autoProductCode
       ? generateProductCode()
       : form.productCode.trim() || sku.trim() || generateProductCode();
@@ -907,7 +912,6 @@ export default function MasterCataloguePage() {
 
   return (
     <div>
-      <Header title="Configuration" />
       <div className="p-6 space-y-6 animate-fade-in">
         {/* Consistent Back Navigation */}
         <div>
@@ -938,7 +942,7 @@ export default function MasterCataloguePage() {
             )}
           </div>
           <Button className="gap-1.5" onClick={() => setBulkImportOpen(true)}>
-            <Plus size={14} /> Bulk Import
+            <Plus size={14} /> Price Engine
           </Button>
         </div>
 
@@ -1309,7 +1313,7 @@ export default function MasterCataloguePage() {
         <Dialog open={bulkImportOpen} onOpenChange={setBulkImportOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Bulk Import Items</DialogTitle>
+              <DialogTitle>Price Engine Items</DialogTitle>
             </DialogHeader>
             <div className="text-center p-8 border-2 border-dashed border-border rounded-lg">
               <Upload size={32} className="mx-auto text-primary mb-3" />
@@ -1838,23 +1842,10 @@ export default function MasterCataloguePage() {
                       />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <Label>SKU</Label>
-                        <div className="flex items-center gap-1 ml-auto">
-                          <Checkbox
-                            checked={autoSku}
-                            onCheckedChange={(v) => setAutoSku(Boolean(v))}
-                            id="autoSku"
-                          />
-                          <Label htmlFor="autoSku" className="text-xs">
-                            Auto-Generate
-                          </Label>
-                        </div>
-                      </div>
+                      <Label>SKU</Label>
                       <Input
                         placeholder="e.g., LAP-1002"
-                        value={autoSku ? "(auto)" : form.sku}
-                        disabled={autoSku}
+                        value={form.sku}
                         onChange={(e) => updateForm({ sku: e.target.value })}
                       />
                     </div>

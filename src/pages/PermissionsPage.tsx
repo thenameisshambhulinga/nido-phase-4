@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import Header from "@/components/layout/Header";
+import { useMemo, useState, useEffect } from "react";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useData } from "@/contexts/DataContext";
@@ -56,6 +56,12 @@ function makeDefaultPermissions() {
 
 export default function PermissionsPage() {
   const { roles, addRole, updateRole, deleteRole } = useData();
+  const { setMeta } = usePageMeta();
+
+  useEffect(() => {
+    setMeta({ title: "Nido Roles", breadcrumbs: [{ label: "Nido Roles" }] });
+    return () => setMeta({});
+  }, [setMeta]);
 
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -69,17 +75,15 @@ export default function PermissionsPage() {
     Record<string, Record<string, boolean>>
   >(makeDefaultPermissions());
 
-  const filtered = useMemo(
-    () =>
-      roles.filter((r) => {
-        const q = search.toLowerCase();
-        return (
-          r.name.toLowerCase().includes(q) ||
-          (r.description || "").toLowerCase().includes(q)
-        );
-      }),
-    [roles, search],
-  );
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return roles.filter((r) => {
+      return (
+        r.name.toLowerCase().includes(q) ||
+        (r.description || "").toLowerCase().includes(q)
+      );
+    });
+  }, [roles, search]);
 
   const resetForm = () => {
     setEditing(null);
@@ -142,8 +146,6 @@ export default function PermissionsPage() {
 
   return (
     <div>
-      <Header title="Nido Roles" />
-
       <div className="p-6 space-y-4">
         <div className="flex justify-between items-center gap-3">
           <div className="relative w-full max-w-md">
@@ -216,7 +218,6 @@ export default function PermissionsPage() {
           </CardContent>
         </Card>
       </div>
-
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

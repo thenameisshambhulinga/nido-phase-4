@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/layout/Header";
+
 import { useEnhancedAuth } from "@/contexts/EnhancedAuthContext";
 import { ROLE_TEMPLATES, RoleTemplateKey, UserType } from "@/lib/permissions";
 import { UserInvitation } from "@/lib/userManagementTypes";
@@ -48,8 +48,13 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 export default function UserInvitationPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "User Invitation" }); }, []);
+
   const {
     inviteUser,
     getInvitations,
@@ -189,8 +194,7 @@ export default function UserInvitationPage() {
 
   return (
     <div className="min-h-full bg-background">
-      <Header title="User Invitation & Onboarding" />
-
+      
       <div className="p-6 space-y-6">
         {/* Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

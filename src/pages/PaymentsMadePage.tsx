@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import Header from "@/components/layout/Header";
+
 import { useData } from "@/contexts/DataContext";
 import { safeReadJson } from "@/lib/storage";
 import { toast } from "@/hooks/use-toast";
@@ -35,6 +35,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Ellipsis, Mail, Pencil, Plus, Printer, X } from "lucide-react";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 type BillStatus = "DRAFT" | "OPEN" | "PAID";
 
@@ -202,6 +204,9 @@ function PaymentVoucher({ entry }: { entry: PaymentEntry }) {
 }
 
 export default function PaymentsMadePage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Payments Made" }); }, []);
+
   const navigate = useNavigate();
   const location = useLocation();
   const { vendors } = useData();
@@ -364,8 +369,7 @@ export default function PaymentsMadePage() {
 
   return (
     <div>
-      <Header title="Payments Made" />
-      <div className="space-y-4 p-6">
+            <div className="space-y-4 p-6">
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
             <h2 className="text-3xl font-semibold">All Payments</h2>

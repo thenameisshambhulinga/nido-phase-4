@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, view } from "react";
 import { Outlet } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Sidebar from "@/components/layout/Sidebar";
 import FloatingCartButton from "@/components/layout/FloatingCartButton";
+import Header from "@/components/layout/Header";
+import { PageMetaProvider } from "@/contexts/PageMetaContext";
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -12,18 +14,15 @@ export default function AppLayout() {
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    if (!isMobile) {
-      setSidebarOpen(false);
-    }
+    if (!isMobile) setSidebarOpen(false);
   }, [isMobile]);
 
   return (
-    <div className="h-screen overflow-hidden bg-background text-foreground">
+    <div className="h-screen w-screen overflow-hidden bg-background text-foreground">
       <div className="flex h-full w-full overflow-hidden">
-        {/* Sidebar */}
         <div
           className={cn(
-            "fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-out",
+            "fixed inset-y-0 left-0 z-50 flex-shrink-0 transition-transform duration-300 ease-out",
             isMobile
               ? sidebarOpen
                 ? "translate-x-0"
@@ -38,23 +37,18 @@ export default function AppLayout() {
             onCollapseChange={setSidebarCollapsed}
           />
         </div>
-
-        {/* Mobile Overlay */}
         {isMobile && sidebarOpen && (
           <div
             className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
             onClick={() => setSidebarOpen(false)}
           />
         )}
-
-        {/* Main Content */}
         <div
           className={cn(
-            "relative flex min-w-0 flex-1 flex-col overflow-hidden transition-all duration-300",
-            isMobile ? "ml-0" : sidebarCollapsed ? "ml-20" : "ml-72",
+            "flex min-w-0 flex-1 flex-col overflow-hidden transition-all duration-300",
+            isMobile ? "ml-0" : sidebarCollapsed ? "ml-16" : "ml-60",
           )}
         >
-          {/* Mobile Toggle */}
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(true)}
@@ -63,16 +57,18 @@ export default function AppLayout() {
               <Menu className="h-5 w-5" />
             </button>
           )}
-
-          {/* Scroll Container */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden">
             <div className="min-h-full w-full">
-              <div className="mx-auto w-full max-w-[1800px] px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-                <Outlet />
-              </div>
+              <PageMetaProvider>
+                <Header />
+                {/* Workspace: full width (no centered max-width wrappers).
+                   Dialogs/modals should be constrained; pages should occupy the full content region. */}
+                <div className="w-full">
+                  <Outlet />
+                </div>
+              </PageMetaProvider>
             </div>
           </div>
-
           <FloatingCartButton />
         </div>
       </div>

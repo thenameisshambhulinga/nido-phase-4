@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,8 @@ import {
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 interface PricingRule {
   id: string;
@@ -85,6 +87,9 @@ interface CouponCode {
 }
 
 export default function PricingDiscountsPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Pricing & Discounts" }); }, []);
+
   const { isOwner } = useAuth();
   const {
     clients,
@@ -547,8 +552,7 @@ export default function PricingDiscountsPage() {
 
   return (
     <div>
-      <Header title="Pricing & Discounts" />
-      <div className="p-6 space-y-6 animate-fade-in">
+            <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold">

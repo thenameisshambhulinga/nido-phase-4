@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import Header from "@/components/layout/Header";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,6 +40,8 @@ import { safeReadJson } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { useData } from "@/contexts/DataContext";
 import { Ellipsis, ImageUp, Plus, Search } from "lucide-react";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 type ExpenseType = "Goods" | "Services";
 type BillableStatus = "BILLABLE" | "NON-BILLABLE";
@@ -297,6 +299,9 @@ function ExpensePrintSheet({ entry }: { entry: ExpenseEntry }) {
 }
 
 export default function ExpensesPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Expenses" }); }, []);
+
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
@@ -485,8 +490,7 @@ export default function ExpensesPage() {
 
   return (
     <div>
-      <Header title="Expenses" />
-      <div className="space-y-4 p-6">
+            <div className="space-y-4 p-6">
         <Card>
           <CardContent className="pt-5">
             <div className="flex flex-wrap items-center justify-between gap-4">

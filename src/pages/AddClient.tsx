@@ -1,6 +1,7 @@
 import { useMemo, useState, type ChangeEvent } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useData } from "@/contexts/DataContext";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { toast } from "@/hooks/use-toast";
 import { nextSequentialCode } from "@/lib/documentNumbering";
 import {
@@ -70,6 +72,9 @@ const INDIAN_STATES = [
 ];
 
 export default function AddClient() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Client Onboarding" }); }, []);
+
   const { addClient, clients, generalSettings } = useData();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -235,8 +240,7 @@ export default function AddClient() {
 
   return (
     <div>
-      <Header title="Client Onboarding" />
-      <div className="p-6 space-y-6 animate-fade-in">
+            <div className="p-6 space-y-6 animate-fade-in">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <Button
             variant="ghost"

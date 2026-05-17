@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useReducer } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -26,12 +26,17 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  FileText,
+  RefreshCcw,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useI18n } from "@/i18n/I18nProvider";
 import { useCart } from "@/contexts/CartContext";
 import { useData } from "@/contexts/DataContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 interface NavItem {
+  labelKey?: string;
   label: string;
   icon: React.ElementType;
   path?: string;
@@ -40,6 +45,7 @@ interface NavItem {
 }
 
 interface NavChildItem {
+  labelKey?: string;
   label: string;
   path?: string;
   children?: NavChildItem[];
@@ -195,6 +201,53 @@ const isClientAccount = (role?: string) =>
     .toLowerCase()
     .startsWith("client_");
 
+// Client role navigation items - NO Vendors
+const CLIENT_NAV_ITEMS: NavItem[] = [
+  { label: "Home", icon: LayoutDashboard, module: "dashboard", path: "/home" },
+  { label: "Shop", icon: Tags, module: "shop", path: "/shop" },
+  { label: "Services", icon: Wrench, module: "services", path: "/services" },
+  {
+    label: "My Requests",
+    icon: ClipboardList,
+    module: "orders",
+    path: "/my-requests",
+  },
+  {
+    label: "Orders",
+    icon: ShoppingBag,
+    module: "orders",
+    children: [
+      { label: "All Orders", path: "/orders" },
+      { label: "Order Statuses", path: "/orders/statuses" },
+    ],
+  },
+  {
+    label: "Clients",
+    icon: Users,
+    module: "clients",
+    children: [
+      { label: "My Organization", path: "/clients/my-organization" },
+      { label: "Team Members", path: "/clients/members" },
+      { label: "Contracts", path: "/clients/contracts" },
+    ],
+  },
+  {
+    label: "Reports",
+    icon: BarChart3,
+    module: "reports",
+    children: [
+      { label: "My Activity", path: "/reports/my-activity" },
+      { label: "Usage Reports", path: "/reports/usage" },
+    ],
+  },
+  {
+    label: "Support",
+    icon: HeadphonesIcon,
+    module: "support",
+    path: "/support",
+  },
+];
+
 interface SidebarProps {
   onClose?: () => void;
   isMobile?: boolean;
@@ -212,7 +265,72 @@ export default function Sidebar({
   const location = useLocation();
   const { user, logout, hasPermission } = useAuth();
   const { totalItems } = useCart();
+  const { t, language } = useI18n();
   const { organizations, generalSettings } = useData();
+  const { currentOrganization } = useOrganization();
+
+  // Determine which navigation items to use based on user role
+  const isClient = isClientAccount(user?.role);
+  const navItems = isClient ? CLIENT_NAV_ITEMS : NAV_ITEMS;
+
+  const getTranslatedLabel = (label: string): string => {
+    const keyMap: Record<string, string> = {
+      "Home": "nav.home",
+      "Shop": "nav.shop",
+      "Product Dashboard": "nav.productDashboard",
+      "Main Dashboard": "nav.mainDashboard",
+      "SLA Overview": "nav.slaOverview",
+      "Services": "nav.services",
+      "New AMC": "nav.newAmc",
+      "Support": "nav.support",
+      "Clients": "nav.clients",
+      "Client List": "nav.clientList",
+      "Client Addition": "nav.clientAddition",
+      "Contracts": "nav.contracts",
+      "Vendors": "nav.vendors",
+      "Vendor List": "nav.vendorList",
+      "Vendor Orders": "nav.vendorOrders",
+      "Vendor Dashboard": "nav.vendorDashboard",
+      "Vendor Categories": "nav.vendorCategories",
+      "Vendor Onboarding": "nav.vendorOnboarding",
+      "Procure": "nav.procure",
+      "Orders": "nav.orders",
+      "Purchase Requests": "nav.purchaseRequests",
+      "Approvals": "nav.approvals",
+      "Reports": "nav.reports",
+      "Analytics": "nav.analytics",
+      "Audit Trail": "nav.auditTrail",
+      "Transactions": "nav.transactions",
+      "Sales": "nav.sales",
+      "Quotes": "nav.quotes",
+      "Sales Orders": "nav.salesOrders",
+      "Invoices": "nav.invoices",
+      "Recurring Invoices": "nav.recurringInvoices",
+      "Delivery Challans": "nav.deliveryChallans",
+      "Payment Receipt": "nav.paymentReceipt",
+      "Credit Notes": "nav.creditNotes",
+      "e-Way Bills": "nav.eWayBills",
+      "Purchases": "nav.purchases",
+      "Expenses": "nav.expenses",
+      "Recurring Expenses": "nav.recurringExpenses",
+      "Purchase Orders": "nav.purchaseOrders",
+      "Bills": "nav.bills",
+      "Recurring Bills": "nav.recurringBills",
+      "Payments Made": "nav.paymentsMade",
+      "Vendor Credits": "nav.vendorCredits",
+      "User Management": "nav.userManagement",
+      "Users": "nav.users",
+      "Roles": "nav.roles",
+      "Departments": "nav.departments",
+      "Invitations": "nav.invitations",
+      "Configuration": "nav.configuration"
+    };
+    const key = keyMap[label];
+    return key ? t(key) : label;
+  };
+  // Force re-render when language changes
+  const [, forceUpdate] = useReducer(x => x + 1, 0);
+  useEffect(() => { forceUpdate(); }, [language]);
   const [expandedItems, setExpandedItems] = useState<string[]>(["Dashboard"]);
 
   const primaryOrgId = organizations[0]?.id || "";
@@ -326,8 +444,12 @@ export default function Sidebar({
           collapsed && "px-2",
         )}
       >
-        {NAV_ITEMS.map((item) => {
-          if (item.module === "procure" && isClientAccount(user?.role)) {
+        {navItems.map((item) => {
+          // Hide Vendors completely for client roles
+          if (item.module === "vendors" && isClient) {
+            return null;
+          }
+          if (item.module === "procure" && isClient) {
             return null;
           }
           if (
@@ -376,7 +498,7 @@ export default function Sidebar({
                           : "text-sidebar-foreground/70",
                       )}
                     >
-                      <span className="flex-1">{child.label}</span>
+                      <span className="flex-1">{getTranslatedLabel(child.label)}</span>
                       {child.children && (
                         <ChevronDown
                           className={cn(
@@ -430,7 +552,7 @@ export default function Sidebar({
                   )}
                 />
                 {!collapsed && (
-                  <span className="flex-1 text-left">{item.label}</span>
+                  <span className="flex-1 text-left">{getTranslatedLabel(item.label)}</span>
                 )}
                 {!collapsed && item.children && (
                   <ChevronDown
@@ -479,6 +601,11 @@ export default function Sidebar({
               <p className="text-[10px] text-sidebar-foreground/60 truncate capitalize">
                 {user?.role?.replace("_", " ")}
               </p>
+              {isClient && currentOrganization && (
+                <p className="text-[10px] text-sidebar-primary/70 truncate font-medium">
+                  {currentOrganization.name}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -490,7 +617,7 @@ export default function Sidebar({
           )}
         >
           <LogOut className="h-3.5 w-3.5" />
-          {!collapsed && "Sign Out"}
+          {!collapsed && t("common.signOut")}
         </button>
       </div>
     </aside>

@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useData } from "@/contexts/DataContext";
 import {
@@ -34,6 +34,15 @@ import { Button } from "@/components/ui/button";
 export default function SLAOverview() {
   const { orders } = useData();
   const navigate = useNavigate();
+  const { setMeta } = usePageMeta();
+
+  useEffect(() => {
+    setMeta({
+      title: "SLA Overview",
+      breadcrumbs: [{ label: "SLA Overview" }],
+    });
+    return () => setMeta({});
+  }, [setMeta]);
 
   const withinSla = orders.filter((o) => o.slaStatus === "within_sla").length;
   const atRisk = orders.filter((o) => o.slaStatus === "at_risk").length;
@@ -199,7 +208,6 @@ export default function SLAOverview() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Header title="SLA Overview" />
       <div className="space-y-6 p-6 animate-fade-in">
         <section className="relative overflow-hidden rounded-3xl border border-amber-200/70 bg-gradient-to-br from-slate-100 via-amber-50 to-blue-100 p-6 md:p-8">
           <div className="pointer-events-none absolute -right-16 -top-12 h-48 w-48 rounded-full bg-amber-400/15 blur-3xl" />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useData } from "@/contexts/DataContext";
 import { MapPin, Plus, Search, MoreHorizontal, Globe, Building, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 export default function LocationsPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Locations" }); }, []);
+
   const { locations, addLocation, updateLocation, deleteLocation } = useData();
   const [search, setSearch] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
@@ -36,8 +41,7 @@ export default function LocationsPage() {
 
   return (
     <div>
-      <Header title="Locations" />
-      <div className="p-6 space-y-6 animate-fade-in">
+            <div className="p-6 space-y-6 animate-fade-in">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span>⊙ Configuration</span><ChevronRight className="h-3 w-3" /><span className="text-foreground font-medium">Locations</span>
         </div>

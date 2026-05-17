@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Header from "@/components/layout/Header";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -113,10 +113,18 @@ const CONFIG_TABS: ConfigTab[] = [
 export default function ConfigurationPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<ConfigTab["value"]>("general");
+  const { setMeta } = usePageMeta();
+
+  useEffect(() => {
+    setMeta({
+      title: "Configuration",
+      breadcrumbs: [{ label: "Configuration" }],
+    });
+    return () => setMeta({});
+  }, [setMeta]);
 
   return (
     <div>
-      <Header title="Configuration" />
       <div className="animate-fade-in space-y-6 p-6">
         <div>
           <h1 className="text-2xl font-display font-bold">Configuration</h1>

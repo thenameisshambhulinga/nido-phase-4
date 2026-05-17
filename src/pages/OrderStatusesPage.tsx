@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Header from "@/components/layout/Header";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Plus, Pencil, Trash2, Search, GripVertical } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
+import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useEffect } from "react";
 
 export default function OrderStatusesPage() {
+  const { setMeta } = usePageMeta();
+  useEffect(() => { setMeta({ title: "Order Statuses" }); }, []);
+
   const {
     orderStatuses,
     addOrderStatus,
@@ -91,8 +96,7 @@ export default function OrderStatusesPage() {
 
   return (
     <div>
-      <Header title="Order Statuses" />
-      <div className="p-6 space-y-4 animate-fade-in">
+            <div className="p-6 space-y-4 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold">Order Statuses</h1>
