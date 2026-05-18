@@ -120,6 +120,8 @@ export default function ShopPage() {
   const { addToCart, totalItems } = useCart();
   const { masterCatalogItems, isCoreDataLoading, coreDataError } = useData();
 
+  console.log("SHOP INPUT PRODUCTS:", masterCatalogItems.length);
+
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [page, setPage] = useState(1);
@@ -190,7 +192,7 @@ export default function ShopPage() {
   const filtered = useMemo(() => {
     const term = deferredSearch.trim().toLowerCase();
 
-    return products.filter((product) => {
+    const result = products.filter((product) => {
       const searchMatch =
         !term ||
         product.name.toLowerCase().includes(term) ||
@@ -203,6 +205,10 @@ export default function ShopPage() {
 
       return searchMatch && categoryMatch;
     });
+
+    console.log("FILTERED PRODUCTS:", result.length);
+
+    return result;
   }, [products, deferredSearch, category]);
 
   const suggestions = useMemo(() => {

@@ -683,7 +683,7 @@ export default function AddMasterCatalogueItemPage() {
     toast.success("Draft saved (local build)");
   };
 
-  const onPublish = () => {
+  const onPublish = async () => {
     if (!productName.trim()) {
       toast.error("Product Name is required");
       return;
@@ -751,18 +751,31 @@ export default function AddMasterCatalogueItemPage() {
       // Note: no forbidden sections.
     } as any;
 
-    if (isEditMode && editingItem) {
-      updateMasterCatalogItem(editingItem.id, payload);
-      toast.success("Product updated successfully");
-    } else {
-      addMasterCatalogItem({
-        id: Date.now().toString(),
-        ...payload,
-      } as any);
-      toast.success("Product published (local build)");
+    try {
+      if (isEditMode && editingItem) {
+        const ok = await updateMasterCatalogItem(editingItem.id, payload);
+        if (!ok) {
+          toast.error("Product update failed");
+          return;
+        }
+        toast.success("Product updated successfully");
+      } else {
+        const ok = await addMasterCatalogItem({
+          id: Date.now().toString(),
+          ...payload,
+        } as any);
+        if (!ok) {
+          toast.error("Product publishing failed");
+          return;
+        }
+        toast.success("Product published");
+      }
+      navigate("/configuration/master-catalogue");
+    } catch (e: any) {
+      toast.error(
+        `Publish failed: ${e?.message || e?.toString?.() || "Unknown error"}`,
+      );
     }
-
-    navigate("/configuration/master-catalogue");
   };
 
   const selectedPrimaryImage = images.find((im) => im.isPrimary) || images[0];
@@ -1204,7 +1217,8 @@ export default function AddMasterCatalogueItemPage() {
                       3. General Specifications
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Categorized product attributes for structured catalog metadata.
+                      Categorized product attributes for structured catalog
+                      metadata.
                     </p>
                   </div>
 
@@ -1213,9 +1227,15 @@ export default function AddMasterCatalogueItemPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[280px]">Category</TableHead>
-                            <TableHead className="w-[280px]">Attribute Value</TableHead>
-                            <TableHead className="w-20 text-right">Delete</TableHead>
+                            <TableHead className="w-[280px]">
+                              Category
+                            </TableHead>
+                            <TableHead className="w-[280px]">
+                              Attribute Value
+                            </TableHead>
+                            <TableHead className="w-20 text-right">
+                              Delete
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1225,7 +1245,8 @@ export default function AddMasterCatalogueItemPage() {
                                 colSpan={3}
                                 className="py-8 text-center text-muted-foreground"
                               >
-                                No general specifications yet. Click "Add Row" to begin.
+                                No general specifications yet. Click "Add Row"
+                                to begin.
                               </TableCell>
                             </TableRow>
                           ) : (
@@ -1235,7 +1256,11 @@ export default function AddMasterCatalogueItemPage() {
                                   <Input
                                     value={r.category}
                                     onChange={(e) =>
-                                      updateGenSpecRow(r.id, "category", e.target.value)
+                                      updateGenSpecRow(
+                                        r.id,
+                                        "category",
+                                        e.target.value,
+                                      )
                                     }
                                     placeholder="e.g., Manufacturer, Color, Weight"
                                     className="h-9 rounded-lg text-sm"
@@ -1245,7 +1270,11 @@ export default function AddMasterCatalogueItemPage() {
                                   <Input
                                     value={r.value}
                                     onChange={(e) =>
-                                      updateGenSpecRow(r.id, "value", e.target.value)
+                                      updateGenSpecRow(
+                                        r.id,
+                                        "value",
+                                        e.target.value,
+                                      )
                                     }
                                     placeholder="e.g., Samsung, Black, 2.5kg"
                                     className="h-9 rounded-lg text-sm"

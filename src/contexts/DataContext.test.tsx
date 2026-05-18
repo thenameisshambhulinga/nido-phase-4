@@ -2,15 +2,19 @@ import React from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { DataProvider, useData } from "@/contexts/DataContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <DataProvider>{children}</DataProvider>
+  <AuthProvider>
+    <DataProvider>{children}</DataProvider>
+  </AuthProvider>
 );
 
 const NIDO_STORAGE_KEYS = [
-  "nido_orders",
-  "nido_vendors",
-  "nido_clients",
+  // DataContext usePersistedState keys (see DataContext.tsx)
+  "nido_orders_v2",
+  "nido_vendors_v2",
+  "nido_clients_v2",
   "nido_locations",
   "nido_audit",
   "nido_order_statuses",
@@ -24,16 +28,97 @@ const NIDO_STORAGE_KEYS = [
   "nido_app_users",
   "nido_master_catalog",
   "nido_client_catalog",
+  "nido_service_tier_policies",
   "nido_pricing_rules",
   "nido_discount_rules",
   "nido_tax_settings",
   "nido_coupon_codes",
   "nido_coupon_code_rules",
+  "nido_sales_quotes",
+  "nido_sales_orders",
+  "nido_invoices",
+  "nido_sales_activities",
 ];
 
 describe("DataContext production flows", () => {
   beforeEach(() => {
     NIDO_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+
+    // Seed minimal orders for the bulk update test (DataContext uses nido_orders_v2).
+    localStorage.setItem(
+      "nido_orders_v2",
+      JSON.stringify([
+        {
+          id: "ord-1",
+          orderNumber: "2498563",
+          orderDate: "2026-01-03T09:30:00.000Z",
+          organization: "Apex Tech Solutions",
+          requestingUser: "Jane Smith",
+          approvingUser: "David Chen",
+          status: "Pending",
+          items: [],
+          billingAddress: "",
+          shippingAddress: "",
+          paymentMethod: "",
+          deliveryMethod: "",
+          trackingNumber: "",
+          slaStartTime: "",
+          slaStatus: "within_sla",
+          assignedAnalyst: "",
+          analystTeam: "",
+          totalAmount: 0,
+          comments: "Initial comments 1",
+          commentHistory: [],
+          attachments: [],
+        },
+        {
+          id: "ord-2",
+          orderNumber: "2498564",
+          orderDate: "2026-01-04T10:00:00.000Z",
+          organization: "Global Corp",
+          requestingUser: "John Doe",
+          approvingUser: "Mark Adams",
+          status: "Approved",
+          items: [],
+          billingAddress: "",
+          shippingAddress: "",
+          paymentMethod: "",
+          deliveryMethod: "",
+          trackingNumber: "",
+          slaStartTime: "",
+          slaStatus: "within_sla",
+          assignedAnalyst: "",
+          analystTeam: "",
+          totalAmount: 0,
+          comments: "Initial comments 2",
+          commentHistory: [],
+          attachments: [],
+        },
+        {
+          id: "ord-3",
+          orderNumber: "2498565",
+          orderDate: "2026-01-05T08:00:00.000Z",
+          organization: "Apex Tech Solutions",
+          requestingUser: "Alice Brown",
+          approvingUser: "David Chen",
+          status: "Pending",
+          items: [],
+          billingAddress: "",
+          shippingAddress: "",
+          paymentMethod: "",
+          deliveryMethod: "",
+          trackingNumber: "",
+          slaStartTime: "",
+          slaStatus: "at_risk",
+          assignedAnalyst: "",
+          analystTeam: "",
+          totalAmount: 0,
+          comments: "Initial comments 3",
+          commentHistory: [],
+          attachments: [],
+        },
+      ]),
+    );
   });
 
   it("bulk updates only selected client orders", () => {

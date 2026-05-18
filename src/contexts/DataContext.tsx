@@ -583,12 +583,12 @@ interface DataContextType {
   addUserRole: (role: Omit<UserRole, "id">) => void;
   updateUserRole: (id: string, data: Partial<UserRole>) => void;
   deleteUserRole: (id: string) => void;
-  addMasterCatalogItem: (item: Partial<MasterCatalogItem>) => void;
+  addMasterCatalogItem: (item: Partial<MasterCatalogItem>) => Promise<boolean>;
   updateMasterCatalogItem: (
     id: string,
     data: Partial<MasterCatalogItem>,
-  ) => void;
-  deleteMasterCatalogItem: (id: string) => void;
+  ) => Promise<boolean>;
+  deleteMasterCatalogItem: (id: string) => Promise<boolean>;
   getClientCatalog: (clientId: string) => ClientCatalogItem[];
   addClientCatalogItem: (
     clientId: string,
@@ -3096,11 +3096,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         if (productsResult.status === "fulfilled") {
-          const mapped = productsResult.value.map(
+          const products = productsResult.value;
+
+          console.log("RAW API PRODUCTS:", products.length);
+          console.log(products);
+
+          const mappedProducts = products.map(
             (product: any, index: number) =>
               mapProductToCatalogItem(product, index),
           );
-          setMasterCatalogItems(mapped);
+
+          console.log(
+            "MAPPED CATALOG ITEMS:",
+            mappedProducts.length,
+          );
+          console.log(mappedProducts);
+
+          setMasterCatalogItems(mappedProducts);
+          console.log(
+            "MASTER CATALOG STATE:",
+            mappedProducts.length,
+          );
         } else {
           errors.push(
             `products: ${productsResult.reason?.message || "failed"}`,
@@ -4140,7 +4156,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         status: "SENT",
         paymentStatus: "UNPAID",
         createdBy: actor,
-      });
+      } as any);
 
       setSalesQuotes((prev) =>
         prev.map((entry) =>
@@ -4219,7 +4235,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
               ? "PARTIALLY PAID"
               : "UNPAID",
         createdBy: actor,
-      });
+      } as any);
 
       setSalesOrders((prev) =>
         prev.map((entry) =>
@@ -4337,8 +4353,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     [setUserRoles],
   );
 
+  const refreshMasterCatalogItems = useCallback(async () => {
+    try {
+      const products = await apiRequest<any[]>("/api/products");
+      const mapped = products.map((product: any, index: number) =>
+        mapProductToCatalogItem(product, index),
+      );
+      setMasterCatalogItems(mapped);
+    } catch (error) {
+      console.error("Failed to refresh master catalogue items:", error);
+    }
+  }, [setMasterCatalogItems]);
+
   const addMasterCatalogItem = useCallback(
-    (item: Partial<MasterCatalogItem>) => {
+    async (item: Partial<MasterCatalogItem>) => {
       const productCode =
         item.productCode ||
         nextSequentialCode(
@@ -4348,11 +4376,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         );
 
       const payload = {
+        // backend Product schema requires `name`
+        name: item.name || "Unnamed Item",
         masterProductId: item.masterProductId,
         productName: item.name || "Unnamed Item",
         productCode,
         sku: productCode,
-        serialNumber: item.vendorSku || "",
+        // IMPORTANT: backend has unique index on serialNumber.
+        // Never persist empty string; omit field when blank to avoid duplicate-key conflicts.
+        ...(typeof item.vendorSku === "string" && item.vendorSku.trim()
+          ? { serialNumber: item.vendorSku }
+          : {}),
         category: item.category || "General",
         subCategory: item.subCategory || "",
         brand: item.brand || "",
@@ -4391,41 +4425,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         performanceRating: Number(item.performanceRating) || 0,
       };
 
-      void (async () => {
-        try {
-          const response = await fetch(`${API_BASE}/products`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!response.ok) {
-            throw new Error(`Failed to create product (${response.status})`);
-          }
-          const responsePayload = await response.json();
-          const created = mapProductToCatalogItem(
-            responsePayload?.data || responsePayload,
-          );
-          setMasterCatalogItems((prev) => [created, ...prev]);
-        } catch (error) {
-          console.error("Product creation failed:", error);
-        }
-      })();
+      await apiRequest<any>("/api/products", {
+        method: "POST",
+        body: payload,
+      });
+
+      await refreshMasterCatalogItems();
+      return true;
     },
-    [API_BASE, configuredPrefix, masterCatalogItems, setMasterCatalogItems],
+    [refreshMasterCatalogItems, configuredPrefix, masterCatalogItems],
   );
 
   const updateMasterCatalogItem = useCallback(
-    (id: string, data: Partial<MasterCatalogItem>) => {
-      setMasterCatalogItems((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, ...data } : item)),
-      );
-
+    async (id: string, data: Partial<MasterCatalogItem>) => {
       const payload = {
+        // keep backend-required field
+        name: data.name,
         masterProductId: data.masterProductId,
         productName: data.name,
         productCode: data.productCode,
         sku: data.productCode,
-        serialNumber: data.vendorSku,
+        // IMPORTANT: unique index on serialNumber => never persist empty string.
+        ...(typeof data.vendorSku === "string" && data.vendorSku.trim()
+          ? { serialNumber: data.vendorSku }
+          : {}),
         category: data.category,
         subCategory: data.subCategory,
         brand: data.brand,
@@ -4465,55 +4488,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         performanceRating: data.performanceRating,
       };
 
-      void (async () => {
-        try {
-          const response = await fetch(`${API_BASE}/products/${id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!response.ok) {
-            throw new Error(`Failed to update product (${response.status})`);
-          }
-          const responsePayload = await response.json();
-          const updated = mapProductToCatalogItem(
-            responsePayload?.data || responsePayload,
-          );
-          setMasterCatalogItems((prev) =>
-            prev.map((item) => (item.id === id ? updated : item)),
-          );
-        } catch (error) {
-          console.error("Product update failed:", error);
-        }
-      })();
+      await apiRequest<any>(`/api/products/${id}`, {
+        method: "PATCH",
+        body: payload,
+      });
+
+      await refreshMasterCatalogItems();
+      return true;
     },
-    [API_BASE, setMasterCatalogItems],
+    [refreshMasterCatalogItems],
   );
 
   const deleteMasterCatalogItem = useCallback(
-    (id: string) => {
-      setMasterCatalogItems((prev) => prev.filter((item) => item.id !== id));
-      setClientCatalogItems((prev) => {
-        const next = { ...prev };
-        Object.keys(next).forEach((clientId) => {
-          next[clientId] = next[clientId].filter(
-            (item) => item.masterProductId !== id && item.id !== id,
-          );
-        });
-        return next;
-      });
-
-      void (async () => {
-        try {
-          await fetch(`${API_BASE}/products/${id}`, {
-            method: "DELETE",
-          });
-        } catch (error) {
-          console.error("Product delete failed:", error);
-        }
-      })();
+    async (id: string) => {
+      await apiRequest<any>(`/api/products/${id}`, { method: "DELETE" });
+      await refreshMasterCatalogItems();
+      return true;
     },
-    [API_BASE, setClientCatalogItems, setMasterCatalogItems],
+    [refreshMasterCatalogItems],
   );
 
   const getClientCatalog = useCallback(
@@ -5216,7 +5208,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           appUser.jobTitle,
           appUser.department,
           appUser.roleId,
-          appUser.organizationAccess,
+          Array.isArray(appUser.organizationAccess)
+            ? appUser.organizationAccess.join(", ")
+            : appUser.organizationAccess,
           appUser.userType,
           appUser.status,
         ]);
@@ -5227,7 +5221,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           subtitle: [appUser.jobTitle, appUser.organizationAccess]
             .filter(Boolean)
             .join(" • "),
-          badge: appUser.status || "user",
+          badge:
+            (Array.isArray(appUser.status)
+              ? appUser.status.join(", ")
+              : appUser.status) || "user",
           path: "/users",
           id: appUser.id,
           score,
@@ -5290,7 +5287,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           subtitle: [order.organization, order.status]
             .filter(Boolean)
             .join(" • "),
-          badge: order.slaStatus.replaceAll("_", " "),
+          badge: order.slaStatus.replace(/_/g, " "),
           path: `/orders/${order.id}`,
           id: order.id,
           score,
@@ -5322,12 +5319,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Search Products from master catalog
       const derivedCategories = Array.from(
-        new Set(masterCatalogItems.map((item: any) => item.category).filter(Boolean)),
+        new Set(
+          masterCatalogItems.map((item: any) => item.category).filter(Boolean),
+        ),
       );
       derivedCategories.forEach((catName) => {
         const score = collectBestScore([catName]);
         if (!score) return;
-        const count = masterCatalogItems.filter((item: any) => item.category === catName).length;
+        const count = masterCatalogItems.filter(
+          (item: any) => item.category === catName,
+        ).length;
         groupedResults.Products.push({
           group: "Products",
           title: catName,
@@ -5351,12 +5352,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         groupedResults.Products.push({
           group: "Products",
           title: product.name,
-          subtitle: [product.category, product.productCode ? `SKU: ${product.productCode}` : ""]
+          subtitle: [
+            product.category,
+            product.productCode ? `SKU: ${product.productCode}` : "",
+          ]
             .filter(Boolean)
             .join(" • "),
-          badge: product.stock !== undefined
-            ? product.stock > 0 ? "In Stock" : "Out of Stock"
-            : product.status || "Active",
+          badge:
+            product.stock !== undefined
+              ? product.stock > 0
+                ? "In Stock"
+                : "Out of Stock"
+              : product.status || "Active",
           path: `/categories?search=${encodeURIComponent(product.name)}`,
           id: product.id,
           score,
