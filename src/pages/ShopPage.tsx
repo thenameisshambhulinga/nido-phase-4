@@ -55,6 +55,9 @@ interface ShopProduct {
   leadTime: string;
   status: "In Stock" | "Out of Stock";
   stock: number;
+
+  // Phase 1 — Product Notes & Alerts (optional)
+  productNotes?: string;
 }
 
 const PAGE_SIZE = 12;
@@ -167,6 +170,9 @@ export default function ShopPage() {
           leadTime: item.leadTime || "5-7 Days",
           status: normalizeStatus(item.status),
           stock,
+
+          // Phase 1 — Product Notes & Alerts (optional)
+          productNotes: item.productNotes,
         };
       });
   }, [masterCatalogItems]);

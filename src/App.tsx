@@ -673,13 +673,13 @@ const App = () => (
               <NotificationProvider>
                 <AuthProvider>
                   <EnhancedAuthProvider>
-                    <DataProvider>
-                      <CartProvider>
-                        <OrganizationProvider>
+                    <OrganizationProvider>
+                      <DataProvider>
+                        <CartProvider>
                           <AppRoutes />
-                        </OrganizationProvider>
-                      </CartProvider>
-                    </DataProvider>
+                        </CartProvider>
+                      </DataProvider>
+                    </OrganizationProvider>
                   </EnhancedAuthProvider>
                 </AuthProvider>
               </NotificationProvider>

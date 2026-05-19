@@ -6,6 +6,7 @@ import React, {
   useEffect,
 } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { safeReadJson } from "@/lib/storage";
 import { apiBaseUrl, apiRequest } from "@/lib/api";
 import {
@@ -238,6 +239,9 @@ export interface MasterCatalogItem {
   vendorPhone2?: string;
   trackPerformance?: boolean;
   performanceRating?: number;
+
+  // Phase 1 — Master Catalogue Product Notes (optional)
+  productNotes?: string;
 }
 
 export interface ClientCatalogItem extends MasterCatalogItem {
@@ -2726,15 +2730,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           ? "Low Stock"
           : "In Stock";
 
+    const safeMasterProductId =
+      product.masterProductId ||
+      product.productId ||
+      product.id ||
+      product._id ||
+      product.productCode ||
+      product.sku ||
+      product.serialNumber ||
+      "";
+
+    const safeProductCode =
+      product.productCode ||
+      product.sku ||
+      product.serialNumber ||
+      `PRD-${index + 1}`;
+
     return {
       id: product._id || product.id || `prd-${Date.now()}-${index}`,
-      masterProductId:
-        product.masterProductId || product.productId || product.id || "",
-      productCode:
-        product.productCode ||
-        product.sku ||
-        product.serialNumber ||
-        `PRD-${index + 1}`,
+      masterProductId: safeMasterProductId || safeProductCode,
+      productCode: safeProductCode,
       name: product.productName || product.name || "Unnamed Product",
       category: product.category || "General",
       subCategory: product.subCategory || "General",
@@ -2771,6 +2786,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       vendorPhone2: product.vendorPhone2,
       trackPerformance: Boolean(product.trackPerformance),
       performanceRating: Number(product.performanceRating) || 0,
+
+      // Phase 1 — Product Notes (optional, pass-through)
+      productNotes:
+        typeof product.productNotes === "string"
+          ? product.productNotes
+          : undefined,
     };
   };
 
@@ -2965,7 +2986,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     updatedAt: invoice.updatedAt || new Date().toISOString(),
   });
 
-  const primaryOrgId = organizations[0]?.id || "org-nido";
+  const { currentOrganization } = useOrganization();
+  const primaryOrgId =
+    currentOrganization?.id || organizations[0]?.id || "org-nido";
   const activeSettings =
     generalSettings[primaryOrgId] || buildDefaultGeneralSettings();
 
@@ -3101,22 +3124,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           console.log("RAW API PRODUCTS:", products.length);
           console.log(products);
 
-          const mappedProducts = products.map(
-            (product: any, index: number) =>
-              mapProductToCatalogItem(product, index),
+          const mappedProducts = products.map((product: any, index: number) =>
+            mapProductToCatalogItem(product, index),
           );
 
-          console.log(
-            "MAPPED CATALOG ITEMS:",
-            mappedProducts.length,
-          );
+          console.log("MAPPED CATALOG ITEMS:", mappedProducts.length);
           console.log(mappedProducts);
 
           setMasterCatalogItems(mappedProducts);
-          console.log(
-            "MASTER CATALOG STATE:",
-            mappedProducts.length,
-          );
+          console.log("MASTER CATALOG STATE:", mappedProducts.length);
         } else {
           errors.push(
             `products: ${productsResult.reason?.message || "failed"}`,
@@ -3152,6 +3168,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     void fetchData();
   }, [
     isAuthenticated,
+    currentOrganization?.id,
     setClients,
     setInvoices,
     setMasterCatalogItems,
@@ -4378,7 +4395,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       const payload = {
         // backend Product schema requires `name`
         name: item.name || "Unnamed Item",
-        masterProductId: item.masterProductId,
+        // Phase 1 + Shop fix: never leave masterProductId empty,
+        // ShopPage filters on `!!item.masterProductId`
+        masterProductId:
+          item.masterProductId || productCode || item.productCode,
         productName: item.name || "Unnamed Item",
         productCode,
         sku: productCode,
@@ -4423,6 +4443,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         vendorPhone2: item.vendorPhone2,
         trackPerformance: item.trackPerformance,
         performanceRating: Number(item.performanceRating) || 0,
+
+        // Phase 1 — Product Notes (optional)
+        productNotes:
+          typeof item.productNotes === "string" && item.productNotes.trim()
+            ? item.productNotes
+            : undefined,
       };
 
       await apiRequest<any>("/api/products", {
@@ -4441,7 +4467,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       const payload = {
         // keep backend-required field
         name: data.name,
-        masterProductId: data.masterProductId,
+        // keep masterProductId non-empty for ShopPage filtering
+        masterProductId: data.masterProductId || data.productCode,
         productName: data.name,
         productCode: data.productCode,
         sku: data.productCode,
@@ -4486,6 +4513,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         leadTime: data.leadTime,
         trackPerformance: data.trackPerformance,
         performanceRating: data.performanceRating,
+
+        // Phase 1 — Product Notes (optional)
+        productNotes:
+          typeof data.productNotes === "string" && data.productNotes.trim()
+            ? data.productNotes
+            : undefined,
       };
 
       await apiRequest<any>(`/api/products/${id}`, {

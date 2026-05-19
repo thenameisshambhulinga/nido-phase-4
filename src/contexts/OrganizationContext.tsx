@@ -7,8 +7,7 @@ import React, {
   useMemo,
 } from "react";
 import { safeReadJson } from "@/lib/storage";
-import { useAuth } from "@/contexts/AuthContext";
-import { useData } from "@/contexts/DataContext";
+import { useAuth } from "@/contexts/AuthContext"; // NOTE: Removed useData import to break circular dep
 
 export interface OrganizationInfo {
   id: string;
@@ -84,8 +83,6 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { user } = useAuth();
-  const { clients } = useData();
-
   // Accessible organizations - loaded from user data or backend
   const [accessibleOrganizations, setAccessibleOrganizations] = useState<
     OrganizationInfo[]
@@ -200,43 +197,8 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      // Seed from clients data (NO DUMMY / NO RANDOM IDS)
-      if (clients && clients.length > 0) {
-        const orgsFromClients: OrganizationInfo[] = clients
-          .slice(0, 10)
-          .map((client: any) => {
-            const stableId = String(
-              client.id ??
-                client.companyId ??
-                client.company_name ??
-                client.name ??
-                "",
-            );
-            // If we truly cannot find a stable id, skip this record instead of generating dummy/random.
-            if (!stableId || stableId === "undefined" || stableId === "null")
-              return null;
-
-            return {
-              id: stableId,
-              name: client.name || client.companyName || "Unnamed Organization",
-              industry: client.industry || "",
-              status: (client.status === "active" ? "active" : "inactive") as
-                | "active"
-                | "inactive"
-                | "pending",
-              memberCount:
-                client.memberCount ?? client.membersCount ?? undefined,
-              lastActive: client.lastActive ?? undefined,
-              logo: client.logo ?? undefined,
-            } as OrganizationInfo;
-          })
-          .filter(Boolean) as OrganizationInfo[];
-
-        if (orgsFromClients.length > 0) {
-          setAccessibleOrganizations(orgsFromClients);
-          if (!currentOrganization) setCurrentOrganization(orgsFromClients[0]);
-        }
-      } else if (user?.organization) {
+      // No clients seeding - use storage fallback or user.org
+      if (user?.organization) {
         // Fallback to user organization (stable id)
         const userOrg: OrganizationInfo = {
           id: String(user.organization),
@@ -251,7 +213,7 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({
     loadOrgs();
     // Note: intentionally do NOT depend on accessibleOrganizations.length to avoid re-seeding loops.
     // currentOrganization is used to decide whether to set the initial org.
-  }, [user, clients, currentOrganization]);
+  }, [user, currentOrganization]);
 
   const value = useMemo(
     () => ({
@@ -304,20 +266,7 @@ export const useOrganization = () => {
   return ctx;
 };
 
-// Hook for checking if current user is a client role (non-owner, non-admin internal)
-export const useIsClientRole = () => {
-  const { user } = useAuth();
-  const { clients } = useData();
-  return useMemo(() => {
-    if (!user) return false;
-    const role = user.role?.toLowerCase() || "";
-    return (
-      role.startsWith("client_") ||
-      role === "client_admin" ||
-      role === "client_employee"
-    );
-  }, [user?.role]);
-};
+// useIsClientRole moved to AuthContext to avoid circular dep
 
 // Hook to get organization-filtered data
 export const useOrganizationFilteredData = <

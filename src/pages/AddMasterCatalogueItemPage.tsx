@@ -343,6 +343,8 @@ export default function AddMasterCatalogueItemPage() {
   const [tagInput, setTagInput] = useState("");
 
   const [descriptionHtmlLike, setDescriptionHtmlLike] = useState("");
+  // Phase 1 — Product Notes & Alerts
+  const [productNotes, setProductNotes] = useState<string>("");
 
   const [specCategories, setSpecCategories] = useState<SpecCategory[]>(
     defaultSpecCategories,
@@ -552,6 +554,7 @@ export default function AddMasterCatalogueItemPage() {
     setBrand(editingItem.brand || "");
     setTags(editingItem.tags || []);
     setDescriptionHtmlLike(editingItem.description || "");
+    setProductNotes((editingItem as any).productNotes || "");
     setImages(
       editingItem.image
         ? [
@@ -748,6 +751,9 @@ export default function AddMasterCatalogueItemPage() {
       performanceRating: editingItem?.performanceRating || 4,
       specAttributes: specAttributesForApi as any,
       vendorInventory: vendorInventory as any,
+
+      // Phase 1 — Product Notes & Alerts (optional pass-through)
+      productNotes: productNotes.trim() ? productNotes : undefined,
       // Note: no forbidden sections.
     } as any;
 
@@ -1209,12 +1215,44 @@ export default function AddMasterCatalogueItemPage() {
                 </CardContent>
               </Card>
 
-              {/* SECTION 3 - General Specifications */}
+              {/* SECTION 3 - Product Notes & Alerts */}
               <Card className="rounded-2xl bg-white shadow-sm border-border/70">
                 <CardContent className="p-6 space-y-6">
                   <div>
                     <h2 className="text-xl font-semibold">
-                      3. General Specifications
+                      3. Product Notes &amp; Alerts
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Enter manual note points, warnings, explanations, stock
+                      notices, or product-specific remarks.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="product-notes">
+                      Product Notes (optional)
+                    </Label>
+                    <Textarea
+                      id="product-notes"
+                      value={productNotes}
+                      onChange={(e) => setProductNotes(e.target.value)}
+                      placeholder="Enter product notes, issue explanations, stock notices, warnings or remarks..."
+                      className="min-h-[180px] rounded-2xl"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Multiline supported. Leave empty to hide banners on Shop
+                      cards.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* SECTION 4 - General Specifications */}
+              <Card className="rounded-2xl bg-white shadow-sm border-border/70">
+                <CardContent className="p-6 space-y-6">
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      4. General Specifications
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
                       Categorized product attributes for structured catalog
@@ -1310,12 +1348,12 @@ export default function AddMasterCatalogueItemPage() {
                 </CardContent>
               </Card>
 
-              {/* SECTION 4 */}
+              {/* SECTION 5 */}
               <Card className="rounded-2xl bg-white shadow-sm border-border/70">
                 <CardContent className="p-6 space-y-6">
                   <div>
                     <h2 className="text-xl font-semibold">
-                      4. Product Images & Media
+                      5. Product Images &amp; Media
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
                       Modern enterprise upload experience with preview strip,

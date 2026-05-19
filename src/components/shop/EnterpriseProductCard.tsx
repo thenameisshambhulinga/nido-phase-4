@@ -20,6 +20,10 @@ export default function EnterpriseProductCard({
 }: Props) {
   const isOutOfStock = product.status === "Out of Stock";
 
+  const hasNotes =
+    typeof product.productNotes === "string" &&
+    product.productNotes.trim().length > 0;
+
   return (
     <Card
       className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
@@ -35,6 +39,25 @@ export default function EnterpriseProductCard({
       }}
     >
       <div className="p-5">
+        {hasNotes && (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5">⚠</span>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-amber-900">
+                  Product Notice:
+                </div>
+                <div
+                  className="mt-1 whitespace-pre-line break-words text-sm text-amber-900/90"
+                  style={{ wordBreak: "break-word" }}
+                >
+                  {product.productNotes}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mb-4 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl bg-gray-50">
           <img
             src={product.image}
