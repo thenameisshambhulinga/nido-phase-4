@@ -72,7 +72,9 @@ const INDIAN_STATES = [
 
 export default function AddVendorPage() {
   const { setMeta } = usePageMeta();
-  useEffect(() => { setMeta({ title: "Add Vendor" }); }, []);
+  useEffect(() => {
+    setMeta({ title: "Add Vendor" });
+  }, []);
 
   const { addVendor, vendors, generalSettings } = useData();
   const navigate = useNavigate();
@@ -220,7 +222,7 @@ export default function AddVendorPage() {
       phone: form.contactNumber,
       contactPhone: form.contactNumber,
       contactEmail: normalizeEmail(form.email),
-      status: "pending",
+      status: "active",
       rating: 0,
       totalOrders: 0,
       totalSpend: 0,

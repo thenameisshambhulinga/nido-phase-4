@@ -4,7 +4,7 @@ import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import Sidebar from "@/components/layout/Sidebar";
-import FloatingCartButton from "@/components/layout/FloatingCartButton";
+import FloatingCart from "@/components/shared/FloatingCart";
 import Header from "@/components/layout/Header";
 import { PageMetaProvider } from "@/contexts/PageMetaContext";
 
@@ -69,7 +69,7 @@ export default function AppLayout() {
               </PageMetaProvider>
             </div>
           </div>
-          <FloatingCartButton />
+          <FloatingCart />
         </div>
       </div>
     </div>

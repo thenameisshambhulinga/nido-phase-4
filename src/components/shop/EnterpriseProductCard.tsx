@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ShoppingCart, MessageCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,8 @@ interface Props {
   onOpen?: () => void;
   onAdd: () => void;
   onEnquire: () => void;
+  // allow extra props without breaking ShopPage compile
+  [key: string]: any;
 }
 
 export default function EnterpriseProductCard({
@@ -18,11 +21,27 @@ export default function EnterpriseProductCard({
   onAdd,
   onEnquire,
 }: Props) {
-  const isOutOfStock = product.status === "Out of Stock";
+  const isOutOfStock = product?.status === "Out of Stock";
 
   const hasNotes =
-    typeof product.productNotes === "string" &&
+    typeof product?.productNotes === "string" &&
     product.productNotes.trim().length > 0;
+
+  const imageSrc =
+    (Array.isArray(product?.images) && product.images?.[0]) ||
+    product?.image ||
+    "";
+
+  const leadTime =
+    typeof product?.leadTime === "string" ? product.leadTime : "";
+
+  const tags: string[] = Array.isArray(product?.tags)
+    ? product.tags.filter((t: any) => typeof t === "string")
+    : [];
+
+  const description = String(product?.description || "").trim();
+  const hasLongDescription = description.length > 160;
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   return (
     <Card
@@ -60,13 +79,13 @@ export default function EnterpriseProductCard({
 
         <div className="mb-4 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl bg-gray-50">
           <img
-            src={product.image}
-            alt={product.name}
+            src={imageSrc || getProductImage({ category: product?.category })}
+            alt={product?.name || "Product"}
             loading="lazy"
             decoding="async"
             onError={(event) => {
               event.currentTarget.src = getProductImage({
-                category: product.category,
+                category: product?.category,
               });
             }}
             className="h-full w-full object-contain p-4 transition-transform duration-500 group-hover:scale-105"
@@ -76,32 +95,98 @@ export default function EnterpriseProductCard({
         <div className="space-y-3">
           <div>
             <h3 className="line-clamp-2 text-[18px] font-semibold text-slate-900">
-              {product.name}
+              {product?.name}
             </h3>
 
             <p className="mt-1 text-sm font-medium text-blue-600">
-              {product.category}
+              {product?.brand || product?.category}
             </p>
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-semibold text-slate-800">
-              Key Specifications
-            </p>
+            <div className="space-y-2">
+              {description ? (
+                <div>
+                  <p
+                    className={cn(
+                      "text-sm text-slate-600",
+                      !showFullDescription && "line-clamp-3",
+                    )}
+                  >
+                    {description}
+                  </p>
+                  {hasLongDescription ? (
+                    <button
+                      type="button"
+                      className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setShowFullDescription((value) => !value);
+                      }}
+                    >
+                      {showFullDescription ? "Show less" : "Read more"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
 
-            <ul className="ml-5 list-disc space-y-1 text-sm text-slate-600">
-              <li>{product.description}</li>
-              <li>Warranty: {product.warranty}</li>
-              <li>Lead Time: {product.leadTime}</li>
-            </ul>
+              {Array.isArray(product?.keySpecifications) &&
+              product.keySpecifications.length > 0 ? (
+                <ul className="ml-5 list-disc space-y-1 text-sm text-slate-600">
+                  {product.keySpecifications
+                    .slice(0, 3)
+                    .map((spec: any, idx: number) => (
+                      <li key={spec?.name || spec?.label || idx}>
+                        {(spec?.name || spec?.label || "Spec").toString()}:{" "}
+                        {spec?.value ?? ""}
+                      </li>
+                    ))}
+                </ul>
+              ) : null}
+
+              {Array.isArray(product?.generalSpecifications) &&
+              product.generalSpecifications.length > 0 ? (
+                <ul className="ml-5 list-disc space-y-1 text-sm text-slate-600">
+                  {product.generalSpecifications
+                    .slice(0, 3)
+                    .map((spec: any, idx: number) => (
+                      <li key={spec?.name || spec?.label || idx}>
+                        {(spec?.name || spec?.label || "Spec").toString()}:{" "}
+                        {spec?.value ?? ""}
+                      </li>
+                    ))}
+                </ul>
+              ) : null}
+
+              {product?.productNotes?.trim() ? (
+                <p className="text-xs text-slate-500">
+                  Notes: {product.productNotes}
+                </p>
+              ) : null}
+
+              {tags.length > 0 ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {tags.slice(0, 5).map((t) => (
+                    <Badge
+                      key={t}
+                      variant="secondary"
+                      className="rounded-full px-3 py-1"
+                    >
+                      {t}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
 
-          <div className="flex items-center justify-between pt-3">
-            <div>
-              <p className="text-xs text-slate-500">MOQ: {product.minOrder}</p>
-
-              <p className="mt-1 text-xl font-bold text-slate-900">
-                ₹{product.price.toLocaleString()}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-3">
+            <div className="min-w-0 space-y-1">
+              <p className="text-xs text-slate-600">
+                MOQ: {product?.minOrder ?? 1}
+              </p>
+              <p className="text-xs text-slate-500">
+                Lead time: {leadTime || "TBD"}
               </p>
             </div>
 

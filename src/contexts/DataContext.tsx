@@ -13,6 +13,24 @@ import {
   nextSequentialCode,
   resolveSequentialCode,
 } from "@/lib/documentNumbering";
+
+// Normalize product status values sent to API so they always match backend enum
+const normalizeStatusForApi = (status?: string) => {
+  if (!status) return undefined;
+  const s = String(status).trim().toLowerCase();
+  if (s === "draft") return "draft";
+  if (s === "published") return "published";
+  if (s === "in stock" || s === "instock" || s === "in_stock")
+    return "In Stock";
+  if (s === "low stock" || s === "low_stock") return "Low Stock";
+  if (s === "out of stock" || s === "out_of_stock" || s === "outofstock")
+    return "Out Of Stock";
+  if (s === "active") return "active";
+  if (s === "inactive") return "inactive";
+  if (s === "discontinued") return "discontinued";
+  // default fallback
+  return undefined;
+};
 import type {
   GeneralSettings,
   UserRole,
@@ -239,6 +257,23 @@ export interface MasterCatalogItem {
   vendorPhone2?: string;
   trackPerformance?: boolean;
   performanceRating?: number;
+  images?: string[];
+  keySpecifications?: Array<{ name?: string; label?: string; value?: string }>;
+  generalSpecifications?: Array<{
+    name?: string;
+    label?: string;
+    value?: string;
+  }>;
+  productStatus?: string;
+
+  // Multi-vendor stock allocation (optional; persisted from Master Catalogue vendor stock UI)
+  vendorInventory?: Array<{
+    vendorId?: string;
+    vendorName: string;
+    pricePerItem: number;
+    quantity: number;
+    leadTime?: string;
+  }>;
 
   // Phase 1 — Master Catalogue Product Notes (optional)
   productNotes?: string;
@@ -1092,74 +1127,6 @@ const DEFAULT_COUPON_CODE_RULES: CouponCodeRule[] = [
     maxUsagePerCustomer: 1,
     stackable: false,
     active: true,
-  },
-];
-
-const DEFAULT_VENDORS: Vendor[] = [
-  {
-    id: "v1",
-    name: "Apex Tech Solutions",
-    category: "IT Hardware",
-    contactEmail: "contact@apex.com",
-    contactPhone: "+1-555-0100",
-    address: "123 Tech St, San Diego, CA",
-    status: "active",
-    rating: 4.5,
-    totalOrders: 156,
-    totalSpend: 2450000,
-    joinDate: "2024-01-15",
-  },
-  {
-    id: "v2",
-    name: "Global Supply Co",
-    category: "Office Supplies",
-    contactEmail: "info@globalsupply.com",
-    contactPhone: "+1-555-0200",
-    address: "456 Supply Ave, Houston, TX",
-    status: "active",
-    rating: 4.2,
-    totalOrders: 89,
-    totalSpend: 890000,
-    joinDate: "2024-03-20",
-  },
-  {
-    id: "v3",
-    name: "SecureTech Ltd",
-    category: "Security Systems",
-    contactEmail: "sales@securetech.com",
-    contactPhone: "+1-555-0300",
-    address: "789 Security Blvd, New York, NY",
-    status: "active",
-    rating: 4.8,
-    totalOrders: 45,
-    totalSpend: 1200000,
-    joinDate: "2024-05-10",
-  },
-  {
-    id: "v4",
-    name: "CloudNet Services",
-    category: "Cloud Services",
-    contactEmail: "hello@cloudnet.com",
-    contactPhone: "+1-555-0400",
-    address: "321 Cloud Way, Seattle, WA",
-    status: "pending",
-    rating: 4.0,
-    totalOrders: 12,
-    totalSpend: 340000,
-    joinDate: "2025-01-05",
-  },
-  {
-    id: "v5",
-    name: "EuroTech GmbH",
-    category: "IT Hardware",
-    contactEmail: "kontakt@eurotech.de",
-    contactPhone: "+49-555-0500",
-    address: "10 Technik Str, Berlin, DE",
-    status: "active",
-    rating: 4.6,
-    totalOrders: 67,
-    totalSpend: 1800000,
-    joinDate: "2024-06-15",
   },
 ];
 
@@ -2723,8 +2690,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   ): MasterCatalogItem => {
     const quantity = Number(product.quantity) || 0;
     const minStockThreshold = Number(product.minStockThreshold) || 0;
-    const status =
-      quantity <= 0
+    const rawStatus = String(product.status || "")
+      .trim()
+      .toLowerCase();
+    const isDraft = rawStatus === "draft";
+    const isPublished = rawStatus === "published" || rawStatus === "active";
+    const status = isDraft
+      ? "Out of Stock"
+      : quantity <= 0
         ? "Out of Stock"
         : minStockThreshold > 0 && quantity <= minStockThreshold
           ? "Low Stock"
@@ -2746,6 +2719,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       product.serialNumber ||
       `PRD-${index + 1}`;
 
+    const images = normalizeStringList(product.images);
+    const imageList = images.length
+      ? images
+      : product.image
+        ? ([normalizeAssetPath(product.image)].filter(Boolean) as string[])
+        : [];
+
     return {
       id: product._id || product.id || `prd-${Date.now()}-${index}`,
       masterProductId: safeMasterProductId || safeProductCode,
@@ -2762,7 +2742,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           ? Number(product.discountPrice)
           : undefined,
       status,
-      image: normalizeAssetPath(product.image),
+      productStatus: rawStatus || (isPublished ? "published" : undefined),
+      image: normalizeAssetPath(product.image) || imageList[0],
+      images: imageList,
       description: product.description,
       initialStock: quantity,
       minStockThreshold,
@@ -2780,6 +2762,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       primaryVendor: product.primaryVendor || product.vendorName,
       vendorSku: product.vendorSku || product.sku,
       leadTime: product.leadTime,
+      vendorInventory: Array.isArray(product.vendorInventory)
+        ? product.vendorInventory.map((entry: any) => ({
+            vendorId: entry.vendorId,
+            vendorName: entry.vendorName,
+            pricePerItem: Number(entry.pricePerItem) || 0,
+            quantity: Number(entry.quantity) || 0,
+            leadTime: entry.leadTime,
+          }))
+        : [],
+      keySpecifications:
+        Array.isArray(product.keySpecifications) &&
+        product.keySpecifications.length > 0
+          ? product.keySpecifications
+          : [],
+      generalSpecifications:
+        Array.isArray(product.generalSpecifications) &&
+        product.generalSpecifications.length > 0
+          ? product.generalSpecifications
+          : [],
       vendorContact: product.vendorContact,
       vendorEmail: product.vendorEmail,
       vendorPhone: product.vendorPhone,
@@ -2986,11 +2987,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     updatedAt: invoice.updatedAt || new Date().toISOString(),
   });
 
-  const { currentOrganization } = useOrganization();
+  let currentOrganization: Organization | undefined;
+  try {
+    // Tests may mount DataProvider without OrganizationProvider.
+    // Fall back to defaults in that case.
+    ({ currentOrganization } = useOrganization());
+  } catch {
+    currentOrganization = undefined;
+  }
+
   const primaryOrgId =
     currentOrganization?.id || organizations[0]?.id || "org-nido";
   const activeSettings =
-    generalSettings[primaryOrgId] || buildDefaultGeneralSettings();
+    (generalSettings && primaryOrgId
+      ? (generalSettings[primaryOrgId] as GeneralSettings | undefined)
+      : undefined) || ({} as GeneralSettings);
 
   const configuredPrefix = useCallback(
     (
@@ -3104,7 +3115,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (clientsResult.status === "fulfilled") {
           const mapped = clientsResult.value.map(mapApiClientToFrontend);
-          console.log("✅ Clients loaded:", mapped.length);
           setClients(mapped);
         } else {
           console.error("❌ CLIENTS FETCH ERROR:", clientsResult.reason);
@@ -3121,18 +3131,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         if (productsResult.status === "fulfilled") {
           const products = productsResult.value;
 
-          console.log("RAW API PRODUCTS:", products.length);
-          console.log(products);
-
           const mappedProducts = products.map((product: any, index: number) =>
             mapProductToCatalogItem(product, index),
           );
 
-          console.log("MAPPED CATALOG ITEMS:", mappedProducts.length);
-          console.log(mappedProducts);
-
           setMasterCatalogItems(mappedProducts);
-          console.log("MASTER CATALOG STATE:", mappedProducts.length);
         } else {
           errors.push(
             `products: ${productsResult.reason?.message || "failed"}`,
@@ -3428,7 +3431,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
               rating: Number(vendor.rating) || 0,
             },
           });
-          setVendors((prev) => [mapApiVendorToFrontend(created), ...prev]);
+
+          const mappedCreated = mapApiVendorToFrontend(created);
+          setVendors((prev) => [mappedCreated, ...prev]);
+
+          const refreshed = await apiRequest<any[]>("/vendors");
+          setVendors(refreshed.map(mapApiVendorToFrontend));
         } catch (error) {
           console.error("Vendor creation failed:", error);
         }
@@ -3529,7 +3537,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
               totalOrders: Number(client.totalOrders) || 0,
             },
           });
-          setClients((prev) => [mapApiClientToFrontend(created), ...prev]);
+
+          const mappedCreated = mapApiClientToFrontend(created);
+          setClients((prev) => [mappedCreated, ...prev]);
+
+          const refreshed = await apiRequest<any[]>("/clients");
+          setClients(refreshed.map(mapApiClientToFrontend));
         } catch (error) {
           console.error("Client creation failed:", error);
         }
@@ -4419,7 +4432,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
             : undefined,
         quantity: Number(item.initialStock) || 0,
         minStockThreshold: Number(item.minStockThreshold) || 0,
-        status: item.status === "Out of Stock" ? "inactive" : "active",
+        status:
+          normalizeStatusForApi(item.status) ??
+          (item.status ? item.status : undefined),
         image: item.image,
         description: item.description,
         tags: item.tags || [],
@@ -4444,19 +4459,88 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         trackPerformance: item.trackPerformance,
         performanceRating: Number(item.performanceRating) || 0,
 
+        // Multi-vendor inventory allocation (added for Master Catalogue vendor inventory persistence)
+        vendorInventory: item.vendorInventory || [],
+
         // Phase 1 — Product Notes (optional)
         productNotes:
           typeof item.productNotes === "string" && item.productNotes.trim()
             ? item.productNotes
             : undefined,
+        keySpecifications: item.keySpecifications || [],
+        generalSpecifications: item.generalSpecifications || [],
+        images: item.images || [],
       };
 
-      await apiRequest<any>("/api/products", {
+      const optimisticItem: MasterCatalogItem = {
+        id: `tmp-${Date.now()}`,
+        masterProductId: item.masterProductId || productCode,
+        productCode,
+        name: item.name || "Unnamed Item",
+        category: item.category || "General",
+        subCategory: item.subCategory || "",
+        brand: item.brand || "",
+        productType: item.productType || "Product",
+        physicalType: item.physicalType || "Physical",
+        price: Number(item.price) || 0,
+        discountPrice:
+          item.discountPrice !== undefined
+            ? Number(item.discountPrice)
+            : undefined,
+        status:
+          item.status === "draft"
+            ? "Out of Stock"
+            : Number(item.initialStock) <= 0
+              ? "Out of Stock"
+              : Number(item.initialStock) <= Number(item.minStockThreshold || 0)
+                ? "Low Stock"
+                : "In Stock",
+        productStatus:
+          item.status === "draft"
+            ? "draft"
+            : item.status === "published"
+              ? "published"
+              : undefined,
+        image: item.image,
+        images: item.images || [],
+        description: item.description,
+        initialStock: Number(item.initialStock) || 0,
+        minStockThreshold: Number(item.minStockThreshold) || 0,
+        tags: item.tags || [],
+        specification: item.specification,
+        warranty: item.warranty,
+        hsnCode: item.hsnCode,
+        dimensionL: item.dimensionL,
+        dimensionW: item.dimensionW,
+        dimensionH: item.dimensionH,
+        dimUnit: item.dimUnit,
+        weight: item.weight,
+        weightUnit: item.weightUnit,
+        customsDeclaration: item.customsDeclaration,
+        primaryVendor: item.primaryVendor,
+        vendorSku: item.vendorSku,
+        leadTime: item.leadTime,
+        vendorInventory: item.vendorInventory || [],
+        productNotes:
+          typeof item.productNotes === "string" && item.productNotes.trim()
+            ? item.productNotes
+            : undefined,
+        keySpecifications: item.keySpecifications || [],
+        generalSpecifications: item.generalSpecifications || [],
+      };
+
+      setMasterCatalogItems((prev) => [optimisticItem, ...prev]);
+
+      const created = await apiRequest<any>("/api/products", {
         method: "POST",
         body: payload,
       });
 
-      await refreshMasterCatalogItems();
+      setMasterCatalogItems((prev) => [
+        mapProductToCatalogItem(created, prev.length),
+        ...prev.filter((entry) => entry.id !== optimisticItem.id),
+      ]);
+
       return true;
     },
     [refreshMasterCatalogItems, configuredPrefix, masterCatalogItems],
@@ -4486,11 +4570,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         quantity: data.initialStock,
         minStockThreshold: data.minStockThreshold,
         status:
-          data.status === "Out of Stock"
-            ? "inactive"
-            : data.status
-              ? "active"
-              : undefined,
+          normalizeStatusForApi(data.status) ??
+          (data.status ? data.status : undefined),
         image: data.image,
         description: data.description,
         tags: data.tags,
@@ -4513,13 +4594,44 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         leadTime: data.leadTime,
         trackPerformance: data.trackPerformance,
         performanceRating: data.performanceRating,
+        keySpecifications: data.keySpecifications,
+        generalSpecifications: data.generalSpecifications,
+        images: data.images,
 
         // Phase 1 — Product Notes (optional)
+        // Multi-vendor inventory allocation (added for Master Catalogue vendor inventory persistence)
+        vendorInventory: data.vendorInventory || [],
+
         productNotes:
           typeof data.productNotes === "string" && data.productNotes.trim()
             ? data.productNotes
             : undefined,
       };
+
+      setMasterCatalogItems((prev) =>
+        prev.map((entry) =>
+          entry.id === id
+            ? {
+                ...entry,
+                ...data,
+                status:
+                  data.status === "draft"
+                    ? "Out of Stock"
+                    : data.status === "published"
+                      ? entry.status
+                      : data.status === "Out of Stock"
+                        ? "Out of Stock"
+                        : entry.status,
+                productStatus:
+                  data.status === "draft"
+                    ? "draft"
+                    : data.status === "published"
+                      ? "published"
+                      : entry.productStatus,
+              }
+            : entry,
+        ),
+      );
 
       await apiRequest<any>(`/api/products/${id}`, {
         method: "PATCH",

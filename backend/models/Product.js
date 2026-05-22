@@ -1,33 +1,108 @@
 import mongoose from "mongoose";
 
+const VendorInventorySchema = new mongoose.Schema({
+  vendorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Vendor",
+  },
+  vendorName: String,
+  quantity: {
+    type: Number,
+    default: 0,
+  },
+  pricePerItem: Number,
+  leadTime: String,
+});
+
 const productSchema = new mongoose.Schema(
   {
-    name: {
+    productCode: {
       type: String,
-      required: [true, "Product name is required"],
+      unique: true,
+      required: true,
+      index: true,
       trim: true,
     },
+
     productName: {
       type: String,
+      required: true,
       trim: true,
-      default: "",
     },
-    masterProductId: {
+
+    description: String,
+
+    brand: String,
+
+    category: String,
+
+    subcategory: String,
+
+    tags: [String],
+
+    productNotes: String,
+
+    keySpecifications: [
+      {
+        specification: String,
+        value: String,
+        unit: String,
+      },
+    ],
+
+    generalSpecifications: [
+      {
+        category: String,
+        value: String,
+      },
+    ],
+
+    images: [String],
+
+    vendorInventory: [VendorInventorySchema],
+
+    status: {
+      type: String,
+      enum: [
+        "draft",
+        "published",
+        "In Stock",
+        "Low Stock",
+        "Out Of Stock",
+        "active",
+        "inactive",
+        "discontinued",
+      ],
+      default: "draft",
+      index: true,
+    },
+
+    stock: {
+      type: Number,
+      default: 0,
+    },
+
+    price: {
+      type: Number,
+      default: 0,
+    },
+
+    // Backward compatibility fields
+    sku: {
       type: String,
       unique: true,
       sparse: true,
       trim: true,
-      index: true,
     },
-    category: {
+    quantity: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    vendorName: {
       type: String,
       trim: true,
-      default: "General",
-    },
-    price: {
-      type: Number,
-      required: [true, "Price is required"],
-      min: [0, "Price cannot be negative"],
+      default: "",
     },
     assignedClients: [
       {
@@ -35,61 +110,14 @@ const productSchema = new mongoose.Schema(
         ref: "Company",
       },
     ],
-    serialNumber: {
-      type: String,
-      unique: true,
-      sparse: true,
-      trim: true,
-    },
-    vendorId: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-    vendorName: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-    quantity: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    unit: {
-      type: String,
-      default: "pieces",
-    },
-    sku: {
-      type: String,
-      unique: true,
-      sparse: true,
-      trim: true,
-    },
-    status: {
-      type: String,
-      enum: ["active", "inactive", "discontinued"],
-      default: "active",
-      index: true,
-    },
   },
   {
     timestamps: true,
-    strict: false,
   },
 );
 
-productSchema.pre("validate", function normalizeProductNames(next) {
-  if (!this.name && this.productName) {
-    this.name = this.productName;
-  }
-  if (!this.productName && this.name) {
-    this.productName = this.name;
-  }
-  next();
-});
-
-productSchema.index({ name: 1 });
-productSchema.index({ assignedClients: 1 });
+productSchema.index({ productName: 1 });
+productSchema.index({ category: 1 });
+productSchema.index({ status: 1 });
 
 export default mongoose.model("Product", productSchema);

@@ -6,9 +6,15 @@ import Client from "./models/Client.js";
 import Vendor from "./models/Vendor.js";
 import Product from "./models/Product.js";
 import { ensureBusinessId } from "./utils/businessIds.js";
-import { connectToMongo, resolveMongoUriFromEnv } from "./utils/mongoConnection.js";
+import {
+  connectToMongo,
+  resolveMongoUriFromEnv,
+} from "./utils/mongoConnection.js";
 
-dotenv.config();
+dotenv.config({
+  // Ensure seeding always loads the backend env file even when invoked from repo root.
+  path: path.resolve(path.dirname(new URL(import.meta.url).pathname), ".env"),
+});
 
 const MONGODB_URI = resolveMongoUriFromEnv();
 const __dirname = path.dirname(new URL(import.meta.url).pathname);

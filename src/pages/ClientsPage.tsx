@@ -63,7 +63,7 @@ export default function ClientsPage() {
 
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<
-    "all" | "active" | "pending" | "inactive"
+    "all" | "active" | "inactive"
   >("all");
   const [showCreateUserDialog, setShowCreateUserDialog] = useState(false);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
@@ -102,7 +102,7 @@ export default function ClientsPage() {
   const stats = useMemo(() => {
     const active = clients.filter((c) => c.status === "active").length;
     const inactive = clients.filter((c) => c.status === "inactive").length;
-    const pending = clients.filter((c) => c.status === "pending").length;
+    const pending = 0;
     const premium = Math.max(1, Math.floor(clients.length * 0.2)); // At least 1 premium
     return { premium, active, pending, inactive, total: clients.length };
   }, [clients]);
@@ -116,16 +116,22 @@ export default function ClientsPage() {
       // Match by organization name or ID
       const orgName = displayOrganization.name.toLowerCase();
       filtered = filtered.filter((client) => {
-        const clientName = (client.name || client.companyName || "").toLowerCase();
-        return clientName === orgName || clientName.includes(orgName) || orgName.includes(clientName);
+        const clientName = (
+          client.name ||
+          client.companyName ||
+          ""
+        ).toLowerCase();
+        return (
+          clientName === orgName ||
+          clientName.includes(orgName) ||
+          orgName.includes(clientName)
+        );
       });
     }
 
     // Tab filter
     if (activeTab === "active") {
       filtered = filtered.filter((c) => c.status === "active");
-    } else if (activeTab === "pending") {
-      filtered = filtered.filter((c) => c.status === "pending");
     } else if (activeTab === "inactive") {
       filtered = filtered.filter((c) => c.status === "inactive");
     }
@@ -273,14 +279,12 @@ export default function ClientsPage() {
                 <h1 className="text-3xl font-bold">
                   {isClientRole && displayOrganization
                     ? displayOrganization.name
-                    : "Clients"
-                  }
+                    : "Clients"}
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   {isClientRole && displayOrganization
                     ? "Your organization details and team members"
-                    : "Manage all your client accounts"
-                  }
+                    : "Manage all your client accounts"}
                 </p>
               </div>
               {!isClientRole && (
@@ -360,16 +364,6 @@ export default function ClientsPage() {
                 }`}
               >
                 Active
-              </button>
-              <button
-                onClick={() => setActiveTab("pending")}
-                className={`px-4 py-2 font-medium text-sm transition-colors ${
-                  activeTab === "pending"
-                    ? "border-b-2 border-primary text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Pending
               </button>
               <button
                 onClick={() => setActiveTab("inactive")}

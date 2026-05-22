@@ -56,8 +56,13 @@ interface ShopProduct {
   status: "In Stock" | "Out of Stock";
   stock: number;
 
-  // Phase 1 — Product Notes & Alerts (optional)
+  // Phase 1 — Shop card data
   productNotes?: string;
+  tags?: string[];
+  images?: string[];
+  vendorInventory?: any[];
+  keySpecifications?: Array<{ name?: string; label?: string; value?: any }>;
+  generalSpecifications?: Array<{ name?: string; label?: string; value?: any }>;
 }
 
 const PAGE_SIZE = 12;
@@ -123,8 +128,6 @@ export default function ShopPage() {
   const { addToCart, totalItems } = useCart();
   const { masterCatalogItems, isCoreDataLoading, coreDataError } = useData();
 
-  console.log("SHOP INPUT PRODUCTS:", masterCatalogItems.length);
-
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [page, setPage] = useState(1);
@@ -137,42 +140,67 @@ export default function ShopPage() {
           !!item.masterProductId &&
           !!item.productCode &&
           !!item.name &&
-          !!item.category,
+          !!item.category &&
+          item.productStatus !== "draft",
       )
-      .map((item, index) => {
+      .map((item) => {
+        const vendorInventory = item.vendorInventory || [];
+        const vendorStock = vendorInventory.reduce(
+          (sum, v) => sum + (Number(v.quantity) || 0),
+          0,
+        );
+
         const stock =
-          item.status === "Out of Stock" ? 0 : item.initialStock || 100;
+          item.status === "Out of Stock"
+            ? 0
+            : vendorStock > 0
+              ? vendorStock
+              : item.initialStock || 0;
+
+        const leadTime =
+          (item.leadTime && String(item.leadTime).trim()) ||
+          vendorInventory.find((v) => (v.leadTime || "").trim())?.leadTime ||
+          "";
+
+        // keySpecifications/generalSpecifications may be persisted either as
+        // explicit arrays or via legacy fields (specAttributes/specification).
+        const keySpecifications = (item as any).keySpecifications || []; // preferred shape: [{name,value}]
+        const generalSpecifications = (item as any).generalSpecifications || []; // preferred shape: [{name,value}]
+
+        // If legacy shape exists as specification, fall back to empty (no placeholders).
+        const images =
+          ((item as any).images as string[] | undefined) || item.image
+            ? [item.image].filter(Boolean) // at least one image fallback is acceptable (media placeholder)
+            : [];
 
         return {
-          id: item.id || item.masterProductId,
+          id: item.id || item.masterProductId!,
           sku: item.productCode,
           name: item.name,
-          minOrder:
-            Number(
-              (item as { minOrder?: number; minOrderQuantity?: number })
-                .minOrder ??
-                (item as { minOrder?: number; minOrderQuantity?: number })
-                  .minOrderQuantity,
-            ) || 1,
+          minOrder: Number((item as any).minOrder || 1) || 1,
           category: item.category,
           subCategory: item.subCategory || "General",
-          brand: item.brand || "Nido",
+          brand: item.brand || "",
           price: Number(item.price) || 0,
           emoji: getProductEmoji(item.category, item.name),
           image: getProductImage({
             category: item.category,
             image: item.image,
           }),
-          description:
-            item.description?.trim() ||
-            `${item.name} is optimized for enterprise procurement workflows and repeat ordering.`,
-          warranty: item.warranty || "Standard warranty",
-          leadTime: item.leadTime || "5-7 Days",
+          description: (item.description || "").trim(),
+          warranty: item.warranty || "",
+          leadTime,
+
+          productNotes: item.productNotes,
+
+          tags: item.tags || [],
+          images,
+          vendorInventory: vendorInventory as any,
+          keySpecifications,
+          generalSpecifications,
+
           status: normalizeStatus(item.status),
           stock,
-
-          // Phase 1 — Product Notes & Alerts (optional)
-          productNotes: item.productNotes,
         };
       });
   }, [masterCatalogItems]);
@@ -182,18 +210,6 @@ export default function ShopPage() {
       new Set(products.map((product) => product.category).filter(Boolean)),
     ).sort((left, right) => left.localeCompare(right));
   }, [products]);
-
-  const categoryCounts = useMemo(
-    () =>
-      ["all", ...categories].map((name) => ({
-        name,
-        count:
-          name === "all"
-            ? products.length
-            : products.filter((product) => product.category === name).length,
-      })),
-    [categories, products],
-  );
 
   const filtered = useMemo(() => {
     const term = deferredSearch.trim().toLowerCase();
@@ -211,8 +227,6 @@ export default function ShopPage() {
 
       return searchMatch && categoryMatch;
     });
-
-    console.log("FILTERED PRODUCTS:", result.length);
 
     return result;
   }, [products, deferredSearch, category]);
@@ -316,29 +330,15 @@ export default function ShopPage() {
               onClick={() => navigate("/shop/cart")}
             >
               <ShoppingCart className="mr-2 h-4 w-4" />
-
+              Cart
               <Badge className="ml-3 bg-white text-blue-700 hover:bg-white">
                 {totalItems}
               </Badge>
             </Button>
-            <Button
-              variant="outline"
-              className={PAGE_PILL_BUTTON_CLASS}
-              onClick={() => navigate("/categories")}
-            >
-              Browse Categories
-            </Button>
-            <Button
-              variant="outline"
-              className={PAGE_PILL_BUTTON_CLASS}
-              onClick={() => navigate("/support")}
-            >
-              Procurement Support
-            </Button>
           </div>
         </div>
 
-        <div className="mt-8 grid gap-3 xl:grid-cols-[minmax(0,1.3fr)_240px_220px_180px]">
+        <div className="mt-8 grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
@@ -362,24 +362,6 @@ export default function ShopPage() {
               ))}
             </SelectContent>
           </Select>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Results
-            </p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">
-              {filtered.length} product{filtered.length === 1 ? "" : "s"}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 shadow-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Page
-            </p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">
-              {page}/{totalPages}
-            </p>
-          </div>
         </div>
 
         {suggestions.length > 0 && (
@@ -401,25 +383,6 @@ export default function ShopPage() {
             </div>
           </div>
         )}
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {categoryCounts.map((entry) => (
-            <button
-              key={entry.name}
-              type="button"
-              onClick={() => setCategory(entry.name)}
-              className={cn(
-                "rounded-full border px-4 py-2 text-xs font-medium transition",
-                category === entry.name
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
-              )}
-            >
-              {entry.name === "all" ? "All Categories" : entry.name}
-              <span className="ml-2 text-slate-400">{entry.count}</span>
-            </button>
-          ))}
-        </div>
       </section>
 
       <section className="space-y-4">
@@ -430,9 +393,7 @@ export default function ShopPage() {
               products
             </p>
             <p className="text-sm text-slate-500">
-              {isCoreDataLoading
-                ? "Loading enterprise catalog records..."
-                : "Consistent product media, clean spacing, and procurement-ready actions."}
+              {isCoreDataLoading ? "Loading enterprise catalog records..." : ""}
             </p>
           </div>
 

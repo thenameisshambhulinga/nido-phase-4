@@ -453,7 +453,7 @@ export default function MasterCataloguePage() {
   const [items, setItems] = useState<CatalogItem[]>(initialItems);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusTab, setStatusTab] = useState("published");
   const [brandFilter, setBrandFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -514,16 +514,38 @@ export default function MasterCataloguePage() {
   }, [masterCatalogItems]);
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "In Stock":
+    const normalized = status?.toLowerCase().trim();
+    switch (normalized) {
+      case "in stock":
+      case "published":
+      case "active":
         return "bg-success text-success-foreground";
-      case "Low Stock":
+      case "low stock":
+      case "draft":
         return "bg-warning text-warning-foreground";
-      case "Out of Stock":
+      case "out of stock":
+      case "archived":
         return "bg-destructive text-destructive-foreground";
       default:
         return "bg-muted text-muted-foreground";
     }
+  };
+
+  const normalizeStatus = (status?: string) =>
+    status?.toLowerCase().trim() || "";
+
+  const getStatusGroup = (status?: string) => {
+    const normalized = normalizeStatus(status);
+    if (["published", "active", "in stock"].includes(normalized)) {
+      return "published";
+    }
+    if (["draft", "low stock", "pending"].includes(normalized)) {
+      return "drafts";
+    }
+    if (["archived", "out of stock", "archive"].includes(normalized)) {
+      return "archived";
+    }
+    return "published";
   };
 
   const filtered = items.filter((i) => {
@@ -536,16 +558,21 @@ export default function MasterCataloguePage() {
     )
       return false;
     if (categoryFilter !== "all" && i.category !== categoryFilter) return false;
-    if (statusFilter !== "all" && i.status !== statusFilter) return false;
+
+    const itemGroup = getStatusGroup(i.status);
+    if (itemGroup !== statusTab) return false;
+
     if (brandFilter !== "all" && i.brand !== brandFilter) return false;
     return true;
   });
 
   const stats = {
     total: items.length,
-    inStock: items.filter((i) => i.status === "In Stock").length,
-    lowStock: items.filter((i) => i.status === "Low Stock").length,
-    outOfStock: items.filter((i) => i.status === "Out of Stock").length,
+    published: items.filter((i) => getStatusGroup(i.status) === "published")
+      .length,
+    drafts: items.filter((i) => getStatusGroup(i.status) === "drafts").length,
+    archived: items.filter((i) => getStatusGroup(i.status) === "archived")
+      .length,
   };
 
   const updateForm = (patch: Partial<Omit<CatalogItem, "id">>) =>
@@ -794,7 +821,6 @@ export default function MasterCataloguePage() {
         Brand: i.brand,
         "Product Type": i.productType,
         "Physical Type": i.physicalType,
-        Price: i.price,
         Status: i.status,
       })),
       "master-catalogue.csv",
@@ -805,10 +831,10 @@ export default function MasterCataloguePage() {
     const rows = items
       .map(
         (i) =>
-          `<tr><td>${i.name}</td><td>${i.sku}</td><td>${i.category}</td><td>${i.brand}</td><td>${i.productType}</td><td>${i.physicalType}</td><td>₹${i.price.toLocaleString()}</td><td>${i.status}</td></tr>`,
+          `<tr><td>${i.name}</td><td>${i.sku}</td><td>${i.category}</td><td>${i.brand}</td><td>${i.productType}</td><td>${i.physicalType}</td><td>${i.status}</td></tr>`,
       )
       .join("");
-    const html = `<html><head><title>Master Catalogue</title><style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f5f5f5;font-weight:bold}h1{color:#333}</style></head><body><h1>Master Catalogue</h1><p>Exported on ${new Date().toLocaleDateString()}</p><table><thead><tr><th>Item Name</th><th>SKU</th><th>Category</th><th>Brand</th><th>Product Type</th><th>Physical Type</th><th>Price</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+    const html = `<html><head><title>Master Catalogue</title><style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f5f5f5;font-weight:bold}h1{color:#333}</style></head><body><h1>Master Catalogue</h1><p>Exported on ${new Date().toLocaleDateString()}</p><table><thead><tr><th>Item Name</th><th>SKU</th><th>Category</th><th>Brand</th><th>Product Type</th><th>Physical Type</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
     const win = window.open("", "_blank");
     if (win) {
       win.document.write(html);
@@ -949,22 +975,22 @@ export default function MasterCataloguePage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           {[
             {
-              label: `${stats.total} Items`,
+              label: `${stats.total} Total`,
               icon: ShoppingCart,
               color: "bg-primary text-primary-foreground",
             },
             {
-              label: `${stats.inStock} in Stock`,
+              label: `${stats.published} Published`,
               icon: ShoppingCart,
               color: "bg-success/20 text-success",
             },
             {
-              label: `${stats.lowStock} Low Stock`,
+              label: `${stats.drafts} Drafts`,
               icon: ShoppingCart,
               color: "bg-warning/20 text-warning",
             },
             {
-              label: `${stats.outOfStock} Out of Stock`,
+              label: `${stats.archived} Archived`,
               icon: ShoppingCart,
               color: "bg-destructive/20 text-destructive",
             },
@@ -979,6 +1005,18 @@ export default function MasterCataloguePage() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          <Tabs
+            value={statusTab}
+            onValueChange={setStatusTab}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-3 max-w-xs">
+              <TabsTrigger value="published">Published</TabsTrigger>
+              <TabsTrigger value="drafts">Drafts</TabsTrigger>
+              <TabsTrigger value="archived">Archived</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
             <SelectTrigger className="w-36 h-8 text-xs">
               <SelectValue placeholder="All Categories" />
@@ -1003,17 +1041,6 @@ export default function MasterCataloguePage() {
                   {b}
                 </SelectItem>
               ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-28 h-8 text-xs">
-              <SelectValue placeholder="All Statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="In Stock">In Stock</SelectItem>
-              <SelectItem value="Low Stock">Low Stock</SelectItem>
-              <SelectItem value="Out of Stock">Out of Stock</SelectItem>
             </SelectContent>
           </Select>
           <div className="relative">
@@ -1071,110 +1098,119 @@ export default function MasterCataloguePage() {
                   <TableHead>SKU</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Brand</TableHead>
-                  <TableHead>Price</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer transition-colors hover:bg-muted/40"
-                    onClick={() => openEditDialog(item)}
-                  >
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.includes(item.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        onCheckedChange={() =>
-                          setSelectedIds((prev) =>
-                            prev.includes(item.id)
-                              ? prev.filter((id) => id !== item.id)
-                              : [...prev, item.id],
-                          )
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
-                          {item.image ? (
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className="w-8 h-8 object-cover rounded"
-                            />
-                          ) : (
-                            <ImageIcon
-                              size={14}
-                              className="text-muted-foreground"
-                            />
-                          )}
+                {filtered.length > 0 ? (
+                  filtered.map((item) => (
+                    <TableRow
+                      key={item.id}
+                      className="transition-colors hover:bg-muted/40"
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.includes(item.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onCheckedChange={() =>
+                            setSelectedIds((prev) =>
+                              prev.includes(item.id)
+                                ? prev.filter((id) => id !== item.id)
+                                : [...prev, item.id],
+                            )
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {item.image ? (
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                className="w-8 h-8 object-cover rounded"
+                              />
+                            ) : (
+                              <ImageIcon
+                                size={14}
+                                className="text-muted-foreground"
+                              />
+                            )}
+                          </div>
+                          <span className="font-medium">{item.name}</span>
                         </div>
-                        <span className="font-medium">{item.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {item.sku}
-                    </TableCell>
-                    <TableCell className="text-sm">{item.category}</TableCell>
-                    <TableCell className="text-sm text-primary">
-                      {item.brand}
-                    </TableCell>
-                    <TableCell>₹{item.price.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Badge
-                        className={`${getStatusColor(item.status)} border-none`}
-                      >
-                        {item.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditDialog(item);
-                          }}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {item.sku}
+                      </TableCell>
+                      <TableCell className="text-sm">{item.category}</TableCell>
+                      <TableCell className="text-sm text-primary">
+                        {item.brand}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={`${getStatusColor(item.status)} border-none`}
                         >
-                          <Pencil size={12} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditDialog(item);
-                          }}
-                        >
-                          <Eye size={12} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteMasterCatalogItem(item.id);
-                            setItems((prev) =>
-                              prev.filter((i) => i.id !== item.id),
-                            );
-                            toast.success("Item deleted");
-                          }}
-                        >
-                          <Trash2 size={12} />
-                        </Button>
-                      </div>
+                          {item.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditDialog(item);
+                            }}
+                          >
+                            <Pencil size={12} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditDialog(item);
+                            }}
+                          >
+                            <Eye size={12} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteMasterCatalogItem(item.id);
+                              setItems((prev) =>
+                                prev.filter((i) => i.id !== item.id),
+                              );
+                              toast.success("Item deleted");
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="h-24 text-center text-sm text-muted-foreground"
+                    >
+                      No items match the selected filters. Adjust search,
+                      category, or status to view catalog entries.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
             <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
               <span>
-                Showing 1 - {filtered.length} of {items.length} entries
+                Showing {filtered.length} of {items.length} entries
               </span>
             </div>
           </CardContent>

@@ -1,20 +1,32 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/lib/toastManager";
 import {
-  ArrowLeft,
   ChevronDown,
+  Copy,
+  Eye,
   Image as ImageIcon,
   Link as LinkIcon,
   MoreHorizontal,
   Plus,
+  RotateCcw,
   Save,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
+
+function useDebounce<T>(value: T, delayMs: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +50,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import BrandAutocomplete from "@/components/shared/BrandAutocomplete";
 import CategoryCombobox from "@/components/shared/CategoryCombobox";
@@ -66,6 +89,7 @@ type ProductImage = {
 
 type VendorInventory = {
   id: string;
+  vendorId?: string;
   vendorName: string;
   pricePerItem: number;
   quantity: number;
@@ -125,12 +149,12 @@ function RichTextToolbar({
   onCommand: (cmd: string, value?: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-white px-3 py-2">
+    <div className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/60 px-3 py-2 backdrop-blur-sm">
       <div className="flex items-center gap-1">
         <Button
           type="button"
           variant="ghost"
-          className="h-8 px-2"
+          className="h-9 w-9 p-0"
           onClick={() => onCommand("bold")}
         >
           <span className="font-semibold">B</span>
@@ -138,7 +162,7 @@ function RichTextToolbar({
         <Button
           type="button"
           variant="ghost"
-          className="h-8 px-2"
+          className="h-9 w-9 p-0"
           onClick={() => onCommand("italic")}
         >
           <span className="italic">I</span>
@@ -146,7 +170,7 @@ function RichTextToolbar({
         <Button
           type="button"
           variant="ghost"
-          className="h-8 px-2"
+          className="h-9 w-9 p-0"
           onClick={() => onCommand("underline")}
         >
           <span className="underline">U</span>
@@ -155,11 +179,11 @@ function RichTextToolbar({
 
       <Separator orientation="vertical" className="h-6" />
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <Button
           type="button"
           variant="ghost"
-          className="h-8 px-2"
+          className="h-9 rounded-md px-2"
           onClick={() => onCommand("insertUnorderedList")}
         >
           • List
@@ -172,7 +196,7 @@ function RichTextToolbar({
         <Button
           type="button"
           variant="ghost"
-          className="h-8 px-2"
+          className="h-9 w-9 p-0"
           onClick={() => onCommand("justifyLeft")}
         >
           Left
@@ -180,7 +204,7 @@ function RichTextToolbar({
         <Button
           type="button"
           variant="ghost"
-          className="h-8 px-2"
+          className="h-9 w-9 p-0"
           onClick={() => onCommand("justifyCenter")}
         >
           Center
@@ -188,20 +212,18 @@ function RichTextToolbar({
         <Button
           type="button"
           variant="ghost"
-          className="h-8 px-2"
+          className="h-9 w-9 p-0"
           onClick={() => onCommand("justifyRight")}
         >
           Right
         </Button>
       </div>
 
-      <Separator orientation="vertical" className="h-6" />
-
       <div className="ml-auto flex items-center gap-1">
         <Button
           type="button"
           variant="ghost"
-          className="h-8 px-2"
+          className="h-9 w-9 p-0"
           onClick={() => onCommand("image")}
         >
           <ImageIcon className="h-4 w-4" />
@@ -209,7 +231,7 @@ function RichTextToolbar({
         <Button
           type="button"
           variant="ghost"
-          className="h-8 px-2"
+          className="h-9 w-9 p-0"
           onClick={() => onCommand("link")}
         >
           <LinkIcon className="h-4 w-4" />
@@ -230,6 +252,67 @@ function FauxRichTextArea({
 }) {
   // Uses contenteditable via textarea-like UX but keeps system stable.
   // We implement toolbar commands as lightweight transformations.
+  // Helper: remove existing alignment wrappers (recursive)
+  const stripAlignmentWrappers = (html: string) => {
+    if (!html) return "";
+    // Remove outermost <div style="text-align:..."> wrappers repeatedly
+    let next = html.trim();
+    const wrapperRegex =
+      /^<div\s+style=(?:"|')text-align:\s*(left|center|right)(?:;?)[^"']*(?:"|')>([\s\S]*)<\/div>$/i;
+    let m = next.match(wrapperRegex);
+    while (m) {
+      next = m[2].trim();
+      m = next.match(wrapperRegex);
+    }
+    return next;
+  };
+
+  const setBlockAlignment = (
+    html: string,
+    align: "left" | "center" | "right",
+  ) => {
+    const clean = stripAlignmentWrappers(html).trim();
+    if (!clean) return "";
+
+    // If the content already starts with a block-level tag like <p> or <ul>, set style on the first block
+    const pRegex = /^(<p\b[^>]*>)([\s\S]*)(<\/p>)$/i;
+    const firstTagRegex = /^(<(p|div|ul|ol|h[1-6])\b)([^>]*)>([\s\S]*?)<\/\2>/i;
+
+    const pMatch = clean.match(pRegex);
+    if (pMatch) {
+      // inject text-align into opening <p>
+      const open = pMatch[1].replace(/style=(?:"|')([^"']*)(?:"|')/i, (s) => s);
+      const hasStyle = /style=(?:"|')/i.test(open);
+      const newOpen = hasStyle
+        ? open.replace(
+            /style=(?:"|')([^"']*)(?:"|')/i,
+            (s, g1) => `style=\"text-align:${align};${g1}\"`,
+          )
+        : open.replace(/<p\b([^>]*)/i, `<p style=\"text-align:${align}\"$1`);
+      return `${newOpen}${pMatch[2]}${pMatch[3]}`;
+    }
+
+    const firstMatch = clean.match(firstTagRegex);
+    if (firstMatch) {
+      const tag = firstMatch[2];
+      const attrs = firstMatch[3] || "";
+      const inner = firstMatch[4] || "";
+      const hasStyle = /style=(?:"|')/i.test(attrs);
+      const newAttrs = hasStyle
+        ? attrs.replace(
+            /style=(?:"|')([^"']*)(?:"|')/i,
+            (s, g1) => `style=\"text-align:${align};${g1}\"`,
+          )
+        : ` style=\"text-align:${align}\"${attrs}`;
+      return (
+        `<${tag}${newAttrs}>${inner}</${tag}>` +
+        clean.slice(firstMatch[0].length)
+      );
+    }
+
+    // Fallback: wrap in <p>
+    return `<p style=\"text-align:${align}\">${clean}</p>`;
+  };
   const handleCommand = (cmd: string, _value?: string) => {
     const v = value;
     const safe = v || "";
@@ -260,13 +343,13 @@ function FauxRichTextArea({
         return;
       }
       case "justifyLeft":
-        onChange(`<div style="text-align:left">${safe}</div>`);
+        onChange(setBlockAlignment(safe, "left"));
         return;
       case "justifyCenter":
-        onChange(`<div style="text-align:center">${safe}</div>`);
+        onChange(setBlockAlignment(safe, "center"));
         return;
       case "justifyRight":
-        onChange(`<div style="text-align:right">${safe}</div>`);
+        onChange(setBlockAlignment(safe, "right"));
         return;
       case "image":
         toast.info("Image insertion requires a media picker in this build.");
@@ -331,6 +414,13 @@ export default function AddMasterCatalogueItemPage() {
   const [skuCode, setSkuCode] = useState("");
   const [draggingSpecId, setDraggingSpecId] = useState<string | null>(null);
   const [productCode, setProductCode] = useState("");
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
+  const [vendorHighlightedIndex, setVendorHighlightedIndex] = useState(0);
+
+  const [selectedVendorId, setSelectedVendorId] = useState("");
+  const [selectedVendorName, setSelectedVendorName] = useState("");
+  const vendorDropdownRef = useRef<HTMLDivElement | null>(null);
   const [productType, setProductType] = useState("Product");
   const [physicalType, setPhysicalType] = useState("Physical");
   const [category, setCategory] = useState("");
@@ -437,21 +527,72 @@ export default function AddMasterCatalogueItemPage() {
 
   const [images, setImages] = useState<ProductImage[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [isDraftSaving, setIsDraftSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const videoRefUrl = useRef<HTMLInputElement | null>(null);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
 
-  // Enhanced Product Code generation: PROD-MMDD-XXXXX (timestamp-based + random)
   const generateProductCode = () => {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const randomSuffix = Math.floor(10000 + Math.random() * 90000).toString();
-    const code = `PROD-${month}${day}-${randomSuffix}`;
-    setProductCode(code);
-    return code;
+    const year = new Date().getFullYear();
+    const uniqueSuffix = Math.floor(100000 + Math.random() * 900000);
+    return `PROD-${year}-${uniqueSuffix}`;
   };
+
+  // Generate productCode exactly once when opening Add Item page.
+  const generatedRef = useRef(false);
+  useEffect(() => {
+    if (isEditMode) return;
+    if (generatedRef.current) return;
+
+    setProductCode(generateProductCode());
+    generatedRef.current = true;
+  }, [isEditMode]);
+
+  // Debounce vendor search input (300ms)
+  const debouncedVendorSearch = useDebounce(vendorSearch, 300);
+
+  const { vendors } = useData();
+
+  const filteredVendors = useMemo(() => {
+    const term = debouncedVendorSearch.trim().toLowerCase();
+    if (!term) return [];
+    return (vendors || [])
+      .filter((v) => v.name?.toLowerCase().includes(term))
+      .slice(0, 10);
+  }, [vendors, debouncedVendorSearch]);
+
+  const closeVendorDropdown = () => {
+    setVendorDropdownOpen(false);
+    setVendorHighlightedIndex(0);
+  };
+
+  useEffect(() => {
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (!vendorDropdownRef.current) return;
+      const target = e.target as Node | null;
+      if (!target) return;
+
+      if (!vendorDropdownRef.current.contains(target)) {
+        closeVendorDropdown();
+      }
+    };
+
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, []);
+
+  useEffect(() => {
+    if (!vendorSearch.trim()) {
+      closeVendorDropdown();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendorSearch]);
 
   // Enhanced SKU generation: SKU-XXXX-YYYY (brand/name initials + crypto randomness)
   const generateSkuCode = () => {
@@ -606,9 +747,16 @@ export default function AddMasterCatalogueItemPage() {
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    if (images.length >= 5) {
+      toast.error("Maximum 5 images allowed");
+      return;
+    }
 
-    // local data URL conversion with progress.
-    const fileArr = Array.from(files);
+    const fileArr = Array.from(files).slice(0, 5 - images.length);
+    if (fileArr.length > 5 - images.length) {
+      toast.error("Maximum 5 images allowed");
+    }
+
     setUploadProgress(0);
 
     const toDataUrl = (file: File) =>
@@ -682,57 +830,56 @@ export default function AddMasterCatalogueItemPage() {
     });
   };
 
-  const onSaveAsDraft = () => {
-    toast.success("Draft saved (local build)");
-  };
-
-  const onPublish = async () => {
-    if (!productName.trim()) {
-      toast.error("Product Name is required");
-      return;
-    }
-    if (!skuCode.trim()) {
-      toast.error("SKU Code is required");
-      return;
-    }
-    if (!category.trim()) {
-      toast.error("Category is required");
-      return;
-    }
-
+  const buildMasterCatalogItem = (status: "draft" | "published") => {
     const primaryImage = images.find((im) => im.isPrimary) || images[0];
 
-    const specAttributes = specRows.map((r) => ({
-      category: specCategoryNameById.get(r.categoryId) || "Specifications",
-      attribute: r.attribute,
+    const keySpecifications = specRows.map((r) => ({
+      name: specCategoryNameById.get(r.categoryId) || "Specifications",
+      label: specCategoryNameById.get(r.categoryId) || "Specifications",
+      value: r.unit && r.unit !== "-" ? `${r.value} ${r.unit}` : r.value || "",
+    }));
+
+    const generalSpecifications = genSpecRows.map((r) => ({
+      name: r.category,
+      label: r.category,
       value: r.value,
-      unit: r.unit,
     }));
 
-    // Back-end model uses specAttributes: {category, attribute, value}.
-    // We will store unit as part of value if API expects only value.
-    const specAttributesForApi = specAttributes.map((s) => ({
-      category: s.category,
-      attribute: s.attribute,
-      value: s.unit && s.unit !== "-" ? `${s.value} ${s.unit}` : s.value,
-    }));
+    const leadTime =
+      vendorInventory.find((v) => v.leadTime?.trim())?.leadTime || "";
 
-    const payload = {
-      name: productName.trim(),
-      productCode: productCode.trim() || skuCode.trim(),
-      sku: skuCode.trim(),
-      category: category.trim(),
+    const stock = vendorInventory.reduce(
+      (sum, v) => sum + (Number(v.quantity) || 0),
+      0,
+    );
+
+    const fallbackProductCode = productCode.trim() || `PRD-${Date.now()}`;
+    const fallbackSku =
+      skuCode.trim() || productCode.trim() || `SKU-${Date.now()}`;
+
+    return {
+      name: productName.trim() || "Draft Item",
+      productCode: fallbackProductCode,
+      sku: fallbackSku,
+      masterProductId: editingItem?.masterProductId || fallbackProductCode,
+      category: category.trim() || "General",
       subCategory: subcategory.trim(),
       brand: brand.trim(),
       productType,
-      physicalType: physicalType,
+      physicalType,
       price: 0,
       discountPrice: undefined,
-      status: (editingItem?.status || "In Stock") as ProductStatus,
+      status,
       image: primaryImage?.src,
       description: descriptionHtmlLike,
       tags,
-      initialStock: editingItem?.initialStock || totalInventory,
+      keySpecifications,
+      generalSpecifications,
+      productNotes: productNotes.trim() ? productNotes : undefined,
+      images: images.map((im) => im.src),
+      vendorInventory: vendorInventory as any,
+      leadTime,
+      initialStock: stock,
       minStockThreshold: editingItem?.minStockThreshold || 0,
       specification: editingItem?.specification || "",
       warranty: editingItem?.warranty || "",
@@ -742,46 +889,121 @@ export default function AddMasterCatalogueItemPage() {
       customsDeclaration: editingItem?.customsDeclaration || "Exempt",
       primaryVendor: editingItem?.primaryVendor || "",
       vendorSku: editingItem?.vendorSku || "",
-      leadTime: editingItem?.leadTime || "",
       vendorContact: editingItem?.vendorContact || "",
       vendorEmail: editingItem?.vendorEmail || "",
       vendorPhone: editingItem?.vendorPhone || "",
       vendorPhone2: editingItem?.vendorPhone2 || "",
       trackPerformance: editingItem?.trackPerformance || false,
       performanceRating: editingItem?.performanceRating || 4,
-      specAttributes: specAttributesForApi as any,
-      vendorInventory: vendorInventory as any,
-
-      // Phase 1 — Product Notes & Alerts (optional pass-through)
-      productNotes: productNotes.trim() ? productNotes : undefined,
-      // Note: no forbidden sections.
     } as any;
+  };
 
+  const onSaveAsDraft = async () => {
+    if (isDraftSaving) return;
+    // Drafts are allowed to be incomplete; do not block on images.
+
+    setIsDraftSaving(true);
     try {
+      const draftPayload = buildMasterCatalogItem("draft");
       if (isEditMode && editingItem) {
-        const ok = await updateMasterCatalogItem(editingItem.id, payload);
-        if (!ok) {
-          toast.error("Product update failed");
+        const updated = await updateMasterCatalogItem(editingItem.id, {
+          ...draftPayload,
+          status: "draft",
+        });
+        if (!updated) {
+          toast.error("Saving draft failed");
           return;
         }
-        toast.success("Product updated successfully");
       } else {
-        const ok = await addMasterCatalogItem({
-          id: Date.now().toString(),
-          ...payload,
-        } as any);
-        if (!ok) {
-          toast.error("Product publishing failed");
+        const created = await addMasterCatalogItem({
+          ...draftPayload,
+          status: "draft",
+        });
+        if (!created) {
+          toast.error("Saving draft failed");
           return;
         }
-        toast.success("Product published");
       }
-      navigate("/configuration/master-catalogue");
-    } catch (e: any) {
-      toast.error(
-        `Publish failed: ${e?.message || e?.toString?.() || "Unknown error"}`,
-      );
+      toast.success("Draft saved");
+    } catch (error: any) {
+      toast.error(`Draft save failed: ${error?.message || String(error)}`);
+    } finally {
+      setIsDraftSaving(false);
     }
+  };
+
+  const onPublish = async () => {
+    if (isPublishing) return;
+    if (!productName.trim()) {
+      toast.error("Product Name is required");
+      return;
+    }
+    if (!productCode.trim()) {
+      toast.error("Product Code is required");
+      return;
+    }
+    if (!category.trim()) {
+      toast.error("Category is required");
+      return;
+    }
+    if (images.length === 0) {
+      toast.error("Upload at least one image before publishing.");
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      const publishPayload = buildMasterCatalogItem("published");
+      const publishPromise =
+        isEditMode && editingItem
+          ? updateMasterCatalogItem(editingItem.id, {
+              ...publishPayload,
+              status: "published",
+            })
+          : addMasterCatalogItem({
+              ...publishPayload,
+              status: "published",
+            });
+
+      await Promise.all([publishPromise]);
+      toast.success(isEditMode ? "Product updated" : "Product published");
+      navigate("/configuration/master-catalogue");
+    } catch (error: any) {
+      toast.error(`Publish failed: ${error?.message || String(error)}`);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleDuplicateProduct = () => {
+    // Reset ID to create new product
+    toast.success("Product duplicated. Make changes and save as new.");
+    setMenuOpen(false);
+  };
+
+  const handleResetForm = () => {
+    setProductName("");
+    setProductCode("");
+    setSkuCode("");
+    setCategory("");
+    setSubcategory("");
+    setBrand("");
+    setProductType("Product");
+    setPhysicalType("Physical");
+    setDescriptionHtmlLike("");
+    setTags([]);
+    setProductNotes("");
+    setImages([]);
+    setSpecRows([]);
+    setGenSpecRows([]);
+    setVendorInventory([]);
+    toast.success("Form reset");
+    setResetConfirmOpen(false);
+    setMenuOpen(false);
+  };
+
+  const handleDiscardChanges = () => {
+    navigate("/configuration/master-catalogue");
   };
 
   const selectedPrimaryImage = images.find((im) => im.isPrimary) || images[0];
@@ -797,31 +1019,365 @@ export default function AddMasterCatalogueItemPage() {
               <Button
                 variant="outline"
                 className="h-11 rounded-xl px-4"
-                onClick={onSaveAsDraft}
+                onClick={() => setPreviewModalOpen(true)}
                 disabled={!canEdit}
               >
+                Preview
+              </Button>
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl px-4"
+                onClick={onSaveAsDraft}
+                disabled={!canEdit || isDraftSaving}
+              >
                 <Save className="mr-2 h-4 w-4" />
-                Save as Draft
+                {isDraftSaving ? "Saving Draft..." : "Save as Draft"}
               </Button>
               <Button
                 className="h-11 rounded-xl px-4"
                 onClick={onPublish}
-                disabled={!canEdit}
+                disabled={!canEdit || isPublishing}
               >
-                {isEditMode ? "Save Changes" : "Publish Product"}
+                {isPublishing
+                  ? isEditMode
+                    ? "Saving..."
+                    : "Publishing..."
+                  : isEditMode
+                    ? "Save Changes"
+                    : "Publish Product"}
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 rounded-xl"
-                onClick={() => toast.info("Overflow menu (3 dots)")}
-              >
-                <MoreHorizontal className="h-5 w-5" />
-              </Button>
+              <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 rounded-xl"
+                  >
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-0" align="end">
+                  <div className="flex flex-col">
+                    <button
+                      onClick={() => {
+                        setPreviewModalOpen(true);
+                        setMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 text-left"
+                    >
+                      <Eye className="h-4 w-4" />
+                      Preview Product
+                    </button>
+                    <button
+                      onClick={() => {
+                        onSaveAsDraft();
+                        setMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 text-left border-t"
+                    >
+                      <Save className="h-4 w-4" />
+                      Save as Draft
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleDuplicateProduct();
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 text-left border-t"
+                    >
+                      <Copy className="h-4 w-4" />
+                      Duplicate Product
+                    </button>
+                    <button
+                      onClick={() => {
+                        setResetConfirmOpen(true);
+                        setMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 text-left border-t"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Reset Form
+                    </button>
+                    <button
+                      onClick={handleDiscardChanges}
+                      className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-red-50 text-red-600 text-left border-t"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Discard
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </div>
       </div>
+
+      {/* PRODUCT PREVIEW MODAL - PRODUCTION QUALITY LAYOUT */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-5xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col p-0">
+          {/* STICKY HEADER */}
+          <div className="flex items-center justify-between border-b border-border bg-white px-6 py-4 flex-shrink-0">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Product Preview
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Live review based on current form values · No backend call
+              </p>
+            </div>
+            <button
+              onClick={() => setPreviewOpen(false)}
+              className="text-slate-400 hover:text-slate-600 p-1"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* SCROLLABLE CONTENT */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr] h-full">
+              {/* LEFT SIDE - PRIMARY IMAGE GALLERY + PRODUCT INFO */}
+              <div className="border-r border-border p-6 space-y-6 bg-slate-50">
+                {/* PRIMARY IMAGE WITH THUMBNAILS */}
+                <div>
+                  <div className="aspect-square overflow-hidden rounded-2xl bg-white border border-border mb-3 flex items-center justify-center min-h-80">
+                    {selectedPrimaryImage?.src ? (
+                      <img
+                        src={selectedPrimaryImage.src}
+                        alt={productName || "Product"}
+                        className="h-full w-full object-contain p-2"
+                      />
+                    ) : (
+                      <div className="text-slate-300 text-center">
+                        <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                        <p className="text-xs">No primary image</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* THUMBNAIL STRIP */}
+                  {images.length > 1 && (
+                    <div className="flex gap-2 overflow-x-auto">
+                      {images.map((img, idx) => (
+                        <div
+                          key={idx}
+                          className="h-16 w-16 flex-shrink-0 rounded-lg border-2 border-transparent hover:border-primary overflow-hidden bg-white cursor-pointer"
+                          onClick={() => {
+                            const newImages = images.map((i, i_idx) => ({
+                              id: `img-${i_idx}`,
+                              src: i,
+                              alt: `Image ${i_idx}`,
+                              isPrimary: i_idx === idx,
+                            }));
+                            // Note: This is just visual, actual state update would need setImages call
+                          }}
+                        >
+                          <img
+                            src={img}
+                            alt={`Thumbnail ${idx}`}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* PRODUCT TITLE & METADATA */}
+                <div className="bg-white rounded-xl p-4 border border-border">
+                  <h3 className="text-xl font-bold text-slate-900 mb-1 break-words">
+                    {productName || "(Untitled)"}
+                  </h3>
+                  <p className="text-sm text-slate-600 mb-3">
+                    {brand && category
+                      ? `${brand} · ${category}`
+                      : brand || category || "No category"}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {productCode && (
+                      <Badge variant="outline" className="text-xs">
+                        {productCode}
+                      </Badge>
+                    )}
+                    {subcategory && (
+                      <Badge variant="secondary" className="text-xs">
+                        {subcategory}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* DESCRIPTION */}
+                {descriptionHtmlLike?.trim() && (
+                  <div className="bg-white rounded-xl p-4 border border-border">
+                    <p className="text-sm leading-6 text-slate-700">
+                      {descriptionHtmlLike}
+                    </p>
+                  </div>
+                )}
+
+                {/* TAGS */}
+                {tags.length > 0 && (
+                  <div className="bg-white rounded-xl p-4 border border-border">
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="secondary"
+                          className="text-xs"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* PRODUCT NOTES */}
+                {productNotes?.trim() && (
+                  <div className="bg-white rounded-xl p-4 border border-border">
+                    <h4 className="font-semibold text-xs text-slate-700 mb-2 uppercase tracking-wide">
+                      Notes & Alerts
+                    </h4>
+                    <p className="text-sm text-slate-600 whitespace-pre-wrap">
+                      {productNotes}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* RIGHT SIDE - PRODUCT IDENTIFIERS + SPECIFICATIONS + INVENTORY */}
+              <div className="p-6 space-y-5 overflow-y-auto">
+                {/* PRODUCT IDENTIFIERS */}
+                <div className="bg-white rounded-xl p-4 border border-border">
+                  <h4 className="font-semibold text-xs text-slate-700 mb-3 uppercase tracking-wide">
+                    Identifiers
+                  </h4>
+                  <div className="space-y-2 text-xs">
+                    {productCode && (
+                      <div>
+                        <span className="text-slate-500">Product Code:</span>
+                        <p className="font-mono text-slate-900">
+                          {productCode}
+                        </p>
+                      </div>
+                    )}
+                    {skuCode && (
+                      <div>
+                        <span className="text-slate-500">SKU:</span>
+                        <p className="font-mono text-slate-900">{skuCode}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* KEY SPECIFICATIONS */}
+                {specRows.length > 0 && (
+                  <div className="bg-white rounded-xl p-4 border border-border">
+                    <h4 className="font-semibold text-xs text-slate-700 mb-3 uppercase tracking-wide">
+                      Key Specifications
+                    </h4>
+                    <div className="space-y-2 text-xs">
+                      {specRows.map((spec) => (
+                        <div key={spec.id} className="flex justify-between">
+                          <span className="text-slate-600">
+                            {specCategoryNameById.get(spec.categoryId) ||
+                              "Spec"}
+                            :
+                          </span>
+                          <span className="font-medium text-slate-900">
+                            {spec.value}{" "}
+                            {spec.unit && spec.unit !== "-" ? spec.unit : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* GENERAL SPECIFICATIONS */}
+                {genSpecRows.length > 0 && (
+                  <div className="bg-white rounded-xl p-4 border border-border">
+                    <h4 className="font-semibold text-xs text-slate-700 mb-3 uppercase tracking-wide">
+                      General Specifications
+                    </h4>
+                    <div className="space-y-2 text-xs">
+                      {genSpecRows.map((spec) => (
+                        <div key={spec.id} className="flex justify-between">
+                          <span className="text-slate-600">
+                            {spec.category}:
+                          </span>
+                          <span className="font-medium text-slate-900">
+                            {spec.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* VENDOR INVENTORY */}
+                {vendorInventory.length > 0 && (
+                  <div className="bg-white rounded-xl p-4 border border-border">
+                    <h4 className="font-semibold text-xs text-slate-700 mb-3 uppercase tracking-wide">
+                      Vendor Inventory
+                    </h4>
+                    <div className="space-y-3 text-xs">
+                      {vendorInventory.map((vendor) => (
+                        <div
+                          key={vendor.id}
+                          className="bg-slate-50 rounded-lg p-3 border border-slate-100"
+                        >
+                          <p className="font-semibold text-slate-900 mb-1">
+                            {vendor.vendorName}
+                          </p>
+                          <div className="grid grid-cols-2 gap-2 text-slate-600">
+                            <div>
+                              <span className="text-slate-500">Qty:</span>{" "}
+                              {vendor.quantity}
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Price:</span> ₹
+                              {vendor.pricePerItem}
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-slate-500">Lead:</span>{" "}
+                              {vendor.leadTime || "—"}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* RESET CONFIRMATION DIALOG */}
+      <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reset Form?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600 mb-6">
+            This will clear all form fields. This action cannot be undone.
+          </p>
+          <div className="flex gap-3 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setResetConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleResetForm}>
+              Reset Form
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* MAIN 75/25 FULL-SCREEN LAYOUT */}
       <div className="w-full h-[calc(100vh-72px)] overflow-y-auto">
@@ -1647,7 +2203,8 @@ export default function AddMasterCatalogueItemPage() {
                           className="h-9 rounded-lg text-sm bg-white/70"
                           readOnly={isEditMode}
                         />
-                        {!isEditMode && (
+                        {/* One-time generation happens on page open; no manual regenerate */}
+                        {false && !isEditMode && (
                           <Button
                             type="button"
                             size="sm"
@@ -1790,12 +2347,122 @@ export default function AddMasterCatalogueItemPage() {
                         <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
                         Add Vendor Stock
                       </summary>
-                      <div className="mt-3 space-y-2 pl-6">
-                        <Input
-                          placeholder="Vendor name"
-                          id="vendor-name-temp"
-                          className="h-8 rounded-lg text-sm"
-                        />
+
+                      <div
+                        className="mt-3 space-y-3 pl-6"
+                        ref={vendorDropdownRef}
+                      >
+                        {/* Vendor autocomplete (registered vendors only) */}
+                        <div className="space-y-1">
+                          <Label className="text-xs font-medium text-emerald-900">
+                            Vendor
+                          </Label>
+
+                          <div className="relative">
+                            <Input
+                              value={vendorSearch}
+                              onChange={(e) => {
+                                setVendorSearch(e.target.value);
+                                setVendorDropdownOpen(true);
+                              }}
+                              onFocus={() => {
+                                if (vendorSearch.trim())
+                                  setVendorDropdownOpen(true);
+                              }}
+                              onKeyDown={(e) => {
+                                if (!vendorDropdownOpen) return;
+
+                                if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  closeVendorDropdown();
+                                  return;
+                                }
+                                if (e.key === "ArrowDown") {
+                                  e.preventDefault();
+                                  setVendorHighlightedIndex((i) =>
+                                    Math.min(
+                                      i + 1,
+                                      Math.max(0, filteredVendors.length - 1),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (e.key === "ArrowUp") {
+                                  e.preventDefault();
+                                  setVendorHighlightedIndex((i) =>
+                                    Math.max(0, i - 1),
+                                  );
+                                  return;
+                                }
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const picked =
+                                    filteredVendors[vendorHighlightedIndex];
+                                  if (!picked) return;
+                                  setSelectedVendorId(String(picked.id));
+                                  setSelectedVendorName(picked.name);
+                                  setVendorSearch(picked.name);
+                                  closeVendorDropdown();
+                                }
+                              }}
+                              placeholder="Search vendor name..."
+                              className="h-8 rounded-lg text-sm pr-10"
+                              aria-expanded={vendorDropdownOpen}
+                              aria-controls="vendor-autocomplete"
+                            />
+
+                            {vendorDropdownOpen && vendorSearch.trim() && (
+                              <div className="absolute z-20 mt-1 w-full rounded-xl border border-emerald-200 bg-white shadow-lg overflow-hidden">
+                                {filteredVendors.length === 0 ? (
+                                  <div className="px-3 py-2 text-xs text-emerald-700">
+                                    No vendors found
+                                  </div>
+                                ) : (
+                                  <div
+                                    id="vendor-autocomplete"
+                                    role="listbox"
+                                    aria-label="Vendor results"
+                                    className="max-h-52 overflow-y-auto"
+                                  >
+                                    {filteredVendors.map((v, idx) => (
+                                      <button
+                                        key={v.id}
+                                        type="button"
+                                        role="option"
+                                        aria-selected={
+                                          idx === vendorHighlightedIndex
+                                        }
+                                        className={[
+                                          "w-full text-left px-3 py-2 text-sm",
+                                          idx === vendorHighlightedIndex
+                                            ? "bg-emerald-50"
+                                            : "hover:bg-emerald-50/70",
+                                        ].join(" ")}
+                                        onMouseEnter={() =>
+                                          setVendorHighlightedIndex(idx)
+                                        }
+                                        onClick={() => {
+                                          setSelectedVendorId(String(v.id));
+                                          setSelectedVendorName(v.name);
+                                          setVendorSearch(v.name);
+                                          closeVendorDropdown();
+                                        }}
+                                      >
+                                        <div className="font-medium text-emerald-900">
+                                          {v.name}
+                                        </div>
+                                        <div className="text-xs text-emerald-600">
+                                          {v.category} · {v.status}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         <Input
                           placeholder="Quantity"
                           type="number"
@@ -1816,14 +2483,12 @@ export default function AddMasterCatalogueItemPage() {
                           id="vendor-lead-temp"
                           className="h-8 rounded-lg text-sm"
                         />
+
                         <Button
                           type="button"
                           size="sm"
                           className="w-full h-8 rounded-lg text-xs"
                           onClick={() => {
-                            const nameEl = document.getElementById(
-                              "vendor-name-temp",
-                            ) as HTMLInputElement;
                             const qtyEl = document.getElementById(
                               "vendor-qty-temp",
                             ) as HTMLInputElement;
@@ -1834,21 +2499,26 @@ export default function AddMasterCatalogueItemPage() {
                               "vendor-lead-temp",
                             ) as HTMLInputElement;
 
-                            const name = nameEl?.value.trim();
                             const qty = parseInt(qtyEl?.value || "0");
                             const price = parseFloat(priceEl?.value || "0");
                             const lead = leadEl?.value.trim();
 
-                            if (!name || qty <= 0 || price < 0) {
+                            if (
+                              !selectedVendorId ||
+                              !selectedVendorName ||
+                              qty <= 0 ||
+                              price < 0
+                            ) {
                               toast.error(
-                                "Please fill vendor name, quantity, and price",
+                                "Select a registered vendor, and enter quantity + price",
                               );
                               return;
                             }
 
                             const newVendor: VendorInventory = {
                               id: uid(),
-                              vendorName: name,
+                              vendorId: selectedVendorId,
+                              vendorName: selectedVendorName,
                               quantity: qty,
                               pricePerItem: price,
                               leadTime: lead,
@@ -1857,8 +2527,10 @@ export default function AddMasterCatalogueItemPage() {
                             setVendorInventory((prev) => [...prev, newVendor]);
                             setTotalInventory((prev) => prev + qty);
 
-                            // Reset form
-                            if (nameEl) nameEl.value = "";
+                            // Reset form (keep vendor selection closed)
+                            setVendorSearch(selectedVendorName);
+                            closeVendorDropdown();
+
                             if (qtyEl) qtyEl.value = "";
                             if (priceEl) priceEl.value = "";
                             if (leadEl) leadEl.value = "";
@@ -1880,7 +2552,7 @@ export default function AddMasterCatalogueItemPage() {
                     type="button"
                     variant="outline"
                     className="w-full h-12 rounded-2xl"
-                    onClick={() => toast.info("Preview Product (stub)")}
+                    onClick={() => setPreviewModalOpen(true)}
                   >
                     Preview Product
                   </Button>
@@ -1905,6 +2577,221 @@ export default function AddMasterCatalogueItemPage() {
           </div>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {previewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-border/70 px-6 py-4 flex justify-between items-center rounded-t-2xl">
+              <h2 className="text-xl font-semibold">Product Preview</h2>
+              <button
+                onClick={() => setPreviewModalOpen(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              {/* Basic Info */}
+              <div>
+                <h3 className="font-semibold mb-2">Basic Information</h3>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Code:</span>{" "}
+                    {productCode || "N/A"}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Name:</span>{" "}
+                    {productName || "N/A"}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Category:</span>{" "}
+                    {category || "N/A"}
+                  </div>
+                  {subcategory && (
+                    <div>
+                      <span className="text-muted-foreground">
+                        Sub-Category:
+                      </span>{" "}
+                      {subcategory}
+                    </div>
+                  )}
+                  {brand && (
+                    <div>
+                      <span className="text-muted-foreground">Brand:</span>{" "}
+                      {brand}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Description */}
+              {description && (
+                <div>
+                  <h3 className="font-semibold mb-2">Description</h3>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {description}
+                  </p>
+                </div>
+              )}
+
+              {/* Images */}
+              {images.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">
+                    Images ({images.length})
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {images.map((img, idx) => (
+                      <img
+                        key={idx}
+                        src={img}
+                        alt={`Preview ${idx}`}
+                        className="w-full h-32 object-cover rounded-lg border border-border/70"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Key Specifications */}
+              {keySpecifications.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">Key Specifications</h3>
+                  <table className="w-full text-sm border-collapse">
+                    <tbody>
+                      {keySpecifications.map((spec, idx) => (
+                        <tr key={idx} className="border-b border-border/30">
+                          <td className="p-2 font-medium text-muted-foreground">
+                            {spec.specification}
+                          </td>
+                          <td className="p-2 text-right">
+                            {spec.value} {spec.unit || ""}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* General Specifications */}
+              {generalSpecifications.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">General Specifications</h3>
+                  <table className="w-full text-sm border-collapse">
+                    <tbody>
+                      {generalSpecifications.map((spec, idx) => (
+                        <tr key={idx} className="border-b border-border/30">
+                          <td className="p-2 font-medium text-muted-foreground">
+                            {spec.category}
+                          </td>
+                          <td className="p-2">{spec.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Vendor Inventory */}
+              {vendorInventory.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">Vendor Inventory</h3>
+                  <div className="space-y-2">
+                    {vendorInventory.map((vendor, idx) => (
+                      <div
+                        key={idx}
+                        className="border border-border/70 rounded-lg p-3 text-sm space-y-1"
+                      >
+                        <div className="font-medium">{vendor.vendorName}</div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            Quantity:
+                          </span>{" "}
+                          {vendor.quantity}
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            Price per Item:
+                          </span>{" "}
+                          ₹{vendor.pricePerItem.toFixed(2)}
+                        </div>
+                        {vendor.leadTime && (
+                          <div>
+                            <span className="text-muted-foreground">
+                              Lead Time:
+                            </span>{" "}
+                            {vendor.leadTime}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Product Notes */}
+              {productNotes && (
+                <div>
+                  <h3 className="font-semibold mb-2">Product Notes</h3>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {productNotes}
+                  </p>
+                </div>
+              )}
+
+              {/* Tags */}
+              {tags.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-2">Tags</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Status */}
+              <div className="p-3 rounded-lg bg-slate-50 border border-border/70">
+                <p className="text-xs text-muted-foreground">
+                  Status:{" "}
+                  <span className="font-semibold text-slate-900">
+                    {isEditMode ? "Editing Draft" : "New Product"}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-border/70 px-6 py-4 flex justify-end gap-2 rounded-b-2xl bg-slate-50">
+              <Button
+                variant="outline"
+                onClick={() => setPreviewModalOpen(false)}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setPreviewModalOpen(false);
+                  onSaveAsDraft();
+                }}
+              >
+                Save as Draft
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

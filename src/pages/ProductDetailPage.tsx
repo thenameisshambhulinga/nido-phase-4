@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -120,38 +121,19 @@ export default function ProductDetailPage() {
     ["HSN/SAC", product.hsnCode || "Not specified"],
   ];
 
-  const keySpecifications = [
-    {
-      label: "Function",
-      value: product.productType || product.category,
-      icon: PackageCheck,
-    },
-    {
-      label: "Resolution",
-      value: product.resolution || "Not specified",
-      icon: Star,
-    },
-    {
-      label: "Connectivity",
-      value: product.connectivity || "Standard",
-      icon: ShieldCheck,
-    },
-    {
-      label: "Dimensions",
-      value: product.dimensions || "Refer spec sheet",
-      icon: Truck,
-    },
-    {
-      label: "Warranty",
-      value: product.warranty || "Standard warranty",
-      icon: ShieldCheck,
-    },
-    {
-      label: "Paper Size",
-      value: product.paperSize || "A4 / Standard",
-      icon: PackageCheck,
-    },
-  ];
+  // Use DB-driven key specifications, fallback to empty if not available
+  const keySpecifications = Array.isArray(product.keySpecifications)
+    ? product.keySpecifications
+        .filter((spec: any) => spec && spec.specification && spec.value)
+        .map((spec: any) => ({
+          label: spec.specification || spec.name || "Specification",
+          value:
+            spec.unit && spec.unit !== "-"
+              ? `${spec.value} ${spec.unit}`
+              : spec.value || "Not specified",
+          icon: PackageCheck, // Use consistent icon
+        }))
+    : [];
 
   const handleAddToCart = () => {
     addToCart({
@@ -192,8 +174,7 @@ export default function ProductDetailPage() {
   };
 
   return (
-    <div className="space-y-6 pb-10">
-      {/* Breadcrumb Navigation */}
+    <div className="space-y-8 pb-10 text-slate-50">
       <Breadcrumb
         items={[
           { label: "Shop", onClick: () => navigate("/shop") },
@@ -202,7 +183,6 @@ export default function ProductDetailPage() {
         ]}
       />
 
-      {/* Action Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button
           variant="outline"
@@ -211,8 +191,9 @@ export default function ProductDetailPage() {
         >
           ← Back to Catalog
         </Button>
-        <div className="flex items-center gap-2">
-          <Badge className={cn("rounded-full px-3 py-1", statusBadge)}>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className={cn("rounded-full px-3 py-1 text-sm", statusBadge)}>
             {product.status}
           </Badge>
           <Button
@@ -234,229 +215,218 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      <section className="grid gap-5 xl:grid-cols-[110px_minmax(0,1fr)_360px]">
-        <Card className="hidden overflow-hidden border-slate-200 bg-white/95 xl:block">
-          <CardContent className="space-y-2 p-3">
-            {gallery.map((image, index) => (
-              <button
-                key={image.key}
-                onClick={() => setSelectedImageIndex(index)}
-                className={cn(
-                  "group w-full overflow-hidden rounded-2xl border bg-slate-50 p-1 transition",
-                  selectedImageIndex === index
-                    ? "border-slate-900 shadow-sm"
-                    : "border-slate-200 hover:border-slate-400",
-                )}
-              >
-                <div className="h-20 w-full overflow-hidden rounded-xl bg-white">
-                  <img
-                    src={image.src}
-                    alt={`${product.name}-${image.key}`}
-                    loading="lazy"
-                    className="h-full w-full object-contain"
-                    style={{ objectPosition: image.objectPosition }}
-                  />
-                </div>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden rounded-[28px] border-slate-200 bg-white/95 shadow-[0_24px_70px_-40px_rgba(15,23,42,0.45)]">
-          <CardContent className="space-y-4 p-4 md:p-5">
-            <div className="relative flex min-h-[420px] items-center justify-center overflow-hidden rounded-[22px] border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-cyan-50 p-5">
+      <section className="grid gap-6 xl:grid-cols-[1.55fr_0.95fr]">
+        <div className="space-y-5">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
+            className="relative overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/90 shadow-[0_40px_120px_-72px_rgba(34,211,238,0.25)]"
+          >
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-cyan-500/15 via-transparent to-violet-500/10" />
+            <div className="relative aspect-[16/9] min-h-[420px] bg-slate-950">
               <img
                 src={selectedImage?.src}
                 alt={product.name}
                 className={cn(
-                  "h-full max-h-[380px] w-full max-w-[680px] object-contain transition duration-500",
-                  zoomEnabled && "cursor-zoom-in hover:scale-[1.16]",
+                  "h-full w-full object-contain transition duration-500",
+                  zoomEnabled && "cursor-zoom-in hover:scale-[1.08]",
                 )}
                 style={{
                   objectPosition: selectedImage?.objectPosition || "center",
                 }}
               />
-              <div className="pointer-events-none absolute left-4 top-4 rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600">
+              <div className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200 backdrop-blur">
+                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(56,189,248,0.4)]" />
                 {selectedImage?.label}
               </div>
               <button
                 onClick={() => setZoomEnabled((value) => !value)}
-                className="absolute right-4 top-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-slate-300"
+                className="absolute right-5 top-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/80 px-3 py-1.5 text-xs font-medium text-slate-100 shadow-lg shadow-cyan-500/10 transition hover:border-cyan-300/30"
               >
                 <ZoomIn className="h-3.5 w-3.5" />
                 {zoomEnabled ? "Disable zoom" : "Enable zoom"}
               </button>
             </div>
+          </motion.div>
 
-            <div className="grid gap-2 md:hidden">
-              {gallery.map((image, index) => (
-                <button
-                  key={`mobile-${image.key}`}
-                  onClick={() => setSelectedImageIndex(index)}
-                  className={cn(
-                    "flex items-center gap-3 rounded-2xl border px-3 py-2 text-left transition",
-                    selectedImageIndex === index
-                      ? "border-slate-900 bg-slate-50"
-                      : "border-slate-200 hover:border-slate-300",
-                  )}
-                >
-                  <div className="h-10 w-10 overflow-hidden rounded-lg bg-slate-100">
-                    <img
-                      src={image.src}
-                      alt={`${product.name}-${image.key}`}
-                      loading="lazy"
-                      className="h-full w-full object-contain"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-900">
-                      {image.label}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {image.subtitle}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="sticky top-4 h-fit overflow-hidden rounded-[28px] border-slate-200 bg-white/95 shadow-[0_24px_70px_-40px_rgba(15,23,42,0.45)]">
-          <CardContent className="space-y-4 p-5">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                {product.category}
-              </p>
-              <h1 className="text-2xl font-semibold leading-tight text-slate-950">
-                {product.name}
-              </h1>
-              <p className="text-sm leading-6 text-slate-600">
-                {product.description ||
-                  "Enterprise-ready product with reliable procurement visibility and quality-assured sourcing."}
-              </p>
-            </div>
-
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Enterprise pricing
-              </p>
-              <p className="mt-1 text-4xl font-semibold tracking-tight text-slate-950">
-                ₹{Number(product.price || 0).toLocaleString()}
-              </p>
-              <p className="text-xs text-slate-500">
-                Excluding GST and shipping
-              </p>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-2xl border border-slate-200 bg-white p-2">
-                  <p className="font-semibold text-slate-900">MOQ 1</p>
-                  <p className="text-slate-500">Minimum order</p>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {gallery.map((image, index) => (
+              <button
+                key={image.key}
+                onClick={() => setSelectedImageIndex(index)}
+                className={cn(
+                  "group overflow-hidden rounded-[24px] border bg-slate-950/80 p-2 transition hover:border-cyan-300/30 hover:shadow-[0_20px_80px_-50px_rgba(56,189,248,0.25)]",
+                  selectedImageIndex === index
+                    ? "border-cyan-300/40"
+                    : "border-white/10",
+                )}
+              >
+                <div className="h-24 overflow-hidden rounded-2xl bg-slate-900">
+                  <img
+                    src={image.src}
+                    alt={`${product.name}-${image.key}`}
+                    loading="lazy"
+                    className="h-full w-full object-contain"
+                  />
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-2">
-                  <p className="font-semibold text-slate-900">
-                    {product.warranty || "Standard"}
+                <div className="mt-2 text-left">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    {image.label}
                   </p>
-                  <p className="text-slate-500">Warranty</p>
+                  <p className="text-[11px] text-slate-500">{image.subtitle}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <aside className="space-y-5 xl:sticky xl:top-6">
+          <Card className="overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/90 shadow-[0_40px_100px_-70px_rgba(34,211,238,0.22)]">
+            <CardContent className="space-y-5 p-6">
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
+                  {product.category}
+                </p>
+                <h1 className="text-3xl font-semibold tracking-tight text-white">
+                  {product.name}
+                </h1>
+                <p className="text-sm leading-6 text-slate-300">
+                  {product.description ||
+                    "Enterprise-ready product with reliable procurement visibility and quality-assured sourcing."}
+                </p>
+              </div>
+
+              <div className="rounded-[28px] border border-white/10 bg-slate-900/80 p-5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  Enterprise pricing
+                </p>
+                <p className="mt-2 text-4xl font-semibold tracking-tight text-white">
+                  ₹{Number(product.price || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Excluding GST and shipping
+                </p>
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-3xl border border-white/10 bg-slate-950/75 p-3">
+                    <p className="font-semibold text-slate-100">MOQ 1</p>
+                    <p className="text-slate-500">Minimum order</p>
+                  </div>
+                  <div className="rounded-3xl border border-white/10 bg-slate-950/75 p-3">
+                    <p className="font-semibold text-slate-100">
+                      {product.warranty || "Standard"}
+                    </p>
+                    <p className="text-slate-500">Warranty</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-2 text-sm text-slate-600">
-              <div className="flex items-center gap-2">
-                <Truck className="h-4 w-4 text-sky-600" />
-                Lead time: {product.leadTime || "5-7 Days"}
+              <div className="grid gap-3 text-sm text-slate-300">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-cyan-300" />
+                  <span>Lead time:</span>
+                  <span className="font-semibold text-slate-100">
+                    {product.leadTime || "5-7 Days"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-cyan-300" />
+                  <span>Vendor:</span>
+                  <span className="font-semibold text-slate-100">
+                    {product.primaryVendor || "Preferred vendor network"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <PackageCheck className="h-4 w-4 text-cyan-300" />
+                  <span>Stock:</span>
+                  <span className="font-semibold text-slate-100">
+                    {product.status}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-sky-600" />
-                Vendor: {product.primaryVendor || "Preferred vendor network"}
-              </div>
-              <div className="flex items-center gap-2">
-                <PackageCheck className="h-4 w-4 text-sky-600" />
-                Stock: {product.status}
-              </div>
-            </div>
 
-            <div className="grid gap-2">
-              <Button
-                className={PAGE_PILL_PRIMARY_BUTTON_CLASS}
-                disabled={product.status === "Out of Stock"}
-                onClick={handleAddToCart}
-              >
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                Add to Cart
-              </Button>
-              <Button
-                variant="outline"
-                className={PAGE_PILL_BUTTON_CLASS}
-                onClick={() => {
-                  handleAddToCart();
-                  navigate("/shop/cart");
-                }}
-              >
-                Buy Now
-              </Button>
-              <Button
-                className="h-11 rounded-full bg-sky-600 text-white hover:bg-sky-700"
-                onClick={() => {
-                  toast.info("Opening enquiry interface...");
-                  navigate(`/shop/product/${productId}/enquire`);
-                }}
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Enquire Now
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="grid gap-3">
+                <Button
+                  className={cn(PAGE_PILL_PRIMARY_BUTTON_CLASS, "w-full")}
+                  disabled={product.status === "Out of Stock"}
+                  onClick={handleAddToCart}
+                >
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  Add to Cart
+                </Button>
+                <Button
+                  variant="outline"
+                  className={cn(PAGE_PILL_BUTTON_CLASS, "w-full")}
+                  onClick={() => {
+                    handleAddToCart();
+                    navigate("/shop/cart");
+                  }}
+                >
+                  Buy Now
+                </Button>
+                <Button
+                  className="h-11 w-full rounded-full bg-sky-600 text-white hover:bg-sky-700"
+                  onClick={() => {
+                    toast.info("Opening enquiry interface...");
+                    navigate(`/shop/product/${productId}/enquire`);
+                  }}
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Enquire Now
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </aside>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Card className="border-slate-200">
+        <Card className="border-white/10 bg-slate-950/85">
           <CardContent className="space-y-2 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Product Code
             </p>
-            <p className="text-base font-semibold text-slate-900">
+            <p className="text-base font-semibold text-white">
               {product.productCode || "N/A"}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-slate-200">
+        <Card className="border-white/10 bg-slate-950/85">
           <CardContent className="space-y-2 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Brand
             </p>
-            <p className="text-base font-semibold text-slate-900">
+            <p className="text-base font-semibold text-white">
               {product.brand || "Nido"}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-slate-200">
+        <Card className="border-white/10 bg-slate-950/85">
           <CardContent className="space-y-2 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Warranty
             </p>
-            <p className="text-base font-semibold text-slate-900">
+            <p className="text-base font-semibold text-white">
               {product.warranty || "Standard"}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-slate-200">
+        <Card className="border-white/10 bg-slate-950/85">
           <CardContent className="space-y-2 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Lead Time
             </p>
-            <p className="text-base font-semibold text-slate-900">
+            <p className="text-base font-semibold text-white">
               {product.leadTime || "5-7 Days"}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-slate-200">
+        <Card className="border-white/10 bg-slate-950/85">
           <CardContent className="space-y-2 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Status
             </p>
-            <p className="text-base font-semibold text-emerald-700">
+            <p className="text-base font-semibold text-emerald-300">
               {product.status || "In Stock"}
             </p>
           </CardContent>
@@ -466,10 +436,10 @@ export default function ProductDetailPage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">
               Overview
             </p>
-            <h2 className="text-xl font-semibold text-slate-950">
+            <h2 className="text-xl font-semibold text-slate-100">
               Key Specifications
             </h2>
           </div>
@@ -478,16 +448,19 @@ export default function ProductDetailPage() {
           {keySpecifications.map((spec) => {
             const Icon = spec.icon;
             return (
-              <Card key={spec.label} className="border-slate-200 bg-white/95">
+              <Card
+                key={spec.label}
+                className="border-white/10 bg-slate-950/90"
+              >
                 <CardContent className="flex items-start gap-3 p-4">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-sm">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-500 text-white shadow-[0_20px_40px_-24px_rgba(56,189,248,0.35)]">
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
                       {spec.label}
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-slate-950">
+                    <p className="mt-1 text-sm font-semibold text-white">
                       {spec.value}
                     </p>
                   </div>
@@ -499,52 +472,54 @@ export default function ProductDetailPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-slate-200">
+        <Card className="border-white/10 bg-slate-950/85">
           <CardContent className="space-y-2 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Procurement rating
             </p>
-            <p className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
+            <p className="flex items-center gap-2 text-2xl font-semibold text-white">
               <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
               {(product.performanceRating || 4.8).toFixed(1)}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-slate-200">
+        <Card className="border-white/10 bg-slate-950/85">
           <CardContent className="space-y-2 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Product code
             </p>
-            <p className="text-base font-semibold text-slate-900">
+            <p className="text-base font-semibold text-white">
               {product.productCode}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-slate-200">
+        <Card className="border-white/10 bg-slate-950/85">
           <CardContent className="space-y-2 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Category
             </p>
-            <p className="text-base font-semibold text-slate-900">
+            <p className="text-base font-semibold text-white">
               {product.category} / {product.subCategory || "General"}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-slate-200">
+        <Card className="border-white/10 bg-slate-950/85">
           <CardContent className="space-y-2 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
               Compliance
             </p>
-            <p className="text-base font-semibold text-slate-900">
+            <p className="text-base font-semibold text-white">
               {product.hsnCode || "Standard"}
             </p>
           </CardContent>
         </Card>
       </section>
 
-      <Card className="overflow-hidden border-slate-200">
+      <Card className="overflow-hidden border-white/10 bg-slate-950/90">
         <CardHeader className="pb-3">
-          <CardTitle>General Specifications</CardTitle>
+          <CardTitle className="text-slate-100">
+            General Specifications
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -557,8 +532,12 @@ export default function ProductDetailPage() {
             <TableBody>
               {specRows.map(([label, value]) => (
                 <TableRow key={label}>
-                  <TableCell className="font-medium">{label}</TableCell>
-                  <TableCell>{value || "Not available"}</TableCell>
+                  <TableCell className="font-medium text-slate-100">
+                    {label}
+                  </TableCell>
+                  <TableCell className="text-slate-200">
+                    {value || "Not available"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -566,13 +545,13 @@ export default function ProductDetailPage() {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-slate-200">
+      <Card className="overflow-hidden border-white/10 bg-slate-950/90">
         <CardHeader className="pb-3">
-          <CardTitle>Related Products</CardTitle>
+          <CardTitle className="text-slate-100">Related Products</CardTitle>
         </CardHeader>
         <CardContent>
           {relatedProducts.length === 0 ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-400">
               No related products available.
             </p>
           ) : (
@@ -587,14 +566,14 @@ export default function ProductDetailPage() {
                 return (
                   <button
                     key={item.id || item.masterProductId}
-                    className="w-[240px] shrink-0 rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md"
+                    className="w-[240px] shrink-0 rounded-2xl border border-white/10 bg-slate-950/85 p-3 text-left transition hover:-translate-y-0.5 hover:shadow-[0_20px_60px_-32px_rgba(56,189,248,0.25)]"
                     onClick={() =>
                       navigate(
                         `/shop/product/${item.id || item.masterProductId}`,
                       )
                     }
                   >
-                    <div className="h-32 overflow-hidden rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <div className="h-32 overflow-hidden rounded-xl border border-white/10 bg-slate-900 p-3">
                       <img
                         src={imageSrc}
                         alt={item.name}
@@ -602,12 +581,12 @@ export default function ProductDetailPage() {
                         className="h-full w-full object-contain"
                       />
                     </div>
-                    <p className="mt-3 line-clamp-1 text-sm font-semibold text-slate-900">
+                    <p className="mt-3 line-clamp-1 text-sm font-semibold text-slate-100">
                       {item.name}
                     </p>
-                    <p className="text-xs text-slate-500">{item.category}</p>
+                    <p className="text-xs text-slate-400">{item.category}</p>
                     <Separator className="my-2" />
-                    <p className="text-base font-semibold text-slate-950">
+                    <p className="text-base font-semibold text-white">
                       ₹{Number(item.price || 0).toLocaleString()}
                     </p>
                   </button>

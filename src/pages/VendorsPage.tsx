@@ -66,18 +66,19 @@ export default function VendorsPage() {
     deleteVendor,
     addAuditEntry,
     generalSettings,
+    vendors: contextVendors,
+    isCoreDataLoading,
   } = useData();
   const { isOwner, user } = useAuth();
   const navigate = useNavigate();
-  const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Use vendors from DataContext
   const [loadError, setLoadError] = useState<string | null>(null);
   const vendorCodePrefix =
     Object.values(generalSettings)[0]?.vendorCodePrefix?.trim() || "VND";
   const generateVendorCode = () =>
     nextSequentialCode(
       vendorCodePrefix,
-      vendors.map((vendor) => vendor.vendorCode),
+      contextVendors.map((vendor) => vendor.vendorCode),
       5,
     );
   const [search, setSearch] = useState("");
@@ -97,62 +98,19 @@ export default function VendorsPage() {
     description: "",
   });
 
-  useEffect(() => {
-    const fetchVendors = async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const response = await API.getVendors();
-        const normalized = (Array.isArray(response) ? response : []).map(
-          (vendor: any) => ({
-            id: vendor._id || vendor.id || `ven-${Date.now()}`,
-            vendorId:
-              vendor.vendorId || vendor.vendorCode || vendor._id || vendor.id,
-            vendorCode: vendor.vendorCode || "",
-            name:
-              vendor.companyName ||
-              vendor.vendorName ||
-              vendor.name ||
-              "Unnamed Vendor",
-            category: vendor.category || "General",
-            contactEmail:
-              vendor.email || vendor.contactEmail || vendor.contact || "",
-            contactPhone: vendor.phone || vendor.contactPhone || "",
-            address: vendor.address || "",
-            status:
-              vendor.status === "inactive"
-                ? "inactive"
-                : vendor.status === "suspended"
-                  ? "pending"
-                  : "active",
-            rating: Number(vendor.rating) || 0,
-            totalOrders: Number(vendor.totalOrders) || 0,
-            totalSpend: Number(vendor.totalSpend) || 0,
-            joinDate: vendor.createdAt
-              ? new Date(vendor.createdAt).toISOString().split("T")[0]
-              : new Date().toISOString().split("T")[0],
-          }),
-        );
-        setVendors(normalized);
-      } catch (error) {
-        console.error("Failed to fetch vendors from API:", error);
-        setLoadError(
-          error instanceof Error ? error.message : "Failed to load vendors",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchVendors();
-  }, []);
+  // Vendors are loaded via DataContext, no local fetch needed
+  useEffect(() => {}, []);
 
   useEffect(() => {
     if (showCreate || showEdit) return;
     setForm((prev) => ({ ...prev, vendorCode: generateVendorCode() }));
-  }, [showCreate, showEdit, vendors, vendorCodePrefix]);
+  }, [showCreate, showEdit, contextVendors, vendorCodePrefix]);
 
-  const filtered = vendors.filter((v) => {
+  useEffect(() => {
+    console.log("VENDOR PAGE INPUT:", contextVendors.length, contextVendors);
+  }, [contextVendors]);
+
+  const filtered = contextVendors.filter((v) => {
     const matchSearch =
       v.name.toLowerCase().includes(search.toLowerCase()) ||
       v.contactEmail.toLowerCase().includes(search.toLowerCase());
@@ -160,43 +118,10 @@ export default function VendorsPage() {
     return matchSearch && matchStatus;
   });
 
+  // DataContext handles vendor state, refresh triggered via addVendor callback
   const refreshVendors = async () => {
-    try {
-      const response = await API.getVendors();
-      const normalized = (Array.isArray(response) ? response : []).map(
-        (vendor: any) => ({
-          id: vendor._id || vendor.id || `ven-${Date.now()}`,
-          vendorId:
-            vendor.vendorId || vendor.vendorCode || vendor._id || vendor.id,
-          vendorCode: vendor.vendorCode || "",
-          name:
-            vendor.companyName ||
-            vendor.vendorName ||
-            vendor.name ||
-            "Unnamed Vendor",
-          category: vendor.category || "General",
-          contactEmail:
-            vendor.email || vendor.contactEmail || vendor.contact || "",
-          contactPhone: vendor.phone || vendor.contactPhone || "",
-          address: vendor.address || "",
-          status:
-            vendor.status === "inactive"
-              ? "inactive"
-              : vendor.status === "suspended"
-                ? "pending"
-                : "active",
-          rating: Number(vendor.rating) || 0,
-          totalOrders: Number(vendor.totalOrders) || 0,
-          totalSpend: Number(vendor.totalSpend) || 0,
-          joinDate: vendor.createdAt
-            ? new Date(vendor.createdAt).toISOString().split("T")[0]
-            : new Date().toISOString().split("T")[0],
-        }),
-      );
-      setVendors(normalized);
-    } catch (error) {
-      console.error("Failed to refresh vendors:", error);
-    }
+    // No-op: DataContext.addVendor already updates context state
+    // If manual refresh needed, dispatch a reload action here
   };
 
   const handleCreate = async () => {
@@ -235,7 +160,7 @@ export default function VendorsPage() {
     });
   };
 
-  const handleEdit = (v: (typeof vendors)[0]) => {
+  const handleEdit = (v: (typeof contextVendors)[0]) => {
     setEditId(v.id);
     setForm({
       name: v.name,
@@ -283,7 +208,7 @@ export default function VendorsPage() {
     toast({ title: "Vendor Updated" });
   };
 
-  const handleDelete = async (v: (typeof vendors)[number]) => {
+  const handleDelete = async (v: (typeof contextVendors)[number]) => {
     await Promise.resolve(deleteVendor(v.id));
     addAuditEntry({
       user: user?.name || "System",
@@ -555,22 +480,13 @@ export default function VendorsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
+                {isCoreDataLoading ? (
                   <TableRow>
                     <TableCell
                       colSpan={9}
                       className="text-center py-8 text-muted-foreground"
                     >
-                      Loading vendors from MongoDB...
-                    </TableCell>
-                  </TableRow>
-                ) : loadError ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={9}
-                      className="text-center py-8 text-destructive"
-                    >
-                      {loadError}
+                      Loading vendors...
                     </TableCell>
                   </TableRow>
                 ) : filtered.length > 0 ? (
@@ -715,7 +631,7 @@ export default function VendorsPage() {
           open={showBulkUpload}
           onClose={() => setShowBulkUpload(false)}
           type="vendor"
-          existingRecords={vendors.map((v) => ({
+          existingRecords={contextVendors.map((v) => ({
             id: v.id,
             name: v.name,
             contactEmail: v.contactEmail,
@@ -734,7 +650,9 @@ export default function VendorsPage() {
           }}
           onConfirm={() => {
             if (!deleteTargetId) return;
-            const target = vendors.find((entry) => entry.id === deleteTargetId);
+            const target = contextVendors.find(
+              (entry) => entry.id === deleteTargetId,
+            );
             if (!target) return;
             handleDelete(target);
             setDeleteTargetId(null);
