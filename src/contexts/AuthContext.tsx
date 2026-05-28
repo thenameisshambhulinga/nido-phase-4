@@ -1,3 +1,4 @@
+//AuthContext.tsx
 import React, {
   createContext,
   useContext,
@@ -5,6 +6,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { safeReadJson } from "@/lib/storage";
 import { apiBaseUrl, apiRequest } from "@/lib/api";
 import { isValidEmail, normalizeEmail } from "@/lib/validation";
@@ -161,21 +163,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [token, setToken] = useState<string | null>(() => {
     if (typeof localStorage === "undefined") return null;
-    return localStorage.getItem("nido_auth_token");
+    return (
+      localStorage.getItem("token") ||
+      localStorage.getItem("nido_auth_token") ||
+      null
+    );
   });
   const [user, setUser] = useState<User | null>(() => {
+    if (typeof localStorage === "undefined") return null;
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        return JSON.parse(storedUser);
+      } catch {
+        // ignore invalid stored user
+      }
+    }
     const parsed = safeReadJson<User | null>("nido_user", null);
     return parsed && typeof parsed === "object" ? parsed : null;
   });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   const [users, setUsers] = useState<User[]>(() => {
     const parsed = safeReadJson<User[]>("nido_users", []);
     return Array.isArray(parsed) ? parsed : [];
   });
 
+  const navigate = useNavigate();
+
   useEffect(() => {
-    if (user) localStorage.setItem("nido_user", JSON.stringify(user));
-    else localStorage.removeItem("nido_user");
+    if (typeof localStorage === "undefined") return;
+    if (user) {
+      localStorage.setItem("nido_user", JSON.stringify(user));
+      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("role", user.role);
+    } else {
+      localStorage.removeItem("nido_user");
+      localStorage.removeItem("user");
+      localStorage.removeItem("role");
+    }
   }, [user]);
 
   useEffect(() => {
@@ -192,18 +218,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [users]);
 
   useEffect(() => {
-    if (!token) return;
-    void (async () => {
-      try {
-        const current = await apiRequest<any>("/api/auth/me");
-        setUser(toFrontendUser(current));
-        const remoteUsers = await apiRequest<any[]>("/auth/users");
-        setUsers(remoteUsers.map(toFrontendUser));
-      } catch (error) {
-        console.warn("Auth refresh failed:", error);
+    if (typeof localStorage === "undefined") return;
+
+    try {
+      const storedToken =
+        localStorage.getItem("nido_auth_token") ||
+        localStorage.getItem("token");
+
+      const storedUser =
+        localStorage.getItem("nido_user") || localStorage.getItem("user");
+
+      if (!storedToken || !storedUser) {
+        setIsAuthenticated(false);
+        return;
       }
-    })();
-  }, [token]);
+
+      const parsedUser = JSON.parse(storedUser);
+
+      const normalizedUser = toFrontendUser(parsedUser);
+
+      setToken(storedToken);
+      setUser(normalizedUser);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error("Auth hydration failed:", error);
+
+      [
+        "token",
+        "authToken",
+        "accessToken",
+        "nido_auth_token",
+        "user",
+        "nido_user",
+        "role",
+      ].forEach((key) => localStorage.removeItem(key));
+
+      setToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+    }
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const normalizedEmail = normalizeEmail(email);
@@ -254,27 +308,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return false;
       }
 
-      setToken(token);
+      const responsePayload = {
+        user: toFrontendUser(userData),
+        token,
+      };
+
+      console.log("[Auth] Login successful", responsePayload);
+
+      const normalizedUser = toFrontendUser(responsePayload.user);
+
+      setUser(normalizedUser);
+      setIsAuthenticated(true);
+
       if (typeof localStorage !== "undefined") {
-        localStorage.setItem("nido_auth_token", token);
+        localStorage.setItem("user", JSON.stringify(normalizedUser));
+        localStorage.setItem("token", responsePayload.token);
+        localStorage.setItem("authToken", responsePayload.token);
+        localStorage.setItem("accessToken", responsePayload.token);
+        localStorage.setItem("role", normalizedUser.role);
+        localStorage.setItem("nido_auth_token", responsePayload.token);
+        localStorage.setItem("nido_user", JSON.stringify(normalizedUser));
       }
-      const nextUser = toFrontendUser(userData);
-      setUser(nextUser);
 
-      console.log("[Auth] Login successful", {
-        userId: userData.id,
-        email: userData.email,
-        role: userData.role,
-      });
-
-      // Fetch remote users list
-      try {
-        const remoteUsers = await apiRequest<any[]>("/auth/users");
-        setUsers(remoteUsers.map(toFrontendUser));
-      } catch (error) {
-        console.warn("[Auth] Failed to fetch users list after login:", error);
-        // Don't fail login if users list fetch fails
-      }
+      setToken(token);
+      navigate("/home");
 
       return true;
     } catch (error) {
@@ -296,10 +353,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setUser(null);
     setToken(null);
     setUsers([]);
-    localStorage.removeItem("nido_auth_token");
-    localStorage.removeItem("nido_user");
-    localStorage.removeItem("nido_users");
-  }, []);
+    setIsAuthenticated(false);
+
+    [
+      "token",
+      "authToken",
+      "accessToken",
+      "nido_auth_token",
+      "user",
+      "nido_user",
+      "nido_users",
+      "role",
+      "nido_current_org",
+      "nido_accessible_orgs",
+    ].forEach((key) => localStorage.removeItem(key));
+
+    navigate("/login");
+  }, [navigate]);
 
   const createUser = useCallback(async (data: Partial<User>) => {
     if (!data.email || !isValidEmail(data.email)) {
@@ -399,7 +469,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         user,
         users,
-        isAuthenticated: !!user,
+        isAuthenticated,
         login,
         signup,
         logout,

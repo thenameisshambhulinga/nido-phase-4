@@ -1,3 +1,4 @@
+//backend/utils/emailTemplateGenerator.js
 const safe = (value = "") =>
   String(value)
     .replace(/&/g, "&amp;")

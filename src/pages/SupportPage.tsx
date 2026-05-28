@@ -48,6 +48,7 @@ import {
   Users,
   Wrench,
 } from "lucide-react";
+import { usePageMeta } from "@/contexts/PageMetaContext";
 
 type TicketPriority = "High" | "Medium" | "Low";
 type TicketStatus =
@@ -1062,7 +1063,7 @@ export default function SupportPage() {
         childIds: [],
         assignedTeam: entry.team,
         assignee: ASSIGNEE_OPTIONS[index + 2],
-        status: index === 0 ? "In Progress" : "Open",
+        status: (index === 0 ? "In Progress" : "Open") as TicketStatus,
         timeline: [],
       }));
 

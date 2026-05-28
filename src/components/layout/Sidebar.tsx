@@ -1,3 +1,4 @@
+//Sidebar.tsx
 import { useState, useEffect, useReducer } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ interface NavItem {
   path?: string;
   children?: NavChildItem[];
   module?: string;
+  adminOnly?: boolean;
 }
 
 interface NavChildItem {
@@ -80,6 +82,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Clients",
     icon: Users,
     module: "clients",
+    adminOnly: true,
     children: [
       { label: "Client List", path: "/clients" },
       { label: "Client Addition", path: "/clients/add" },
@@ -90,6 +93,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Vendors",
     icon: Building2,
     module: "vendors",
+    adminOnly: true,
     children: [
       { label: "Vendor List", path: "/vendors" },
       { label: "Vendor Orders", path: "/vendors/orders" },
@@ -168,6 +172,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "User Management",
     icon: UserCog,
     module: "permissions",
+    adminOnly: true,
     children: [
       { label: "Users", path: "/users/management" },
       { label: "Roles", path: "/users/roles" },
@@ -180,6 +185,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Configuration",
     icon: Settings,
     module: "configuration",
+    adminOnly: true,
     path: "/configuration",
   },
 ];
@@ -225,6 +231,7 @@ const CLIENT_NAV_ITEMS: NavItem[] = [
     label: "Clients",
     icon: Users,
     module: "clients",
+    adminOnly: true,
     children: [
       { label: "My Organization", path: "/clients/my-organization" },
       { label: "Team Members", path: "/clients/members" },
@@ -272,65 +279,74 @@ export default function Sidebar({
   // Determine which navigation items to use based on user role
   const isClient = isClientAccount(user?.role);
   const navItems = isClient ? CLIENT_NAV_ITEMS : NAV_ITEMS;
+  const role = user?.role || "USER";
+  const filteredNavItems = navItems.filter((item) => {
+    if (item.adminOnly && role !== "owner") {
+      return false;
+    }
+    return true;
+  });
 
   const getTranslatedLabel = (label: string): string => {
     const keyMap: Record<string, string> = {
-      "Home": "nav.home",
-      "Shop": "nav.shop",
+      Home: "nav.home",
+      Shop: "nav.shop",
       "Product Dashboard": "nav.productDashboard",
       "Main Dashboard": "nav.mainDashboard",
       "SLA Overview": "nav.slaOverview",
-      "Services": "nav.services",
+      Services: "nav.services",
       "New AMC": "nav.newAmc",
-      "Support": "nav.support",
-      "Clients": "nav.clients",
+      Support: "nav.support",
+      Clients: "nav.clients",
       "Client List": "nav.clientList",
       "Client Addition": "nav.clientAddition",
-      "Contracts": "nav.contracts",
-      "Vendors": "nav.vendors",
+      Contracts: "nav.contracts",
+      Vendors: "nav.vendors",
       "Vendor List": "nav.vendorList",
       "Vendor Orders": "nav.vendorOrders",
       "Vendor Dashboard": "nav.vendorDashboard",
       "Vendor Categories": "nav.vendorCategories",
       "Vendor Onboarding": "nav.vendorOnboarding",
-      "Procure": "nav.procure",
-      "Orders": "nav.orders",
+      Procure: "nav.procure",
+      Orders: "nav.orders",
       "Purchase Requests": "nav.purchaseRequests",
-      "Approvals": "nav.approvals",
-      "Reports": "nav.reports",
-      "Analytics": "nav.analytics",
+      Approvals: "nav.approvals",
+      Reports: "nav.reports",
+      Analytics: "nav.analytics",
       "Audit Trail": "nav.auditTrail",
-      "Transactions": "nav.transactions",
-      "Sales": "nav.sales",
-      "Quotes": "nav.quotes",
+      Transactions: "nav.transactions",
+      Sales: "nav.sales",
+      Quotes: "nav.quotes",
       "Sales Orders": "nav.salesOrders",
-      "Invoices": "nav.invoices",
+      Invoices: "nav.invoices",
       "Recurring Invoices": "nav.recurringInvoices",
       "Delivery Challans": "nav.deliveryChallans",
       "Payment Receipt": "nav.paymentReceipt",
       "Credit Notes": "nav.creditNotes",
       "e-Way Bills": "nav.eWayBills",
-      "Purchases": "nav.purchases",
-      "Expenses": "nav.expenses",
+      Purchases: "nav.purchases",
+      Expenses: "nav.expenses",
       "Recurring Expenses": "nav.recurringExpenses",
       "Purchase Orders": "nav.purchaseOrders",
-      "Bills": "nav.bills",
+      Bills: "nav.bills",
       "Recurring Bills": "nav.recurringBills",
       "Payments Made": "nav.paymentsMade",
       "Vendor Credits": "nav.vendorCredits",
       "User Management": "nav.userManagement",
-      "Users": "nav.users",
-      "Roles": "nav.roles",
-      "Departments": "nav.departments",
-      "Invitations": "nav.invitations",
-      "Configuration": "nav.configuration"
+      Users: "nav.users",
+      Roles: "nav.roles",
+      Departments: "nav.departments",
+      Invitations: "nav.invitations",
+      Configuration: "nav.configuration",
     };
     const key = keyMap[label];
     return key ? t(key) : label;
   };
   // Force re-render when language changes
-  const [, forceUpdate] = useReducer(x => x + 1, 0);
-  useEffect(() => { forceUpdate(); }, [language]);
+  const [, forceUpdate] = useReducer((x) => x + 1, 0);
+  useEffect(() => {
+    forceUpdate();
+  }, [language]);
   const [expandedItems, setExpandedItems] = useState<string[]>(["Dashboard"]);
 
   const primaryOrgId = organizations[0]?.id || "";
@@ -391,7 +407,7 @@ export default function Sidebar({
               )}
             >
               <img
-                src="/favicon.svg"
+                src="/company-logo.svg"
                 alt="Nido Tech logo"
                 className={cn(
                   "rounded-xl object-contain shadow-sm ring-1 ring-white/10",
@@ -444,7 +460,7 @@ export default function Sidebar({
           collapsed && "px-2",
         )}
       >
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           // Hide Vendors completely for client roles
           if (item.module === "vendors" && isClient) {
             return null;
@@ -498,7 +514,9 @@ export default function Sidebar({
                           : "text-sidebar-foreground/70",
                       )}
                     >
-                      <span className="flex-1">{getTranslatedLabel(child.label)}</span>
+                      <span className="flex-1">
+                        {getTranslatedLabel(child.label)}
+                      </span>
                       {child.children && (
                         <ChevronDown
                           className={cn(
@@ -552,7 +570,9 @@ export default function Sidebar({
                   )}
                 />
                 {!collapsed && (
-                  <span className="flex-1 text-left">{getTranslatedLabel(item.label)}</span>
+                  <span className="flex-1 text-left">
+                    {getTranslatedLabel(item.label)}
+                  </span>
                 )}
                 {!collapsed && item.children && (
                   <ChevronDown

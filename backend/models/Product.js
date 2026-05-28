@@ -1,3 +1,4 @@
+//Product.js
 import mongoose from "mongoose";
 
 const VendorInventorySchema = new mongoose.Schema({
@@ -26,15 +27,28 @@ const productSchema = new mongoose.Schema(
 
     productName: {
       type: String,
-      required: true,
+      required: [true, "Product name is required"],
       trim: true,
+      minlength: [2, "Product name is too short"],
+      validate: {
+        validator: (v) => typeof v === "string" && v.trim().length > 1,
+        message: "Product name cannot be empty",
+      },
     },
 
     description: String,
 
     brand: String,
 
-    category: String,
+    category: {
+      type: String,
+      trim: true,
+      required: [true, "Category is required"],
+      validate: {
+        validator: (v) => typeof v === "string" && v.trim().length > 1,
+        message: "Category cannot be empty",
+      },
+    },
 
     subcategory: String,
 
@@ -59,6 +73,17 @@ const productSchema = new mongoose.Schema(
 
     images: [String],
 
+    stock: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    price: {
+      type: Number,
+      default: 0,
+    },
+
     vendorInventory: [VendorInventorySchema],
 
     status: {
@@ -74,17 +99,18 @@ const productSchema = new mongoose.Schema(
         "discontinued",
       ],
       default: "draft",
-      index: true,
     },
 
-    stock: {
-      type: Number,
-      default: 0,
+    publicationStatus: {
+      type: String,
+      enum: ["draft", "published", "archived"],
+      default: "draft",
     },
 
-    price: {
-      type: Number,
-      default: 0,
+    inventoryStatus: {
+      type: String,
+      enum: ["In Stock", "Low Stock", "Out Of Stock"],
+      default: "In Stock",
     },
 
     // Backward compatibility fields

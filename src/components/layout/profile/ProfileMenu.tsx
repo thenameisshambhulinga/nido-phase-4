@@ -21,6 +21,7 @@ export default function ProfileMenu() {
   const { currentOrganization } = useOrganization();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const isPrivilegedUser = user?.role === "owner" || user?.role === "admin";
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [orgSwitcherOpen, setOrgSwitcherOpen] = useState(false);

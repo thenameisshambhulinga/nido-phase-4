@@ -1,3 +1,4 @@
+//backend/utils/emailService.js
 import nodemailer from "nodemailer";
 import { generateEmailTemplate } from "./emailTemplateGenerator.js";
 

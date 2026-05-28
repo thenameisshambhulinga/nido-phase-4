@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Nido Tech logo">
+  <defs>
+    <linearGradient id="nido-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f4c81" />
+      <stop offset="100%" stop-color="#1d9ed8" />
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="24" fill="#ffffff" />
+  <path d="M28 90V30h16l18 28 18-28h16v60H76V50L58 76 42 50v40H28Z" fill="url(#nido-grad)" />
+  <circle cx="90" cy="30" r="10" fill="#1d9ed8" opacity="0.85" />
+</svg>

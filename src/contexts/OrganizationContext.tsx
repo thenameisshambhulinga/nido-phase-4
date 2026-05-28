@@ -1,3 +1,4 @@
+//src/Contexts/OrganizationContext.tsx
 import React, {
   createContext,
   useContext,
@@ -183,37 +184,62 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({
     [currentOrganization],
   );
 
-  // Initialize accessible organizations from clients data
+  // Initialize accessible organizations from localStorage
   useEffect(() => {
-    const loadOrgs = () => {
-      const storedOrgs = safeReadJson<OrganizationInfo[]>(
-        "nido_accessible_orgs",
-        [],
+    if (!user) {
+      setAccessibleOrganizations([]);
+      setCurrentOrganization(null);
+      return;
+    }
+
+    try {
+      const storedOrganizations = JSON.parse(
+        localStorage.getItem("nido_organizations") || "[]",
       );
 
-      if (storedOrgs.length > 0) {
-        setAccessibleOrganizations(storedOrgs);
-        if (!currentOrganization) setCurrentOrganization(storedOrgs[0]);
+      if (!Array.isArray(storedOrganizations)) {
         return;
       }
 
-      // No clients seeding - use storage fallback or user.org
-      if (user?.organization) {
-        // Fallback to user organization (stable id)
-        const userOrg: OrganizationInfo = {
-          id: String(user.organization),
-          name: String(user.organization),
-          status: "active",
-        };
-        setAccessibleOrganizations([userOrg]);
-        if (!currentOrganization) setCurrentOrganization(userOrg);
-      }
-    };
+      const userRoleStr = String(user.role || "").toUpperCase();
+      const filteredOrganizations = storedOrganizations.filter(
+        (org: any) =>
+          org &&
+          typeof org === "object" &&
+          (!org.companyId ||
+            org.companyId === user.companyId ||
+            userRoleStr === "OWNER"),
+      );
 
-    loadOrgs();
-    // Note: intentionally do NOT depend on accessibleOrganizations.length to avoid re-seeding loops.
-    // currentOrganization is used to decide whether to set the initial org.
-  }, [user, currentOrganization]);
+      setAccessibleOrganizations((prev) => {
+        const prevString = JSON.stringify(prev);
+        const nextString = JSON.stringify(filteredOrganizations);
+
+        if (prevString === nextString) {
+          return prev;
+        }
+
+        return filteredOrganizations;
+      });
+
+      if (filteredOrganizations.length > 0) {
+        const matched = filteredOrganizations.find(
+          (org: any) =>
+            org.id === currentOrganization?.id ||
+            org.companyId === user.companyId,
+        );
+
+        const nextOrg = matched || filteredOrganizations[0];
+        if (JSON.stringify(currentOrganization) !== JSON.stringify(nextOrg)) {
+          setCurrentOrganization(nextOrg);
+        }
+      } else if (currentOrganization) {
+        setCurrentOrganization(null);
+      }
+    } catch (error) {
+      console.error("OrganizationContext hydration failed:", error);
+    }
+  }, [user?.companyId, user?.role]);
 
   const value = useMemo(
     () => ({

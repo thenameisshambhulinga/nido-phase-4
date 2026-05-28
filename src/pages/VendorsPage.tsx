@@ -50,7 +50,7 @@ import ConfirmationDialog from "@/components/shared/ConfirmationDialog";
 import { downloadVendorTemplate } from "@/lib/templateUtils";
 import type { BulkUploadResult } from "@/lib/templateUtils";
 import { nextSequentialCode } from "@/lib/documentNumbering";
-import { API } from "../api.js";
+import { apiRequest } from "@/lib/api";
 import type { Vendor } from "@/contexts/DataContext";
 
 export default function VendorsPage() {

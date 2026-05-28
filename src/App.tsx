@@ -1,3 +1,4 @@
+//App.tsx
 /// <reference path="./types/react-query-shim.d.ts" />
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";

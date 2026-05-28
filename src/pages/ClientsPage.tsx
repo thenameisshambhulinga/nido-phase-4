@@ -1,3 +1,4 @@
+//src/pages/ClientsPage.tsx
 import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Plus, User, MoreVertical } from "lucide-react";

@@ -1,3 +1,4 @@
+//backend/utils/emailIntegrationExamples.js
 /**
  * INTEGRATION EXAMPLES
  * Shows how to use the production-grade email system

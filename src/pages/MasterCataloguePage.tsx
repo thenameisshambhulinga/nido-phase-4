@@ -1,3 +1,4 @@
+//MasterCataloguePage.tsx
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -450,7 +451,16 @@ export default function MasterCataloguePage() {
     isCoreDataLoading,
     coreDataError,
   } = useData();
-  const [items, setItems] = useState<CatalogItem[]>(initialItems);
+  const items = React.useMemo<CatalogItem[]>(
+    () =>
+      masterCatalogItems.map((item) => ({
+        ...item,
+        sku: item.productCode,
+        tags: item.tags || [],
+        specAttributes: [],
+      })),
+    [masterCatalogItems],
+  );
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusTab, setStatusTab] = useState("published");
@@ -503,15 +513,7 @@ export default function MasterCataloguePage() {
   const bulkFileRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const mappedItems: CatalogItem[] = masterCatalogItems.map((item) => ({
-      ...item,
-      sku: item.productCode,
-      tags: item.tags || [],
-      specAttributes: [],
-    }));
-    setItems(mappedItems);
-  }, [masterCatalogItems]);
+  // items are derived from `masterCatalogItems` (single source of truth)
 
   const getStatusColor = (status: string) => {
     const normalized = status?.toLowerCase().trim();
@@ -534,8 +536,12 @@ export default function MasterCataloguePage() {
   const normalizeStatus = (status?: string) =>
     status?.toLowerCase().trim() || "";
 
-  const getStatusGroup = (status?: string) => {
-    const normalized = normalizeStatus(status);
+  const getStatusGroup = (item: any) => {
+    // Use productStatus if available (for accurate draft/published/archived categorization)
+    // Otherwise fall back to status field for backward compatibility
+    const statusToCheck = item.productStatus || item.status || "";
+    const normalized = normalizeStatus(statusToCheck);
+
     if (["published", "active", "in stock"].includes(normalized)) {
       return "published";
     }
@@ -559,8 +565,12 @@ export default function MasterCataloguePage() {
       return false;
     if (categoryFilter !== "all" && i.category !== categoryFilter) return false;
 
-    const itemGroup = getStatusGroup(i.status);
-    if (itemGroup !== statusTab) return false;
+    const itemGroup = getStatusGroup(i);
+    if (isOwner) {
+      if (itemGroup === "archived") return false;
+    } else {
+      if (itemGroup !== statusTab) return false;
+    }
 
     if (brandFilter !== "all" && i.brand !== brandFilter) return false;
     return true;
@@ -568,11 +578,9 @@ export default function MasterCataloguePage() {
 
   const stats = {
     total: items.length,
-    published: items.filter((i) => getStatusGroup(i.status) === "published")
-      .length,
-    drafts: items.filter((i) => getStatusGroup(i.status) === "drafts").length,
-    archived: items.filter((i) => getStatusGroup(i.status) === "archived")
-      .length,
+    published: items.filter((i) => getStatusGroup(i) === "published").length,
+    drafts: items.filter((i) => getStatusGroup(i) === "drafts").length,
+    archived: items.filter((i) => getStatusGroup(i) === "archived").length,
   };
 
   const updateForm = (patch: Partial<Omit<CatalogItem, "id">>) =>
@@ -706,16 +714,13 @@ export default function MasterCataloguePage() {
         ...newItem,
         productCode: productCode || sku,
       });
-      setItems((prev) =>
-        prev.map((i) => (i.id === editingItem.id ? newItem : i)),
-      );
+      // DataContext will refresh masterCatalogItems; UI updates from context
       toast.success("Item updated successfully");
     } else {
       addMasterCatalogItem({
         ...newItem,
         productCode: productCode || sku,
       });
-      setItems((prev) => [...prev, newItem]);
       toast.success("Item added successfully");
     }
     setAddDialogOpen(false);
@@ -778,7 +783,6 @@ export default function MasterCataloguePage() {
               productCode: item.productCode || item.sku,
             });
           });
-          setItems((prev) => [...prev, ...nextItems]);
         }
         toast.success(`${added} item(s) imported successfully`);
         setBulkImportOpen(false);
@@ -1183,9 +1187,6 @@ export default function MasterCataloguePage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteMasterCatalogItem(item.id);
-                              setItems((prev) =>
-                                prev.filter((i) => i.id !== item.id),
-                              );
                               toast.success("Item deleted");
                             }}
                           >

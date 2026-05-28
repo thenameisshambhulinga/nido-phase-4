@@ -1,3 +1,4 @@
+//backend/routes/email.js
 import express from "express";
 import { sendEmail, verifyEmailService } from "../utils/emailService.js";
 

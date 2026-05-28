@@ -1,3 +1,4 @@
+//AddMasterCatalogueItemPage.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "@/lib/toastManager";
@@ -18,16 +19,6 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
-
-function useDebounce<T>(value: T, delayMs: number) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebounced(value), delayMs);
-    return () => window.clearTimeout(t);
-  }, [value, delayMs]);
-  return debounced;
-}
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -64,6 +55,16 @@ import {
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import BrandAutocomplete from "@/components/shared/BrandAutocomplete";
 import CategoryCombobox from "@/components/shared/CategoryCombobox";
+import ProductPreviewModal from "@/components/catalog/ProductPreviewModal";
+
+function useDebounce<T>(value: T, delayMs: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 type ProductStatus = "In Stock" | "Low Stock" | "Out of Stock";
 
@@ -532,7 +533,6 @@ export default function AddMasterCatalogueItemPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const videoRefUrl = useRef<HTMLInputElement | null>(null);
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -898,35 +898,72 @@ export default function AddMasterCatalogueItemPage() {
     } as any;
   };
 
+  const buildPayload = () => {
+    const totalStock = Array.isArray(vendorInventory)
+      ? vendorInventory.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0)
+      : 0;
+
+    return {
+      productCode,
+      sku: skuCode,
+      productName,
+      description: descriptionHtmlLike,
+      brand,
+      category,
+      subcategory,
+      tags: Array.isArray(tags) ? tags : [],
+      productNotes,
+      images: Array.isArray(images) ? images.map((i) => i.src) : [],
+      keySpecifications: specRows.map((r) => ({
+        specification: specCategoryNameById.get(r.categoryId) || r.attribute,
+        value: r.unit && r.unit !== "-" ? `${r.value} ${r.unit}` : r.value,
+      })),
+      generalSpecifications: genSpecRows.map((r) => ({
+        category: r.category,
+        value: r.value,
+      })),
+      vendorInventory: Array.isArray(vendorInventory) ? vendorInventory : [],
+      initialStock: totalStock,
+      price: 0,
+    };
+  };
+
   const onSaveAsDraft = async () => {
     if (isDraftSaving) return;
-    // Drafts are allowed to be incomplete; do not block on images.
 
-    setIsDraftSaving(true);
     try {
-      const draftPayload = buildMasterCatalogItem("draft");
+      setIsDraftSaving(true);
+
+      const payload = {
+        ...buildPayload(),
+        publicationStatus: "draft",
+        status: "draft",
+        inventoryStatus: "In Stock",
+      };
+
+      const cleanedPayload = {
+        ...payload,
+        productName: String(payload.productName || "").trim(),
+        category: String(payload.category || "").trim(),
+        subcategory: String(payload.subcategory || "").trim(),
+        brand: String(payload.brand || "").trim(),
+      };
+
       if (isEditMode && editingItem) {
-        const updated = await updateMasterCatalogItem(editingItem.id, {
-          ...draftPayload,
-          status: "draft",
-        });
-        if (!updated) {
-          toast.error("Saving draft failed");
-          return;
-        }
+        const updated = await updateMasterCatalogItem(
+          editingItem.id,
+          payload as any,
+        );
+        if (!updated) throw new Error("Draft save failed");
       } else {
-        const created = await addMasterCatalogItem({
-          ...draftPayload,
-          status: "draft",
-        });
-        if (!created) {
-          toast.error("Saving draft failed");
-          return;
-        }
+        const created = await addMasterCatalogItem(cleanedPayload as any);
+        if (!created) throw new Error("Draft save failed");
       }
-      toast.success("Draft saved");
+
+      toast.success("Draft saved successfully");
     } catch (error: any) {
-      toast.error(`Draft save failed: ${error?.message || String(error)}`);
+      console.error("DRAFT ERROR", error);
+      toast.error(error?.message || "Draft save failed");
     } finally {
       setIsDraftSaving(false);
     }
@@ -934,42 +971,40 @@ export default function AddMasterCatalogueItemPage() {
 
   const onPublish = async () => {
     if (isPublishing) return;
-    if (!productName.trim()) {
-      toast.error("Product Name is required");
-      return;
-    }
-    if (!productCode.trim()) {
-      toast.error("Product Code is required");
-      return;
-    }
-    if (!category.trim()) {
-      toast.error("Category is required");
-      return;
-    }
-    if (images.length === 0) {
-      toast.error("Upload at least one image before publishing.");
-      return;
-    }
 
-    setIsPublishing(true);
     try {
-      const publishPayload = buildMasterCatalogItem("published");
-      const publishPromise =
-        isEditMode && editingItem
-          ? updateMasterCatalogItem(editingItem.id, {
-              ...publishPayload,
-              status: "published",
-            })
-          : addMasterCatalogItem({
-              ...publishPayload,
-              status: "published",
-            });
+      setIsPublishing(true);
 
-      await Promise.all([publishPromise]);
-      toast.success(isEditMode ? "Product updated" : "Product published");
-      navigate("/configuration/master-catalogue");
+      const payload = {
+        ...buildPayload(),
+        publicationStatus: "published",
+        inventoryStatus: "In Stock",
+        status: "In Stock",
+      };
+
+      const cleanedPayload = {
+        ...payload,
+        productName: String(payload.productName || "").trim(),
+        category: String(payload.category || "").trim(),
+        subcategory: String(payload.subcategory || "").trim(),
+        brand: String(payload.brand || "").trim(),
+      };
+
+      if (isEditMode && editingItem) {
+        const updated = await updateMasterCatalogItem(
+          editingItem.id,
+          cleanedPayload as any,
+        );
+        if (!updated) throw new Error("Publish failed");
+      } else {
+        const created = await addMasterCatalogItem(cleanedPayload as any);
+        if (!created) throw new Error("Publish failed");
+      }
+
+      toast.success("Product published successfully");
     } catch (error: any) {
-      toast.error(`Publish failed: ${error?.message || String(error)}`);
+      console.error("PUBLISH ERROR", error);
+      toast.error(error?.message || "Publish failed");
     } finally {
       setIsPublishing(false);
     }
@@ -1019,7 +1054,7 @@ export default function AddMasterCatalogueItemPage() {
               <Button
                 variant="outline"
                 className="h-11 rounded-xl px-4"
-                onClick={() => setPreviewModalOpen(true)}
+                onClick={() => setPreviewOpen(true)}
                 disabled={!canEdit}
               >
                 Preview
@@ -1060,7 +1095,7 @@ export default function AddMasterCatalogueItemPage() {
                   <div className="flex flex-col">
                     <button
                       onClick={() => {
-                        setPreviewModalOpen(true);
+                        setPreviewOpen(true);
                         setMenuOpen(false);
                       }}
                       className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 text-left"
@@ -1112,249 +1147,35 @@ export default function AddMasterCatalogueItemPage() {
         </div>
       </div>
 
-      {/* PRODUCT PREVIEW MODAL - PRODUCTION QUALITY LAYOUT */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-5xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col p-0">
-          {/* STICKY HEADER */}
-          <div className="flex items-center justify-between border-b border-border bg-white px-6 py-4 flex-shrink-0">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Product Preview
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Live review based on current form values · No backend call
-              </p>
-            </div>
-            <button
-              onClick={() => setPreviewOpen(false)}
-              className="text-slate-400 hover:text-slate-600 p-1"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          {/* SCROLLABLE CONTENT */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr] h-full">
-              {/* LEFT SIDE - PRIMARY IMAGE GALLERY + PRODUCT INFO */}
-              <div className="border-r border-border p-6 space-y-6 bg-slate-50">
-                {/* PRIMARY IMAGE WITH THUMBNAILS */}
-                <div>
-                  <div className="aspect-square overflow-hidden rounded-2xl bg-white border border-border mb-3 flex items-center justify-center min-h-80">
-                    {selectedPrimaryImage?.src ? (
-                      <img
-                        src={selectedPrimaryImage.src}
-                        alt={productName || "Product"}
-                        className="h-full w-full object-contain p-2"
-                      />
-                    ) : (
-                      <div className="text-slate-300 text-center">
-                        <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                        <p className="text-xs">No primary image</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* THUMBNAIL STRIP */}
-                  {images.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto">
-                      {images.map((img, idx) => (
-                        <div
-                          key={idx}
-                          className="h-16 w-16 flex-shrink-0 rounded-lg border-2 border-transparent hover:border-primary overflow-hidden bg-white cursor-pointer"
-                          onClick={() => {
-                            const newImages = images.map((i, i_idx) => ({
-                              id: `img-${i_idx}`,
-                              src: i,
-                              alt: `Image ${i_idx}`,
-                              isPrimary: i_idx === idx,
-                            }));
-                            // Note: This is just visual, actual state update would need setImages call
-                          }}
-                        >
-                          <img
-                            src={img}
-                            alt={`Thumbnail ${idx}`}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* PRODUCT TITLE & METADATA */}
-                <div className="bg-white rounded-xl p-4 border border-border">
-                  <h3 className="text-xl font-bold text-slate-900 mb-1 break-words">
-                    {productName || "(Untitled)"}
-                  </h3>
-                  <p className="text-sm text-slate-600 mb-3">
-                    {brand && category
-                      ? `${brand} · ${category}`
-                      : brand || category || "No category"}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {productCode && (
-                      <Badge variant="outline" className="text-xs">
-                        {productCode}
-                      </Badge>
-                    )}
-                    {subcategory && (
-                      <Badge variant="secondary" className="text-xs">
-                        {subcategory}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {/* DESCRIPTION */}
-                {descriptionHtmlLike?.trim() && (
-                  <div className="bg-white rounded-xl p-4 border border-border">
-                    <p className="text-sm leading-6 text-slate-700">
-                      {descriptionHtmlLike}
-                    </p>
-                  </div>
-                )}
-
-                {/* TAGS */}
-                {tags.length > 0 && (
-                  <div className="bg-white rounded-xl p-4 border border-border">
-                    <div className="flex flex-wrap gap-2">
-                      {tags.map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="text-xs"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* PRODUCT NOTES */}
-                {productNotes?.trim() && (
-                  <div className="bg-white rounded-xl p-4 border border-border">
-                    <h4 className="font-semibold text-xs text-slate-700 mb-2 uppercase tracking-wide">
-                      Notes & Alerts
-                    </h4>
-                    <p className="text-sm text-slate-600 whitespace-pre-wrap">
-                      {productNotes}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* RIGHT SIDE - PRODUCT IDENTIFIERS + SPECIFICATIONS + INVENTORY */}
-              <div className="p-6 space-y-5 overflow-y-auto">
-                {/* PRODUCT IDENTIFIERS */}
-                <div className="bg-white rounded-xl p-4 border border-border">
-                  <h4 className="font-semibold text-xs text-slate-700 mb-3 uppercase tracking-wide">
-                    Identifiers
-                  </h4>
-                  <div className="space-y-2 text-xs">
-                    {productCode && (
-                      <div>
-                        <span className="text-slate-500">Product Code:</span>
-                        <p className="font-mono text-slate-900">
-                          {productCode}
-                        </p>
-                      </div>
-                    )}
-                    {skuCode && (
-                      <div>
-                        <span className="text-slate-500">SKU:</span>
-                        <p className="font-mono text-slate-900">{skuCode}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* KEY SPECIFICATIONS */}
-                {specRows.length > 0 && (
-                  <div className="bg-white rounded-xl p-4 border border-border">
-                    <h4 className="font-semibold text-xs text-slate-700 mb-3 uppercase tracking-wide">
-                      Key Specifications
-                    </h4>
-                    <div className="space-y-2 text-xs">
-                      {specRows.map((spec) => (
-                        <div key={spec.id} className="flex justify-between">
-                          <span className="text-slate-600">
-                            {specCategoryNameById.get(spec.categoryId) ||
-                              "Spec"}
-                            :
-                          </span>
-                          <span className="font-medium text-slate-900">
-                            {spec.value}{" "}
-                            {spec.unit && spec.unit !== "-" ? spec.unit : ""}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* GENERAL SPECIFICATIONS */}
-                {genSpecRows.length > 0 && (
-                  <div className="bg-white rounded-xl p-4 border border-border">
-                    <h4 className="font-semibold text-xs text-slate-700 mb-3 uppercase tracking-wide">
-                      General Specifications
-                    </h4>
-                    <div className="space-y-2 text-xs">
-                      {genSpecRows.map((spec) => (
-                        <div key={spec.id} className="flex justify-between">
-                          <span className="text-slate-600">
-                            {spec.category}:
-                          </span>
-                          <span className="font-medium text-slate-900">
-                            {spec.value}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* VENDOR INVENTORY */}
-                {vendorInventory.length > 0 && (
-                  <div className="bg-white rounded-xl p-4 border border-border">
-                    <h4 className="font-semibold text-xs text-slate-700 mb-3 uppercase tracking-wide">
-                      Vendor Inventory
-                    </h4>
-                    <div className="space-y-3 text-xs">
-                      {vendorInventory.map((vendor) => (
-                        <div
-                          key={vendor.id}
-                          className="bg-slate-50 rounded-lg p-3 border border-slate-100"
-                        >
-                          <p className="font-semibold text-slate-900 mb-1">
-                            {vendor.vendorName}
-                          </p>
-                          <div className="grid grid-cols-2 gap-2 text-slate-600">
-                            <div>
-                              <span className="text-slate-500">Qty:</span>{" "}
-                              {vendor.quantity}
-                            </div>
-                            <div>
-                              <span className="text-slate-500">Price:</span> ₹
-                              {vendor.pricePerItem}
-                            </div>
-                            <div className="col-span-2">
-                              <span className="text-slate-500">Lead:</span>{" "}
-                              {vendor.leadTime || "—"}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ProductPreviewModal
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        product={{
+          productCode,
+          sku: skuCode,
+          productName,
+          description: descriptionHtmlLike,
+          brand,
+          category,
+          subcategory,
+          tags,
+          productNotes,
+          images: images.map((i) => i.src),
+          keySpecifications: specRows.map((r) => ({
+            specification:
+              specCategoryNameById.get(r.categoryId) || r.attribute,
+            value: r.unit && r.unit !== "-" ? `${r.value} ${r.unit}` : r.value,
+          })),
+          generalSpecifications: genSpecRows,
+          vendorInventory,
+          initialStock: vendorInventory.reduce(
+            (sum, v) => sum + (Number(v.quantity) || 0),
+            0,
+          ),
+          leadTime: vendorInventory[0]?.leadTime || "",
+          publicationStatus: "draft",
+        }}
+      />
 
       {/* RESET CONFIRMATION DIALOG */}
       <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
@@ -2552,7 +2373,7 @@ export default function AddMasterCatalogueItemPage() {
                     type="button"
                     variant="outline"
                     className="w-full h-12 rounded-2xl"
-                    onClick={() => setPreviewModalOpen(true)}
+                    onClick={() => setPreviewOpen(true)}
                   >
                     Preview Product
                   </Button>
@@ -2577,221 +2398,6 @@ export default function AddMasterCatalogueItemPage() {
           </div>
         </div>
       </div>
-
-      {/* Preview Modal */}
-      {previewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-border/70 px-6 py-4 flex justify-between items-center rounded-t-2xl">
-              <h2 className="text-xl font-semibold">Product Preview</h2>
-              <button
-                onClick={() => setPreviewModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 space-y-6">
-              {/* Basic Info */}
-              <div>
-                <h3 className="font-semibold mb-2">Basic Information</h3>
-                <div className="space-y-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Code:</span>{" "}
-                    {productCode || "N/A"}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Name:</span>{" "}
-                    {productName || "N/A"}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Category:</span>{" "}
-                    {category || "N/A"}
-                  </div>
-                  {subcategory && (
-                    <div>
-                      <span className="text-muted-foreground">
-                        Sub-Category:
-                      </span>{" "}
-                      {subcategory}
-                    </div>
-                  )}
-                  {brand && (
-                    <div>
-                      <span className="text-muted-foreground">Brand:</span>{" "}
-                      {brand}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Description */}
-              {description && (
-                <div>
-                  <h3 className="font-semibold mb-2">Description</h3>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {description}
-                  </p>
-                </div>
-              )}
-
-              {/* Images */}
-              {images.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">
-                    Images ({images.length})
-                  </h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {images.map((img, idx) => (
-                      <img
-                        key={idx}
-                        src={img}
-                        alt={`Preview ${idx}`}
-                        className="w-full h-32 object-cover rounded-lg border border-border/70"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Key Specifications */}
-              {keySpecifications.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">Key Specifications</h3>
-                  <table className="w-full text-sm border-collapse">
-                    <tbody>
-                      {keySpecifications.map((spec, idx) => (
-                        <tr key={idx} className="border-b border-border/30">
-                          <td className="p-2 font-medium text-muted-foreground">
-                            {spec.specification}
-                          </td>
-                          <td className="p-2 text-right">
-                            {spec.value} {spec.unit || ""}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* General Specifications */}
-              {generalSpecifications.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">General Specifications</h3>
-                  <table className="w-full text-sm border-collapse">
-                    <tbody>
-                      {generalSpecifications.map((spec, idx) => (
-                        <tr key={idx} className="border-b border-border/30">
-                          <td className="p-2 font-medium text-muted-foreground">
-                            {spec.category}
-                          </td>
-                          <td className="p-2">{spec.value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Vendor Inventory */}
-              {vendorInventory.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">Vendor Inventory</h3>
-                  <div className="space-y-2">
-                    {vendorInventory.map((vendor, idx) => (
-                      <div
-                        key={idx}
-                        className="border border-border/70 rounded-lg p-3 text-sm space-y-1"
-                      >
-                        <div className="font-medium">{vendor.vendorName}</div>
-                        <div>
-                          <span className="text-muted-foreground">
-                            Quantity:
-                          </span>{" "}
-                          {vendor.quantity}
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">
-                            Price per Item:
-                          </span>{" "}
-                          ₹{vendor.pricePerItem.toFixed(2)}
-                        </div>
-                        {vendor.leadTime && (
-                          <div>
-                            <span className="text-muted-foreground">
-                              Lead Time:
-                            </span>{" "}
-                            {vendor.leadTime}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Product Notes */}
-              {productNotes && (
-                <div>
-                  <h3 className="font-semibold mb-2">Product Notes</h3>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {productNotes}
-                  </p>
-                </div>
-              )}
-
-              {/* Tags */}
-              {tags.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">Tags</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {tags.map((tag, idx) => (
-                      <span
-                        key={idx}
-                        className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Status */}
-              <div className="p-3 rounded-lg bg-slate-50 border border-border/70">
-                <p className="text-xs text-muted-foreground">
-                  Status:{" "}
-                  <span className="font-semibold text-slate-900">
-                    {isEditMode ? "Editing Draft" : "New Product"}
-                  </span>
-                </p>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="border-t border-border/70 px-6 py-4 flex justify-end gap-2 rounded-b-2xl bg-slate-50">
-              <Button
-                variant="outline"
-                onClick={() => setPreviewModalOpen(false)}
-              >
-                Close
-              </Button>
-              <Button
-                onClick={() => {
-                  setPreviewModalOpen(false);
-                  onSaveAsDraft();
-                }}
-              >
-                Save as Draft
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

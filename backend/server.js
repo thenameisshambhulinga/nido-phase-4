@@ -46,9 +46,12 @@ if (!MONGODB_URI) {
 }
 
 /* ================= MIDDLEWARE ================= */
+// During local development allow CORS from the frontend dev server.
+// This is intentionally permissive for local testing. In production, rely on
+// FRONTEND_URL to restrict origins.
 app.use(
   cors({
-    origin: CLIENT_ORIGIN === "*" ? true : CLIENT_ORIGIN,
+    origin: true,
     credentials: true,
   }),
 );

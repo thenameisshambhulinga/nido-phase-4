@@ -830,7 +830,25 @@ function usePersistedState<T>(
     return (typeof parsed === typeof defaultValue ? parsed : defaultValue) as T;
   });
   useEffect(() => {
-    localStorage.setItem(key, JSON.stringify(state));
+    // Only persist small auth/preferences primitives to avoid localStorage overflow.
+    const persistAllowed = [
+      "token",
+      "auth",
+      "preference",
+      "org",
+      "theme",
+      "user",
+    ];
+    const keyLower = String(key || "").toLowerCase();
+    if (!persistAllowed.some((substr) => keyLower.includes(substr))) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch {
+      // ignore quota errors — avoid crashing the app
+    }
   }, [key, state]);
   return [state, setState];
 }
@@ -2651,6 +2669,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     DEFAULT_SALES_ACTIVITIES,
   );
 
+  // Ephemeral in-memory product list and loading flag (do NOT persist)
+  const [products, setProducts] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const fetchingProductsRef = React.useRef(false);
+  const fetchingClientsRef = React.useRef(false);
+  const fetchingVendorsRef = React.useRef(false);
+
   const API_BASE = apiBaseUrl;
 
   const toFrontendOrderStatus = (status?: string) => {
@@ -2690,18 +2715,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   ): MasterCatalogItem => {
     const quantity = Number(product.quantity) || 0;
     const minStockThreshold = Number(product.minStockThreshold) || 0;
-    const rawStatus = String(product.status || "")
+
+    // Check publicationStatus first (more reliable), fallback to status field
+    const publicationStatus = String(
+      product.publicationStatus || product.status || "",
+    )
       .trim()
       .toLowerCase();
+
+    const rawStatus = publicationStatus;
     const isDraft = rawStatus === "draft";
     const isPublished = rawStatus === "published" || rawStatus === "active";
+    const isArchived = rawStatus === "archived";
+
     const status = isDraft
       ? "Out of Stock"
-      : quantity <= 0
+      : isArchived
         ? "Out of Stock"
-        : minStockThreshold > 0 && quantity <= minStockThreshold
-          ? "Low Stock"
-          : "In Stock";
+        : quantity <= 0
+          ? "Out of Stock"
+          : minStockThreshold > 0 && quantity <= minStockThreshold
+            ? "Low Stock"
+            : "In Stock";
 
     const safeMasterProductId =
       product.masterProductId ||
@@ -2742,7 +2777,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           ? Number(product.discountPrice)
           : undefined,
       status,
-      productStatus: rawStatus || (isPublished ? "published" : undefined),
+      productStatus: rawStatus,
       image: normalizeAssetPath(product.image) || imageList[0],
       images: imageList,
       description: product.description,
@@ -3026,6 +3061,121 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     [activeSettings],
   );
 
+  // ===== FETCH CALLBACKS (MUST BE DECLARED BEFORE useEffect) =====
+  const fetchProducts = useCallback(async () => {
+    if (fetchingProductsRef.current) return;
+
+    fetchingProductsRef.current = true;
+
+    try {
+      setProductsLoading(true);
+
+      const response = await apiRequest<any>("/api/products");
+
+      const normalizedProducts = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response)
+          ? response
+          : [];
+
+      setProducts(normalizedProducts);
+
+      const mapped = normalizedProducts.map((product: any, index: number) =>
+        mapProductToCatalogItem(product, index),
+      );
+
+      setMasterCatalogItems(mapped);
+    } catch (error) {
+      console.error("Products fetch failed:", error);
+    } finally {
+      setProductsLoading(false);
+      fetchingProductsRef.current = false;
+    }
+  }, []);
+
+  const fetchClients = useCallback(async () => {
+    if (fetchingClientsRef.current) return;
+
+    fetchingClientsRef.current = true;
+
+    try {
+      const response = await apiRequest<any>("/api/clients");
+
+      const normalizedClients = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response)
+          ? response
+          : [];
+
+      setClients(normalizedClients);
+    } catch (error) {
+      console.error("Clients fetch failed:", error);
+    } finally {
+      fetchingClientsRef.current = false;
+    }
+  }, []);
+
+  const fetchVendors = useCallback(async () => {
+    if (fetchingVendorsRef.current) return;
+
+    fetchingVendorsRef.current = true;
+
+    try {
+      const response = await apiRequest<any>("/api/vendors");
+
+      const normalizedVendors = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response)
+          ? response
+          : [];
+
+      setVendors(normalizedVendors);
+    } catch (error) {
+      console.error("Vendors fetch failed:", error);
+    } finally {
+      fetchingVendorsRef.current = false;
+    }
+  }, []);
+
+  const fetchOrders = useCallback(async () => {
+    try {
+      const response = await apiRequest<any>("/api/orders");
+
+      const normalizedOrders = Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response)
+          ? response
+          : [];
+
+      const mapped = normalizedOrders.map(mapApiOrderToFrontend);
+      setOrders(mapped);
+    } catch (error) {
+      console.error("FETCH ORDERS FAILED:", error);
+      setOrders([]);
+    }
+  }, [mapApiOrderToFrontend, setOrders]);
+
+  const refreshMasterCatalogItems = useCallback(async () => {
+    // delegate to fetchProducts if available
+    if (typeof fetchProducts === "function") {
+      try {
+        await fetchProducts();
+      } catch (err) {
+        console.error("Failed to refresh master catalogue items:", err);
+      }
+      return;
+    }
+    try {
+      const products = await apiRequest<any[]>("/api/products");
+      const mapped = products.map((product: any, index: number) =>
+        mapProductToCatalogItem(product, index),
+      );
+      setMasterCatalogItems(mapped);
+    } catch (error) {
+      console.error("Failed to refresh master catalogue items:", error);
+    }
+  }, [fetchProducts, mapProductToCatalogItem, setMasterCatalogItems]);
+
   useEffect(() => {
     setSalesQuotes((prev) =>
       prev.map((quote) => {
@@ -3088,96 +3238,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
           : nextInvoice;
       }),
     );
-  }, [setInvoices, setSalesOrders, setSalesQuotes]);
+  }, []);
 
-  // Fetch clients, vendors, products, and orders from backend
+  // Fetch clients, vendors, products after authentication is available.
   useEffect(() => {
-    const fetchData = async () => {
-      if (!isAuthenticated) {
-        setIsCoreDataLoading(false);
-        setCoreDataError(null);
-        return;
-      }
+    if (!isAuthenticated) return;
 
-      setIsCoreDataLoading(true);
-      setCoreDataError(null);
+    let mounted = true;
+
+    const initialize = async () => {
       try {
-        const results = await Promise.allSettled([
-          apiRequest<any[]>("/api/clients"),
-          apiRequest<any[]>("/api/vendors"),
-          apiRequest<any[]>("/api/products"),
-          apiRequest<any[]>("/api/orders"),
-        ]);
-
-        const [clientsResult, vendorsResult, productsResult, ordersResult] =
-          results;
-        const errors: string[] = [];
-
-        if (clientsResult.status === "fulfilled") {
-          const mapped = clientsResult.value.map(mapApiClientToFrontend);
-          setClients(mapped);
-        } else {
-          console.error("❌ CLIENTS FETCH ERROR:", clientsResult.reason);
-          errors.push(`clients: ${clientsResult.reason?.message || "failed"}`);
-        }
-
-        if (vendorsResult.status === "fulfilled") {
-          const mapped = vendorsResult.value.map(mapApiVendorToFrontend);
-          setVendors(mapped);
-        } else {
-          errors.push(`vendors: ${vendorsResult.reason?.message || "failed"}`);
-        }
-
-        if (productsResult.status === "fulfilled") {
-          const products = productsResult.value;
-
-          const mappedProducts = products.map((product: any, index: number) =>
-            mapProductToCatalogItem(product, index),
-          );
-
-          setMasterCatalogItems(mappedProducts);
-        } else {
-          errors.push(
-            `products: ${productsResult.reason?.message || "failed"}`,
-          );
-        }
-
-        if (ordersResult.status === "fulfilled") {
-          const mapped = ordersResult.value.map(mapApiOrderToFrontend);
-          setOrders(mapped);
-        } else {
-          errors.push(`orders: ${ordersResult.reason?.message || "failed"}`);
-        }
-
-        // Invoices fetched via order relations
-
-        if (errors.length > 0) {
-          setCoreDataError(
-            `Some data could not be refreshed: ${errors.join(" | ")}`,
-          );
-        }
+        await Promise.all([fetchProducts(), fetchClients(), fetchVendors()]);
       } catch (error) {
-        console.error("🚨 CRITICAL: Backend data fetch failed", error);
-        console.error("API_BASE:", apiBaseUrl);
-        console.error("Auth status:", isAuthenticated);
-        setCoreDataError(
-          `Backend error: ${error instanceof Error ? error.message : String(error)}. Check console.`,
-        );
-      } finally {
-        setIsCoreDataLoading(false);
+        console.error("Initial data fetch failed:", error);
       }
     };
 
-    void fetchData();
-  }, [
-    isAuthenticated,
-    currentOrganization?.id,
-    setClients,
-    setInvoices,
-    setMasterCatalogItems,
-    setOrders,
-    setVendors,
-  ]);
+    if (mounted) {
+      void initialize();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthenticated, fetchProducts, fetchClients, fetchVendors]);
 
   const makeCrud = <T extends { id: string }>(
     setter: React.Dispatch<React.SetStateAction<T[]>>,
@@ -3406,90 +3490,166 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     },
     [setOrders],
   );
+  // Fetch callbacks have been moved above useEffect to avoid TDZ issues
 
-  const addVendor = useCallback(
-    (vendor: Partial<Vendor>) => {
-      const vendorCode =
-        vendor.vendorCode ||
+  const addMasterCatalogItem = useCallback(
+    async (item: Partial<MasterCatalogItem>) => {
+      const productCode =
+        item.productCode ||
         nextSequentialCode(
-          configuredPrefix("vendorCodePrefix", "VND"),
-          vendors.map((entry) => entry.vendorCode),
+          configuredPrefix("productCodePrefix", "PRD"),
+          masterCatalogItems.map((entry) => entry.productCode),
           5,
         );
-      void (async () => {
-        try {
-          const created = await apiRequest<any>("/vendors", {
-            method: "POST",
-            body: {
-              vendorCode,
-              vendorName: vendor.name || "Unnamed Vendor",
-              category: vendor.category || "General",
-              email: vendor.contactEmail || "",
-              phone: vendor.contactPhone || "",
-              address: vendor.address || "",
-              status: vendor.status || "active",
-              rating: Number(vendor.rating) || 0,
-            },
-          });
 
-          const mappedCreated = mapApiVendorToFrontend(created);
-          setVendors((prev) => [mappedCreated, ...prev]);
+      const payload = {
+        // backend Product schema requires `name`
+        name: item.name || "Unnamed Item",
+        // Phase 1 + Shop fix: never leave masterProductId empty,
+        // ShopPage filters on `!!item.masterProductId`
+        masterProductId:
+          item.masterProductId || productCode || item.productCode,
+        productName: item.name || "Unnamed Item",
+        productCode,
+        sku: productCode,
+        // IMPORTANT: backend has unique index on serialNumber.
+        // Never persist empty string; omit field when blank to avoid duplicate-key conflicts.
+        ...(typeof item.vendorSku === "string" && item.vendorSku.trim()
+          ? { serialNumber: item.vendorSku }
+          : {}),
+        category: item.category || "General",
+        subCategory: item.subCategory || "",
+        brand: item.brand || "",
+        productType: item.productType || "Product",
+        physicalType: item.physicalType || "Physical",
+        price: Number(item.price) || 0,
+        discountPrice:
+          item.discountPrice !== undefined
+            ? Number(item.discountPrice)
+            : undefined,
+        quantity: Number(item.initialStock) || 0,
+        minStockThreshold: Number(item.minStockThreshold) || 0,
+        status:
+          normalizeStatusForApi(item.status) ??
+          (item.status ? item.status : undefined),
+        image: item.image,
+        description: item.description,
+        tags: item.tags || [],
+        specification: item.specification,
+        warranty: item.warranty,
+        hsnCode: item.hsnCode,
+        dimensionL: item.dimensionL,
+        dimensionW: item.dimensionW,
+        dimensionH: item.dimensionH,
+        dimUnit: item.dimUnit,
+        weight: item.weight,
+        weightUnit: item.weightUnit,
+        customsDeclaration: item.customsDeclaration,
+        primaryVendor: item.primaryVendor,
+        vendorName: item.primaryVendor || "",
+        vendorSku: item.vendorSku,
+        leadTime: item.leadTime,
+        vendorContact: item.vendorContact,
+        vendorEmail: item.vendorEmail,
+        vendorPhone: item.vendorPhone,
+        vendorPhone2: item.vendorPhone2,
+        trackPerformance: item.trackPerformance,
+        performanceRating: Number(item.performanceRating) || 0,
 
-          const refreshed = await apiRequest<any[]>("/vendors");
-          setVendors(refreshed.map(mapApiVendorToFrontend));
-        } catch (error) {
-          console.error("Vendor creation failed:", error);
-        }
-      })();
+        // Multi-vendor inventory allocation (added for Master Catalogue vendor inventory persistence)
+        vendorInventory: item.vendorInventory || [],
+
+        // Phase 1 — Product Notes (optional)
+        productNotes:
+          typeof item.productNotes === "string" && item.productNotes.trim()
+            ? item.productNotes
+            : undefined,
+        keySpecifications: item.keySpecifications || [],
+        generalSpecifications: item.generalSpecifications || [],
+        images: item.images || [],
+      };
+
+      const optimisticItem: MasterCatalogItem = {
+        id: `tmp-${Date.now()}`,
+        masterProductId: item.masterProductId || productCode,
+        productCode,
+        name: item.name || "Unnamed Item",
+        category: item.category || "General",
+        subCategory: item.subCategory || "",
+        brand: item.brand || "",
+        productType: item.productType || "Product",
+        physicalType: item.physicalType || "Physical",
+        price: Number(item.price) || 0,
+        discountPrice:
+          item.discountPrice !== undefined
+            ? Number(item.discountPrice)
+            : undefined,
+        status:
+          String(item.status) === "draft"
+            ? "Out of Stock"
+            : Number(item.initialStock) <= 0
+              ? "Out of Stock"
+              : Number(item.initialStock) <= Number(item.minStockThreshold || 0)
+                ? "Low Stock"
+                : "In Stock",
+        productStatus:
+          String(item.status) === "draft"
+            ? "draft"
+            : String(item.status) === "published"
+              ? "published"
+              : undefined,
+        image: item.image,
+        images: item.images || [],
+        description: item.description,
+        initialStock: Number(item.initialStock) || 0,
+        minStockThreshold: Number(item.minStockThreshold) || 0,
+        tags: item.tags || [],
+        specification: item.specification,
+        warranty: item.warranty,
+        hsnCode: item.hsnCode,
+        dimensionL: item.dimensionL,
+        dimensionW: item.dimensionW,
+        dimensionH: item.dimensionH,
+        dimUnit: item.dimUnit,
+        weight: item.weight,
+        weightUnit: item.weightUnit,
+        customsDeclaration: item.customsDeclaration,
+        primaryVendor: item.primaryVendor,
+        vendorSku: item.vendorSku,
+        leadTime: item.leadTime,
+        vendorInventory: item.vendorInventory || [],
+        productNotes:
+          typeof item.productNotes === "string" && item.productNotes.trim()
+            ? item.productNotes
+            : undefined,
+        keySpecifications: item.keySpecifications || [],
+        generalSpecifications: item.generalSpecifications || [],
+      };
+
+      setMasterCatalogItems((prev) => [optimisticItem, ...prev]);
+
+      const created = await apiRequest<any>("/api/products", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      const createdProduct = created?.data || created;
+
+      setMasterCatalogItems((prev) => [
+        mapProductToCatalogItem(createdProduct, prev.length),
+        ...prev.filter((entry) => entry.id !== optimisticItem.id),
+      ]);
+
+      await fetchProducts();
+
+      return true;
     },
-    [configuredPrefix, setVendors, vendors],
-  );
-
-  const updateVendor = useCallback(
-    (id: string, data: Partial<Vendor>) => {
-      setVendors((prev) =>
-        prev.map((entry) => (entry.id === id ? { ...entry, ...data } : entry)),
-      );
-
-      void (async () => {
-        try {
-          const updated = await apiRequest<any>(`/vendors/${id}`, {
-            method: "PATCH",
-            body: {
-              vendorCode: data.vendorCode,
-              vendorName: data.name,
-              category: data.category,
-              email: data.contactEmail,
-              phone: data.contactPhone,
-              address: data.address,
-              status: data.status,
-              rating: data.rating,
-            },
-          });
-          const mapped = mapApiVendorToFrontend(updated);
-          setVendors((prev) =>
-            prev.map((entry) => (entry.id === id ? mapped : entry)),
-          );
-        } catch (error) {
-          console.error("Vendor update failed:", error);
-        }
-      })();
-    },
-    [setVendors],
-  );
-
-  const deleteVendor = useCallback(
-    (id: string) => {
-      setVendors((prev) => prev.filter((entry) => entry.id !== id));
-      void (async () => {
-        try {
-          await apiRequest(`/vendors/${id}`, { method: "DELETE" });
-        } catch (error) {
-          console.error("Vendor delete failed:", error);
-        }
-      })();
-    },
-    [setVendors],
+    [
+      fetchProducts,
+      configuredPrefix,
+      masterCatalogItems,
+      setMasterCatalogItems,
+    ],
   );
 
   const addClient = useCallback(
@@ -3503,7 +3663,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         );
       void (async () => {
         try {
-          const created = await apiRequest<any>("/clients", {
+          const response = await apiRequest<any>("/clients", {
             method: "POST",
             body: {
               clientCode,
@@ -3538,17 +3698,103 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
             },
           });
 
-          const mappedCreated = mapApiClientToFrontend(created);
+          const createdClient = response?.data || response;
+          const mappedCreated = mapApiClientToFrontend(createdClient);
           setClients((prev) => [mappedCreated, ...prev]);
 
-          const refreshed = await apiRequest<any[]>("/clients");
-          setClients(refreshed.map(mapApiClientToFrontend));
+          await fetchClients();
         } catch (error) {
           console.error("Client creation failed:", error);
         }
       })();
     },
-    [clients, configuredPrefix, setClients],
+    [clients, configuredPrefix, fetchClients, setClients],
+  );
+
+  const addVendor = useCallback(
+    (vendor: Partial<Vendor>) => {
+      const vendorCode =
+        vendor.vendorCode ||
+        nextSequentialCode(
+          configuredPrefix("vendorCodePrefix", "VND"),
+          vendors.map((entry) => entry.vendorCode),
+          5,
+        );
+      void (async () => {
+        try {
+          const response = await apiRequest<any>("/vendors", {
+            method: "POST",
+            body: {
+              vendorCode,
+              vendorName: vendor.name || "Unnamed Vendor",
+              category: vendor.category || "General",
+              email: vendor.contactEmail || "",
+              phone: vendor.contactPhone || "",
+              address: vendor.address || "",
+              status: vendor.status || "active",
+              rating: Number(vendor.rating) || 0,
+            },
+          });
+
+          const createdVendor = response?.data || response;
+          const mappedCreated = mapApiVendorToFrontend(createdVendor);
+          setVendors((prev) => [mappedCreated, ...prev]);
+
+          await fetchVendors();
+        } catch (error) {
+          console.error("Vendor creation failed:", error);
+        }
+      })();
+    },
+    [configuredPrefix, fetchVendors, setVendors, vendors],
+  );
+
+  const updateVendor = useCallback(
+    (id: string, data: Partial<Vendor>) => {
+      setVendors((prev) =>
+        prev.map((entry) => (entry.id === id ? { ...entry, ...data } : entry)),
+      );
+
+      void (async () => {
+        try {
+          const response = await apiRequest<any>(`/vendors/${id}`, {
+            method: "PATCH",
+            body: {
+              vendorCode: data.vendorCode,
+              vendorName: data.name,
+              category: data.category,
+              email: data.contactEmail,
+              phone: data.contactPhone,
+              address: data.address,
+              status: data.status,
+              rating: data.rating,
+            },
+          });
+          const updatedVendor = response?.data || response;
+          const mapped = mapApiVendorToFrontend(updatedVendor);
+          setVendors((prev) =>
+            prev.map((entry) => (entry.id === id ? mapped : entry)),
+          );
+        } catch (error) {
+          console.error("Vendor update failed:", error);
+        }
+      })();
+    },
+    [setVendors],
+  );
+
+  const deleteVendor = useCallback(
+    (id: string) => {
+      setVendors((prev) => prev.filter((entry) => entry.id !== id));
+      void (async () => {
+        try {
+          await apiRequest(`/vendors/${id}`, { method: "DELETE" });
+        } catch (error) {
+          console.error("Vendor delete failed:", error);
+        }
+      })();
+    },
+    [setVendors],
   );
 
   const updateClient = useCallback(
@@ -3559,7 +3805,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
 
       void (async () => {
         try {
-          const updated = await apiRequest<any>(`/clients/${id}`, {
+          const response = await apiRequest<any>(`/clients/${id}`, {
             method: "PATCH",
             body: {
               clientCode: data.clientCode,
@@ -3592,7 +3838,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
               totalOrders: data.totalOrders,
             },
           });
-          const mapped = mapApiClientToFrontend(updated);
+          const updatedClient = response?.data || response;
+          const mapped = mapApiClientToFrontend(updatedClient);
           setClients((prev) =>
             prev.map((entry) => (entry.id === id ? mapped : entry)),
           );
@@ -4383,169 +4630,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     [setUserRoles],
   );
 
-  const refreshMasterCatalogItems = useCallback(async () => {
-    try {
-      const products = await apiRequest<any[]>("/api/products");
-      const mapped = products.map((product: any, index: number) =>
-        mapProductToCatalogItem(product, index),
-      );
-      setMasterCatalogItems(mapped);
-    } catch (error) {
-      console.error("Failed to refresh master catalogue items:", error);
-    }
-  }, [setMasterCatalogItems]);
-
-  const addMasterCatalogItem = useCallback(
-    async (item: Partial<MasterCatalogItem>) => {
-      const productCode =
-        item.productCode ||
-        nextSequentialCode(
-          configuredPrefix("productCodePrefix", "PRD"),
-          masterCatalogItems.map((entry) => entry.productCode),
-          5,
-        );
-
-      const payload = {
-        // backend Product schema requires `name`
-        name: item.name || "Unnamed Item",
-        // Phase 1 + Shop fix: never leave masterProductId empty,
-        // ShopPage filters on `!!item.masterProductId`
-        masterProductId:
-          item.masterProductId || productCode || item.productCode,
-        productName: item.name || "Unnamed Item",
-        productCode,
-        sku: productCode,
-        // IMPORTANT: backend has unique index on serialNumber.
-        // Never persist empty string; omit field when blank to avoid duplicate-key conflicts.
-        ...(typeof item.vendorSku === "string" && item.vendorSku.trim()
-          ? { serialNumber: item.vendorSku }
-          : {}),
-        category: item.category || "General",
-        subCategory: item.subCategory || "",
-        brand: item.brand || "",
-        productType: item.productType || "Product",
-        physicalType: item.physicalType || "Physical",
-        price: Number(item.price) || 0,
-        discountPrice:
-          item.discountPrice !== undefined
-            ? Number(item.discountPrice)
-            : undefined,
-        quantity: Number(item.initialStock) || 0,
-        minStockThreshold: Number(item.minStockThreshold) || 0,
-        status:
-          normalizeStatusForApi(item.status) ??
-          (item.status ? item.status : undefined),
-        image: item.image,
-        description: item.description,
-        tags: item.tags || [],
-        specification: item.specification,
-        warranty: item.warranty,
-        hsnCode: item.hsnCode,
-        dimensionL: item.dimensionL,
-        dimensionW: item.dimensionW,
-        dimensionH: item.dimensionH,
-        dimUnit: item.dimUnit,
-        weight: item.weight,
-        weightUnit: item.weightUnit,
-        customsDeclaration: item.customsDeclaration,
-        primaryVendor: item.primaryVendor,
-        vendorName: item.primaryVendor || "",
-        vendorSku: item.vendorSku,
-        leadTime: item.leadTime,
-        vendorContact: item.vendorContact,
-        vendorEmail: item.vendorEmail,
-        vendorPhone: item.vendorPhone,
-        vendorPhone2: item.vendorPhone2,
-        trackPerformance: item.trackPerformance,
-        performanceRating: Number(item.performanceRating) || 0,
-
-        // Multi-vendor inventory allocation (added for Master Catalogue vendor inventory persistence)
-        vendorInventory: item.vendorInventory || [],
-
-        // Phase 1 — Product Notes (optional)
-        productNotes:
-          typeof item.productNotes === "string" && item.productNotes.trim()
-            ? item.productNotes
-            : undefined,
-        keySpecifications: item.keySpecifications || [],
-        generalSpecifications: item.generalSpecifications || [],
-        images: item.images || [],
-      };
-
-      const optimisticItem: MasterCatalogItem = {
-        id: `tmp-${Date.now()}`,
-        masterProductId: item.masterProductId || productCode,
-        productCode,
-        name: item.name || "Unnamed Item",
-        category: item.category || "General",
-        subCategory: item.subCategory || "",
-        brand: item.brand || "",
-        productType: item.productType || "Product",
-        physicalType: item.physicalType || "Physical",
-        price: Number(item.price) || 0,
-        discountPrice:
-          item.discountPrice !== undefined
-            ? Number(item.discountPrice)
-            : undefined,
-        status:
-          item.status === "draft"
-            ? "Out of Stock"
-            : Number(item.initialStock) <= 0
-              ? "Out of Stock"
-              : Number(item.initialStock) <= Number(item.minStockThreshold || 0)
-                ? "Low Stock"
-                : "In Stock",
-        productStatus:
-          item.status === "draft"
-            ? "draft"
-            : item.status === "published"
-              ? "published"
-              : undefined,
-        image: item.image,
-        images: item.images || [],
-        description: item.description,
-        initialStock: Number(item.initialStock) || 0,
-        minStockThreshold: Number(item.minStockThreshold) || 0,
-        tags: item.tags || [],
-        specification: item.specification,
-        warranty: item.warranty,
-        hsnCode: item.hsnCode,
-        dimensionL: item.dimensionL,
-        dimensionW: item.dimensionW,
-        dimensionH: item.dimensionH,
-        dimUnit: item.dimUnit,
-        weight: item.weight,
-        weightUnit: item.weightUnit,
-        customsDeclaration: item.customsDeclaration,
-        primaryVendor: item.primaryVendor,
-        vendorSku: item.vendorSku,
-        leadTime: item.leadTime,
-        vendorInventory: item.vendorInventory || [],
-        productNotes:
-          typeof item.productNotes === "string" && item.productNotes.trim()
-            ? item.productNotes
-            : undefined,
-        keySpecifications: item.keySpecifications || [],
-        generalSpecifications: item.generalSpecifications || [],
-      };
-
-      setMasterCatalogItems((prev) => [optimisticItem, ...prev]);
-
-      const created = await apiRequest<any>("/api/products", {
-        method: "POST",
-        body: payload,
-      });
-
-      setMasterCatalogItems((prev) => [
-        mapProductToCatalogItem(created, prev.length),
-        ...prev.filter((entry) => entry.id !== optimisticItem.id),
-      ]);
-
-      return true;
-    },
-    [refreshMasterCatalogItems, configuredPrefix, masterCatalogItems],
-  );
-
   const updateMasterCatalogItem = useCallback(
     async (id: string, data: Partial<MasterCatalogItem>) => {
       const payload = {
@@ -4570,8 +4654,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
         quantity: data.initialStock,
         minStockThreshold: data.minStockThreshold,
         status:
-          normalizeStatusForApi(data.status) ??
-          (data.status ? data.status : undefined),
+          normalizeStatusForApi(String(data.status)) ??
+          (data.status ? String(data.status) : undefined),
         image: data.image,
         description: data.description,
         tags: data.tags,
@@ -4615,17 +4699,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
                 ...entry,
                 ...data,
                 status:
-                  data.status === "draft"
+                  String(data.status) === "draft"
                     ? "Out of Stock"
-                    : data.status === "published"
+                    : String(data.status) === "published"
                       ? entry.status
-                      : data.status === "Out of Stock"
+                      : String(data.status) === "Out of Stock"
                         ? "Out of Stock"
                         : entry.status,
                 productStatus:
-                  data.status === "draft"
+                  String(data.status) === "draft"
                     ? "draft"
-                    : data.status === "published"
+                    : String(data.status) === "published"
                       ? "published"
                       : entry.productStatus,
               }
@@ -4641,7 +4725,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       await refreshMasterCatalogItems();
       return true;
     },
-    [refreshMasterCatalogItems],
+    [refreshMasterCatalogItems, setMasterCatalogItems],
   );
 
   const deleteMasterCatalogItem = useCallback(

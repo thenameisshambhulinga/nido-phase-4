@@ -1,3 +1,4 @@
+//AddMasterCatalogueItemWrapper.tsx
 import React from "react";
 import { Navigate } from "react-router-dom";
 import AddMasterCatalogueItemPage from "@/pages/AddMasterCatalogueItemPage";

@@ -1,3 +1,4 @@
+//EnterpriseProductCard.tsx
 import { useState } from "react";
 import { ShoppingCart, MessageCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -131,18 +132,26 @@ export default function EnterpriseProductCard({
               ) : null}
 
               {Array.isArray(product?.keySpecifications) &&
-              product.keySpecifications.length > 0 ? (
-                <ul className="ml-5 list-disc space-y-1 text-sm text-slate-600">
-                  {product.keySpecifications
-                    .slice(0, 3)
-                    .map((spec: any, idx: number) => (
-                      <li key={spec?.name || spec?.label || idx}>
-                        {(spec?.name || spec?.label || "Spec").toString()}:{" "}
-                        {spec?.value ?? ""}
-                      </li>
-                    ))}
-                </ul>
-              ) : null}
+                product.keySpecifications.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {product.keySpecifications.map(
+                      (spec: any, index: number) => (
+                        <div key={index} className="flex gap-2 text-sm">
+                          <span className="font-medium text-slate-700">
+                            {spec?.specification ||
+                              spec?.category ||
+                              "Specification"}
+                            :
+                          </span>
+
+                          <span className="text-slate-600">
+                            {spec?.value || "-"}
+                          </span>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                )}
 
               {Array.isArray(product?.generalSpecifications) &&
               product.generalSpecifications.length > 0 ? (
@@ -159,9 +168,21 @@ export default function EnterpriseProductCard({
               ) : null}
 
               {product?.productNotes?.trim() ? (
-                <p className="text-xs text-slate-500">
-                  Notes: {product.productNotes}
-                </p>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                  <div className="flex items-start gap-2">
+                    <span className="text-sm">⚠</span>
+
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                        Important Note
+                      </div>
+
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-amber-900">
+                        {product.productNotes}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               ) : null}
 
               {tags.length > 0 ? (
@@ -186,7 +207,8 @@ export default function EnterpriseProductCard({
                 MOQ: {product?.minOrder ?? 1}
               </p>
               <p className="text-xs text-slate-500">
-                Lead time: {leadTime || "TBD"}
+                Lead time:
+                {leadTime?.trim() ? leadTime : "2-5 business days"}
               </p>
             </div>
 

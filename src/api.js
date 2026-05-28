@@ -1,3 +1,4 @@
+//src/utils/api.js
 const normalizeApiBase = (value) => {
   const trimmed = String(value || "").replace(/\/+$/, "");
   if (!trimmed) return "http://localhost:5000/api";

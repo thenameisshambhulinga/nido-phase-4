@@ -1,3 +1,5 @@
+//ShopPage.tsx
+
 import {
   useDeferredValue,
   useEffect,
@@ -19,6 +21,7 @@ import {
 
 import EnterpriseProductCard from "@/components/shop/EnterpriseProductCard";
 import { ProductGridLayout } from "@/components/shared/ProductGridLayout";
+import { mapProduct } from "@/utils/ProductMapper";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +43,7 @@ import {
 import { cn } from "@/lib/utils";
 
 interface ShopProduct {
+  publicationStatus: string;
   id: string;
   sku: string;
   name: string;
@@ -134,87 +138,62 @@ export default function ShopPage() {
   const deferredSearch = useDeferredValue(search);
 
   const products = useMemo<ShopProduct[]>(() => {
-    return masterCatalogItems
-      .filter(
-        (item) =>
-          !!item.masterProductId &&
-          !!item.productCode &&
-          !!item.name &&
-          !!item.category &&
-          item.productStatus !== "draft",
-      )
-      .map((item) => {
-        const vendorInventory = item.vendorInventory || [];
-        const vendorStock = vendorInventory.reduce(
-          (sum, v) => sum + (Number(v.quantity) || 0),
-          0,
-        );
+    return masterCatalogItems.map((item) => {
+      const mapped = mapProduct(item);
+      const category = mapped.category;
+      const title = mapped.title;
 
-        const stock =
-          item.status === "Out of Stock"
-            ? 0
-            : vendorStock > 0
-              ? vendorStock
-              : item.initialStock || 0;
+      return {
+        id: mapped.id || item?.masterProductId || "",
+        sku: mapped.productCode,
+        name: title,
+        publicationStatus: mapped.publicationStatus as any,
+        minOrder: Number(mapped.moq || 1) || 1,
+        category: category,
+        subCategory: mapped.subcategory || "General",
+        brand: mapped.brand || "",
+        price: mapped.price || 0,
+        emoji: getProductEmoji(category, title),
+        image: getProductImage({
+          category,
+          image: item?.image || mapped.images?.[0] || "",
+        }),
+        description: (mapped.description || "").trim(),
+        warranty: mapped.warranty || "",
+        leadTime: mapped.leadTime,
 
-        const leadTime =
-          (item.leadTime && String(item.leadTime).trim()) ||
-          vendorInventory.find((v) => (v.leadTime || "").trim())?.leadTime ||
-          "";
+        productNotes: mapped.notes,
 
-        // keySpecifications/generalSpecifications may be persisted either as
-        // explicit arrays or via legacy fields (specAttributes/specification).
-        const keySpecifications = (item as any).keySpecifications || []; // preferred shape: [{name,value}]
-        const generalSpecifications = (item as any).generalSpecifications || []; // preferred shape: [{name,value}]
+        tags: mapped.tags,
+        images: mapped.images,
+        vendorInventory: mapped.vendorInventory as any,
+        keySpecifications: mapped.keySpecifications as any,
+        generalSpecifications: mapped.generalSpecifications as any,
 
-        // If legacy shape exists as specification, fall back to empty (no placeholders).
-        const images =
-          ((item as any).images as string[] | undefined) || item.image
-            ? [item.image].filter(Boolean) // at least one image fallback is acceptable (media placeholder)
-            : [];
-
-        return {
-          id: item.id || item.masterProductId!,
-          sku: item.productCode,
-          name: item.name,
-          minOrder: Number((item as any).minOrder || 1) || 1,
-          category: item.category,
-          subCategory: item.subCategory || "General",
-          brand: item.brand || "",
-          price: Number(item.price) || 0,
-          emoji: getProductEmoji(item.category, item.name),
-          image: getProductImage({
-            category: item.category,
-            image: item.image,
-          }),
-          description: (item.description || "").trim(),
-          warranty: item.warranty || "",
-          leadTime,
-
-          productNotes: item.productNotes,
-
-          tags: item.tags || [],
-          images,
-          vendorInventory: vendorInventory as any,
-          keySpecifications,
-          generalSpecifications,
-
-          status: normalizeStatus(item.status),
-          stock,
-        };
-      });
+        status: normalizeStatus(mapped.inventoryStatus),
+        stock: mapped.stock,
+      };
+    });
   }, [masterCatalogItems]);
+
+  const visibleProducts = useMemo(
+    () =>
+      products.filter((product) => product.publicationStatus === "published"),
+    [products],
+  );
 
   const categories = useMemo(() => {
     return Array.from(
-      new Set(products.map((product) => product.category).filter(Boolean)),
+      new Set(
+        visibleProducts.map((product) => product.category).filter(Boolean),
+      ),
     ).sort((left, right) => left.localeCompare(right));
-  }, [products]);
+  }, [visibleProducts]);
 
   const filtered = useMemo(() => {
     const term = deferredSearch.trim().toLowerCase();
 
-    const result = products.filter((product) => {
+    const result = visibleProducts.filter((product) => {
       const searchMatch =
         !term ||
         product.name.toLowerCase().includes(term) ||
@@ -229,13 +208,13 @@ export default function ShopPage() {
     });
 
     return result;
-  }, [products, deferredSearch, category]);
+  }, [visibleProducts, deferredSearch, category]);
 
   const suggestions = useMemo(() => {
     const term = deferredSearch.trim().toLowerCase();
     if (!term) return [];
 
-    return products
+    return visibleProducts
       .map((product) => {
         const haystack = [
           product.name,
@@ -260,7 +239,7 @@ export default function ShopPage() {
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
       .map((entry) => entry.product);
-  }, [products, deferredSearch]);
+  }, [visibleProducts, deferredSearch]);
 
   useEffect(() => {
     setPage(1);

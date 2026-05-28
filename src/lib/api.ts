@@ -1,3 +1,4 @@
+//api.ts
 const getAPIBase = (): string => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL.replace(/\/+$/, "");
@@ -26,46 +27,59 @@ type RequestOptions = Omit<RequestInit, "body"> & {
 
 export const apiBaseUrl = API_BASE;
 
-export async function apiRequest<T>(
-  path: string,
+export async function apiRequest<T = unknown>(
+  endpoint: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { body, headers, ...rest } = options;
-  const normalizedPath = path.startsWith("http")
-    ? path
-    : path.startsWith("/api/")
-      ? path
-      : path.startsWith("/")
-        ? `/api${path}`
-        : `/api/${path}`;
-  const authToken =
-    typeof localStorage !== "undefined"
-      ? localStorage.getItem("nido_auth_token")
-      : null;
-  const response = await fetch(`${API_BASE}${normalizedPath}`, {
-    ...rest,
-    headers: {
-      "Content-Type": "application/json",
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      ...(headers || {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  const token =
+    localStorage.getItem("nido_auth_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("authToken") ||
+    localStorage.getItem("accessToken");
 
-  let payload: any = null;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
+  const headers = new Headers(options.headers || {});
+
+  headers.set("Content-Type", "application/json");
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
+
+  const requestBody =
+    options.body === undefined
+      ? undefined
+      : typeof options.body === "string"
+        ? options.body
+        : JSON.stringify(options.body);
+
+  const response = await fetch(
+    `${
+      import.meta.env.VITE_API_URL || "https://nido-backend-iztc.onrender.com"
+    }${endpoint}`,
+    {
+      ...options,
+      headers,
+      credentials: "include",
+      body: requestBody,
+    },
+  );
 
   if (!response.ok) {
-    throw new Error(
-      payload?.error ||
-        payload?.message ||
-        `Request failed: ${response.status} ${response.statusText}`,
-    );
+    let errorMessage = "Request failed";
+
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData?.error || errorData?.message || errorMessage;
+    } catch {}
+
+    if (response.status === 401) {
+      throw new Error("Authentication required");
+    }
+
+    console.error("API ERROR RESPONSE:", response.status, errorMessage);
+
+    throw new Error(errorMessage);
   }
 
-  return (payload?.data ?? payload) as T;
+  return response.json();
 }
